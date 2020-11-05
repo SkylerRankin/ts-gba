@@ -1,3 +1,3 @@
 ### ARM Emulator
 
-A JavaScript emulator for ARM instruction sets.
+A TypeScript emulator for ARM instruction sets.
