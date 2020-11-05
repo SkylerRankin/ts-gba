@@ -1,0 +1,26 @@
+@import "variables.scss";
+
+body {
+    background-color: $mainBlue;
+    height: 100%;
+    margin: 0px;
+}
+
+.app {
+    font-family: $mono;
+    display: flex;
+    flex-flow: column;
+    height: 100vh;
+
+    .container {
+        padding: 20px;
+        display: flex;
+        flex-flow: column;
+        height: 100%;
+
+        .title {
+            color: $white;
+        }
+
+    }
+}

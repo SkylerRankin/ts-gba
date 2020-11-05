@@ -1,0 +1,35 @@
+@import 'variables.scss';
+
+.editor {
+    color: $white;
+    display: flex;
+    flex: 1 1 auto;
+    flex-flow: column;
+    width: 30%;
+    min-width: 400px;
+    height: 100px;
+    border: solid 1px white;
+    overflow-y: scroll;
+
+    .editorLine {
+        display: flex;
+
+        .lineNumber {
+            width: 35px;
+            user-select: none;
+        }
+        .lineContent {
+            flex: 1;
+        }
+    }
+
+    .row:hover {
+        .lineNumber {
+            color: $white;
+        }
+        .lineText {
+            background-color: $darkBlue;
+        }
+    }
+
+}

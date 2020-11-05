@@ -1,0 +1,15 @@
+// Colors
+$mainBlue: #47afd1;
+$mediumBlue: #4798d1;
+$darkBlue: #327e96;
+$mainGreen: #47d192;
+$white: #fff;
+
+// Fonts
+
+@font-face {
+    font-family: 'SourceCodePro';
+    src: url('../fonts/Source_Code_Pro/SourceCodePro-Black.ttf') format('truetype')
+}
+
+$mono: 'SourceCodePro', monospace;
