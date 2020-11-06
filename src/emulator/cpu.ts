@@ -1,4 +1,4 @@
-import { compileInstruction } from './compiler';
+import { assembleInstruction } from './assembler';
 
 /**
  * A simulator for a CPU that implements the ARM ISA.
@@ -28,7 +28,7 @@ class CPU implements CPUType {
     loadProgramFromText(program: string[]) : void {
         this.rom = [];
         program.forEach((instruction: string) => {
-            const i = compileInstruction(instruction);
+            const i = assembleInstruction(instruction);
             console.log(`${instruction}    ${i}: ${i.toString(2)}`);
             this.rom.push(i);
         });

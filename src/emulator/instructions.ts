@@ -1,4 +1,8 @@
-type InstructionType = 'adc' | 'add' | 'undefined';
+type InstructionType =
+    'adc' | 'add' | 'and' | 'b' | 'bl' | 'bic' | 'bkpt' | 'blx' | 'bx' | 'cdp' | 'clz' | 'cmn' | 'cmp' | 'eor' |
+    'ldc' | 'ldm' | 'ldr' | 'ldrb' | 'ldrbt' | 'ldrh' | 'ldrsb' | 'ldrsh' | 'ldrt' | 'mcr' | 'mla' | 'mov' | 'mrc' |
+    'mrs' | 'msr' | 'mul' | 'mvn' | 'orr' | 'rsb' | 'rsc' | 'sbc' | 'smlal' | 'smull' | 'stc' | 'stm' | 'str' |
+    'strb' | 'strbt' | 'strh' | 'strt' | 'sub' | 'swi' | 'swp' | 'swpb' | 'teq' | 'tst' | 'umlal' | 'umull';
 
 type InstructionData = {
     type: InstructionType,              // The instruction type
