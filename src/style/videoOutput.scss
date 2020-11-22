@@ -1,0 +1,14 @@
+.videoOutput {
+    grid-column-start: 4;
+    grid-column-end: 5;
+    grid-row-start: 3;
+    grid-row-end: 4;
+
+    canvas {
+        display: block;
+        width: 256px;
+        margin: auto;
+        margin-top: 10px;
+    }
+
+}

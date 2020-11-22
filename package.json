@@ -11,24 +11,27 @@
     "@types/jest": "^26.0.15",
     "@types/long": "^4.0.1",
     "@types/node": "^14.14.6",
-    "@types/react": "^16.9.55",
+    "@types/react": "^17.0.0",
     "@types/react-dom": "^16.9.9",
+    "babel-loader": "^8.2.1",
     "draft-js": "^0.11.7",
+    "html-webpack-plugin": "^4.5.0",
     "long": "^4.0.0",
     "node-sass": "^4.14.1",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-redux": "^7.2.2",
-    "react-scripts": "4.0.0",
+    "react-scripts": "^4.0.0",
     "react-use-keypress": "^1.1.0",
     "redux": "^4.0.5",
+    "ts-loader": "^8.0.11",
     "typescript": "^4.0.5"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "webpack serve",
+    "build": "webpack --watch --mode development",
+    "build-prod": "webpack --mode production",
+    "test": "jest"
   },
   "eslintConfig": {
     "extends": [
@@ -47,5 +50,14 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "file-loader": "^6.2.0",
+    "sass-loader": "^10.1.0",
+    "ts-jest": "^26.4.4",
+    "ttf-loader": "^1.0.2",
+    "webpack-cli": "^4.2.0",
+    "worker-loader": "^3.0.5",
+    "workerize-loader": "^1.3.0"
   }
 }

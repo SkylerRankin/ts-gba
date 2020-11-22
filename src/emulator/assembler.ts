@@ -3,9 +3,11 @@ import { encodeWithRotation } from './math';
 
 const assembleInstruction = (line:string) : number => {
     let i = 1;
+
     while (!Object.keys(Instruction).includes(line.toUpperCase().substring(0, i)) && i < 6) i++;
-    while (Object.keys(Instruction).includes(line.substring(0, i + 1))) i++;
+    while (Object.keys(Instruction).includes(line.substring(0, i + 1)) && i < line.length) i++;
     const name: InstructionType = line.substring(0, i).toLowerCase() as InstructionType;
+
     switch (name) {
         case 'adc': return assembleAdc(line);
         case 'add': return assembleAdd(line);
