@@ -13,7 +13,7 @@ interface EditorState {
 }
 
 const preloadedStates = {
-    'test': ['ADD R0, R0, #1', 'ADD R1, R1, #2', 'ADD R2, R0, R2', 'ADD R3, R1, R2'].join('\n')
+    'test': ['ADD R0, R0, #1', 'SUB R1, R1, #2', 'ADD R2, R0, R2', 'SUB R3, R1, R2'].join('\n')
 };
 
 function findWithRegex(regex: RegExp, callback: any, contentBlock: ContentBlock) {

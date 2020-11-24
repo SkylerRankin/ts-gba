@@ -1,4 +1,4 @@
-import { CPU } from '../emulator/cpu';
+import { CPU } from '../../emulator/cpu';
 
 const cpu = new CPU();
 console.log('CPU Worker Initialized...', cpu);

@@ -37,10 +37,11 @@ module.exports = {
         loader: 'ts-loader'
       },
       {
-        test: /\.scss$/,
+        test: /\.s?css$/,
         loaders: ['style-loader', 'css-loader', 'sass-loader'],
         include: [
-          path.resolve(__dirname, 'src/style')
+          path.resolve(__dirname, 'src/ui/style'),
+          path.resolve(__dirname, 'node_modules/react-tabs/style/react-tabs.css')
         ]
       },
       {
@@ -49,6 +50,14 @@ module.exports = {
         options: {
           name: './font/[hash].[ext]',
         }
+      },
+      {
+        test: /\.png$/,
+        loader: 'file-loader',
+        options: {
+          name: './image/[hash].[ext]',
+        },
+        include: [ path.resolve(__dirname, 'src/res/images') ]
       }
     ]
   }

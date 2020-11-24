@@ -1,1 +1,0 @@
-export const EDITOR_KEY_PRESS: string = 'Editor Key Press';

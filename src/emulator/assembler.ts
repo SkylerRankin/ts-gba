@@ -1,5 +1,10 @@
 import { Instruction, InstructionType, ConditionCodeType, ConditionCodeValue, ShiftOperandData, DataProcessingOperandValue } from './instructions';
 import { encodeWithRotation } from './math';
+import { CPU } from './cpu';
+
+const assembleAndLoadProgram = (lines: string[], cpu: CPU) => {
+    
+}
 
 const assembleInstruction = (line:string) : number => {
     let i = 1;
@@ -129,7 +134,7 @@ const assembleAdc = (s: string) : number => {
 const assembleAdd = (s: string) : number => {
     const regex = /^add(\w{2})?(s)? r(\d+), r(\d+), ([\w,\s#]+)$/;
     const m = regex.exec(s.toLowerCase().trim());
-    if (!m) { throw `Failed to parse ${s}`; }
+    if (!m) { throw `Assembler: Failed to parse ${s}`; }
 
     const condition = m[1] as ConditionCodeType || 'al';
     const sFlag = m[2] ? '1' : '0';
@@ -137,7 +142,7 @@ const assembleAdd = (s: string) : number => {
     const rn = parseInt(m[4]).toString(2).padStart(4, '0');
     const shiftOperandData: ShiftOperandData = parseShiftOperand(m[5]);
     const [iFlag, shiftOperandString] = shiftOperandToString(shiftOperandData);
-    let bitString = ConditionCodeValue[condition.toUpperCase()] + '00' + iFlag + '0100' + sFlag + rn + rd + shiftOperandString;
+    const bitString = ConditionCodeValue[condition.toUpperCase()] + '00' + iFlag + '0100' + sFlag + rn + rd + shiftOperandString;
     return parseInt(bitString, 2);
 }
 
@@ -146,7 +151,17 @@ const assembleAnd = (s: string) : number => {
 }
 
 const assembleB_Bl = (s: string) : number => {
-    return 0;
+    const regex = /^b(l)?(\w{2})? #([a-z0-9]+)$/;
+    const m = regex.exec(s.toLowerCase().trim());
+    if (!m) { throw `Assembler: Failed to parse ${s}` }
+
+    const lFlag = m[1] ? '1' : '0';
+    const condition = m[2] as ConditionCodeType || 'al';
+    const imm = parseInt(m[3]).toString(2).padStart(24, '0');;
+    
+    const bitString = ConditionCodeValue[condition.toUpperCase()] + '101' + lFlag + imm;
+    console.log(bitString);
+    return parseInt(bitString, 2);
 }
 
 const assembleBic = (s: string) : number => {

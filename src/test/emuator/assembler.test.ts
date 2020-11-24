@@ -7,6 +7,14 @@ test('assemble ADD', () => {
     expect(assembleInstruction('addls r1, r2, #0xA')).toBe(2457997322);
 });
 
+test('assemble B/BL', () => {
+    expect(assembleInstruction('b #256')).toBe(0xea00003e);
+    expect(assembleInstruction('bl #2')).toBe(0xebfffffe);
+    expect(assembleInstruction('beq #0xFF0')).toBe(0x0a0003fa);
+    expect(assembleInstruction('bgt #0xC000')).toBe(0xca002ffe);
+    expect(assembleInstruction('bllt #0xB040')).toBe(0xbb002c0e);
+});
+
 test('assemble SUB', () => {
     expect(assembleInstruction('sub r0, r1, #10')).toBe(3795910666);
     expect(assembleInstruction('subeq r2, r7, #2684354564')).toBe(38216266);

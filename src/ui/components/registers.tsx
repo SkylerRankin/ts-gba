@@ -24,12 +24,14 @@ class Registers extends Component<any, RegistersProps> {
                             this.props.values.slice(0, Math.ceil(this.props.values.length / 2)).map((value: number, i: number) => {
                                 const name = Object.keys(names).includes(i.toString()) ? names[i.toString()] : '';
                                 const name2 = Object.keys(names).includes((i + 9).toString()) ? names[(i + 9).toString()] : '';
+                                const value1 = value >>> 0;
+                                const value2 =  this.props.values[i + 8] >>> 0;
                                 return (
                                     <tr>
                                         <td className='registerName'>{`${i} ${name}`}</td>
-                                        <td>0x{value.toString(16).padStart(8, '0')}</td>
+                                        <td>0x{value1.toString(16).padStart(8, '0')}</td>
                                         { (i + 8 < this.props.values.length) &&  <td className='registerName'>{`${i + 8 + 1} ${name2}`}</td> }
-                                        { (i + 8 < this.props.values.length) && <td>0x{this.props.values[i + 8].toString(16).padStart(8, '0')}</td> }
+                                        { (i + 8 < this.props.values.length) && <td>0x{value2.toString(16).padStart(8, '0')}</td> }
                                     </tr>
                                 )
                             })

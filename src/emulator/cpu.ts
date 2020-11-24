@@ -13,18 +13,19 @@ type CPUType = {
     loadProgramFromText: (program: string[]) => void,
     reset: () => void,
     step: () => void,
-    atBreakpoint: () => boolean
+    atBreakpoint: () => boolean,
+    updateStatusRegister: (update: StatusRegisterUpdate) => void
 }
 
 type StatusRegisterUpdate = {
-    n?: number,
-    z?: number,
-    c?: number,
-    v?: number,
-    q?: number,
-    i?: number,
-    f?: number,
-    t?: number
+    n?: boolean,
+    z?: boolean,
+    c?: boolean,
+    v?: boolean,
+    q?: boolean,
+    i?: boolean,
+    f?: boolean,
+    t?: boolean
 }
 
 // Keys for the named registers.
@@ -84,13 +85,13 @@ class CPU implements CPUType {
 
     updateStatusRegister(update: StatusRegisterUpdate) : void {
         const keys : (keyof StatusRegisterUpdate)[] = ['n', 'z', 'c', 'v', 'q', 'i', 'f', 't'];
-        const setMasks : number[] = [0];
-        const clearMasks : number[] = [0];
+        const setMasks : number[] = [0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x8000000, 0x80, 0x40, 0x20];
+        const clearMasks : number[] = setMasks.map((mask: number) => ~mask);
         let newStatus = this.statusRegisters[0];
 
         keys.forEach((key: keyof StatusRegisterUpdate, i: number) => {
-            if (update[key] === 1) newStatus |= setMasks[i];
-            if (update[key] === 0) newStatus &= clearMasks[i];
+            if (update[key]) newStatus |= setMasks[i];
+            else newStatus &= clearMasks[i];
         });
 
         this.statusRegisters[0] = newStatus;
@@ -99,4 +100,4 @@ class CPU implements CPUType {
 }
 
 export { CPU }
-export type { CPUType }
+export type { CPUType, StatusRegisterUpdate }

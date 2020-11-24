@@ -8,35 +8,80 @@ const process = (cpu: CPU, i: number) : void => {
 }
 
 const processDataProcessing = (cpu: CPU, i: number) : void => {
-    const opcode = (i >> 21) & 0x4;
+    const opcode = (i >>> 21) & 0xF;
+    const sFlag = (i >>> 20) & 0x1;
+    const iFlag = (i >>> 25) & 0x1;
+    const rn = (i >>> 16) & 0xF;
+    const rd = (i >>> 12) & 0xF;
+
+    const value1 = cpu.generalRegisters[rn];
+    const value2 = getShiftOperandValue(cpu, i, iFlag);
+    let result: number = 0;
     switch(opcode) {
-        case 0b0100: return processAdd(cpu, i);
+        case 0b0100: result = processAdd(cpu, value1, value2, rd); break;
+        case 0b0010: result = processSub(cpu, value1, value2, rd); break;
+    }
+
+    if (sFlag) {
+        if (result === 0) {
+            cpu.updateStatusRegister({z: true});
+        } else if (result < 0) {
+            cpu.updateStatusRegister({n: true});
+        } else {
+            cpu.updateStatusRegister({});
+        }
     }
 }
 
-const processAdd = (cpu: CPU, i: number) : void => {
-    const rn = (i >>> 16) & 0xF;
-    const rd = (i >>> 12) & 0xF;
-    const immediate = ((i >> 25) & 0x1) === 1;
-    const shiftOpcode = (i >>> 3) & 0x7;
-    const data = (i >>> 6) & 0x1F;
-    let op2 = 0;
-    if (immediate) {
-        const rotate = (i >> 8) & 0xF;
+const getShiftOperandValue = (cpu: CPU, i: number, iFlag: number) : number => {
+    if (iFlag) {
+        const rotate = (i >>> 8) & 0xF;
         const imm = i & 0xFF;
-        op2 = rotateRight(imm, rotate * 2, 32);
-    } else if (shiftOpcode === 0 && data === 0) {
-        const rm = i & 0xF;
-        op2 = cpu.generalRegisters[rm];
+        return rotateRight(imm, rotate * 2, 32);
     } else {
-        console.log('instructionProcessor.processAdd: unsupported shift operand');
+        const rm = i & 0xF;
+        const shiftType = (i >>> 5) & 0x3;
+        // 4th bit is 0 for immediate shifts, 1 for register shifts.
+        const shiftOpcode = (i >>> 4) & 0x1;
+        let shiftAmount = 0;
+        if (shiftOpcode === 1) {
+            // Rm shifted by register value
+            const rs = (i >>> 8) && 0xF;
+            shiftAmount = cpu.generalRegisters[rs];
+        } else {
+            // Rm shifted by immediate value
+            const imm = (i >>> 7) & 0x1F;
+            shiftAmount = imm;
+        }
+
+        switch (shiftType) {
+            case 0x0:
+                // Logical shift left
+                return cpu.generalRegisters[rm] << shiftAmount;
+            case 0x1:
+                // Logical shift right
+                return cpu.generalRegisters[rm] >>> shiftAmount;
+            case 0x2:
+                // Arithmetic shift right
+                return cpu.generalRegisters[rm] >> shiftAmount;
+            case 0x3:
+                // Rotate right
+                return rotateRight(cpu.generalRegisters[rm], shiftAmount, 32);
+            default:
+                console.log(`InstructionProcessor.getShiftOperandValue: illegal shiftType ${shiftType} from instruction ${i}`);
+                return 0;
+        }
     }
+}
 
-    const op1 = cpu.generalRegisters[rn];
-    const result = op1 + op2;
-    cpu.generalRegisters[rd] = result;
+const processAdd = (cpu: CPU, value1: number, value2: number, rd: number) : number => {
+    cpu.generalRegisters[rd] = value1 + value2;
+    return cpu.generalRegisters[rd];
+}
 
-    console.log(`Processing ADD: ${op1} + ${op2} = ${result}`);
+const processSub = (cpu: CPU, value1: number, value2: number, rd: number) : number => {
+    cpu.generalRegisters[rd] = value1 - value2;
+    return cpu.generalRegisters[rd];
 }
 
 export { process }
