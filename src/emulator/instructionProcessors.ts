@@ -1,5 +1,5 @@
 import { CPU } from './cpu';
-import { rotateRight } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight } from './math';
 
 const process = (cpu: CPU, i: number) : void => {
     // Data processing instructions
@@ -14,22 +14,12 @@ const processDataProcessing = (cpu: CPU, i: number) : void => {
     const rn = (i >>> 16) & 0xF;
     const rd = (i >>> 12) & 0xF;
 
-    const value1 = cpu.generalRegisters[rn];
+    const value1 = cpu.getGeneralRegister(rn);
     const value2 = getShiftOperandValue(cpu, i, iFlag);
     let result: number = 0;
     switch(opcode) {
-        case 0b0100: result = processAdd(cpu, value1, value2, rd); break;
-        case 0b0010: result = processSub(cpu, value1, value2, rd); break;
-    }
-
-    if (sFlag) {
-        if (result === 0) {
-            cpu.updateStatusRegister({z: true});
-        } else if (result < 0) {
-            cpu.updateStatusRegister({n: true});
-        } else {
-            cpu.updateStatusRegister({});
-        }
+        case 0b0100: result = processAdd(cpu, value1, value2, rd, sFlag); break;
+        case 0b0010: result = processSub(cpu, value1, value2, rd, sFlag); break;
     }
 }
 
@@ -46,8 +36,8 @@ const getShiftOperandValue = (cpu: CPU, i: number, iFlag: number) : number => {
         let shiftAmount = 0;
         if (shiftOpcode === 1) {
             // Rm shifted by register value
-            const rs = (i >>> 8) && 0xF;
-            shiftAmount = cpu.generalRegisters[rs];
+            const rs = (i >>> 8) & 0xF;
+            shiftAmount = cpu.getGeneralRegister(rs);
         } else {
             // Rm shifted by immediate value
             const imm = (i >>> 7) & 0x1F;
@@ -57,16 +47,16 @@ const getShiftOperandValue = (cpu: CPU, i: number, iFlag: number) : number => {
         switch (shiftType) {
             case 0x0:
                 // Logical shift left
-                return cpu.generalRegisters[rm] << shiftAmount;
+                return logicalShiftLeft(cpu.getGeneralRegister(rm), shiftAmount);
             case 0x1:
                 // Logical shift right
-                return cpu.generalRegisters[rm] >>> shiftAmount;
+                return logicalShiftRight(cpu.getGeneralRegister(rm), shiftAmount);
             case 0x2:
                 // Arithmetic shift right
-                return cpu.generalRegisters[rm] >> shiftAmount;
+                return arithmeticShiftRight(cpu.getGeneralRegister(rm), shiftAmount);
             case 0x3:
                 // Rotate right
-                return rotateRight(cpu.generalRegisters[rm], shiftAmount, 32);
+                return rotateRight(cpu.getGeneralRegister(rm), shiftAmount, 32);
             default:
                 console.log(`InstructionProcessor.getShiftOperandValue: illegal shiftType ${shiftType} from instruction ${i}`);
                 return 0;
@@ -74,14 +64,40 @@ const getShiftOperandValue = (cpu: CPU, i: number, iFlag: number) : number => {
     }
 }
 
-const processAdd = (cpu: CPU, value1: number, value2: number, rd: number) : number => {
-    cpu.generalRegisters[rd] = value1 + value2;
-    return cpu.generalRegisters[rd];
+const processAdd = (cpu: CPU, value1: number, value2: number, rd: number, sFlag: number) : number => {
+    cpu.updateGeneralRegister(rd, (value1 + value2) & 0xFFFFFFFF);
+    const result = cpu.getGeneralRegister(rd);
+    if (sFlag) {
+        cpu.clearConditionCodeFlags();
+        if (result === 0) cpu.setConditionCodeFlags('z');
+        if (result < 0) cpu.setConditionCodeFlags('n');
+        // Unsigned overflow
+        if (result >= 2**32 - 1) cpu.setConditionCodeFlags('c');
+        // Signed overflow
+        const resultMSB = result >>> 31, value1MSB = value1 >>> 31 , value2MSB = value2 >>> 31;
+        if ((resultMSB && !value1MSB && !value2MSB) || (!resultMSB && value1MSB && value2MSB)) {
+            cpu.setConditionCodeFlags('v');
+        }
+    }
+    return result;
 }
 
-const processSub = (cpu: CPU, value1: number, value2: number, rd: number) : number => {
-    cpu.generalRegisters[rd] = value1 - value2;
-    return cpu.generalRegisters[rd];
+const processSub = (cpu: CPU, value1: number, value2: number, rd: number, sFlag: number) : number => {
+    cpu.updateGeneralRegister(rd, value1 - value2);
+    const result = cpu.getGeneralRegister(rd);
+    if (sFlag) {
+        cpu.clearConditionCodeFlags();
+        if (result === 0) cpu.setConditionCodeFlags('z');
+        if (result < 0) cpu.setConditionCodeFlags('n');
+        // Unsigned overflow
+        if (result < 2**32 - 1) cpu.setConditionCodeFlags('c');
+        // Signed overflow
+        const resultMSB = result >>> 31, value1MSB = value1 >>> 31 , value2MSB = value2 >>> 31;
+        if ((resultMSB && !value1MSB && !value2MSB) || (!resultMSB && value1MSB && value2MSB)) {
+            cpu.setConditionCodeFlags('v');
+        }
+    }
+    return result;
 }
 
 export { process }
