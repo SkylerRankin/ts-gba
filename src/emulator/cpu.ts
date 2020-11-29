@@ -67,16 +67,6 @@ const BankedRegisters = {
 type StatusRegister = 'CPSR' | 'SPSR';
 type StatusRegisterKey = 'n' | 'z' | 'c' | 'v' | 'q' | 'i' | 'f' | 't';
 type StatusRegisterUpdate = StatusRegisterKey[];
-// type StatusRegisterUpdate = {
-//     n?: boolean,
-//     z?: boolean,
-//     c?: boolean,
-//     v?: boolean,
-//     q?: boolean,
-//     i?: boolean,
-//     f?: boolean,
-//     t?: boolean
-// }
 
 class CPU implements CPUType {
     rom = [] as number[];
@@ -118,8 +108,11 @@ class CPU implements CPUType {
 
     step() : void {
         const pc = this.getGeneralRegister(Reg.PC);
-        // ROM is stored as array of 32-bit words, so each instruction is index by the byte address / 4.
-        const instruction = this.rom[(pc - 8) / 4];
+        // PC points to the instruction after the next instruction, so we subtract 8 bytes.
+        let instruction = 0;
+        for (let i = 0; i < 4; i++) {
+            instruction += this.rom[pc - 8 + i] << ((3 - i) * 8);
+        }
         const condition = instruction >> 27;
         if (this.conditionIsMet(condition)) {
             process(this, instruction);
