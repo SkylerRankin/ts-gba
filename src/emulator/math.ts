@@ -8,21 +8,29 @@ const rotateLeft = (n: number, r: number, bits: number) : number => {
     return ((n << r) | (n >> (bits - r))) & (Math.pow(2, bits) - 1);
 }
 
-const logicalShiftRight = (n: number, s: number) : number => {
-    if (s >= 32) return 0;
-    return n >>> s;
+// Returns [value, carry out]
+const logicalShiftRight = (n: number, s: number) : number[] => {
+    if (s > 32) return [0, 0];
+    if (s === 32) return [0, (n >>> 31) & 0x1];
+    return [n >>> s, (n >>> (s - 1)) & 0x1];
 }
 
-const arithmeticShiftRight = (n: number, s: number) : number => {
-    if (s >= 32) return n < 0 ? -1 : 0;
-    return n >> s;
+// Returns [value, carry out]
+const arithmeticShiftRight = (n: number, s: number) : number[] => {
+    const carry = (n >> (s - 1)) & 0x1;
+    if (s > 32) return [n < 0 ? -1 : 0, n < 0 ? 1 : 0];
+    if (s === 32) return n < 0 ? [-1, carry] : [0, carry];
+    return [n >> s, carry];
 }
 
-const logicalShiftLeft = (n: number, s: number) : number => {
-    return n << s;
+// Returns [value, carry out]
+const logicalShiftLeft = (n: number, s: number) : number[] => {
+    if (s > 32) return [0, 0];
+    if (s === 32) return [0, n & 0x1];
+    return [n << s, (n >>> (32 - s)) & 0x1];
 }
 
-// Converts an number n into values r and i such that n = i >> 2r. This operation (>>) is a right rotation.
+// Converts a number n into values r and i such that n = i >> 2r. This operation (>>) is a right rotation.
 // The bitwise sizes of n, r, and i are restricted by bits, rotBits, and immBits respectively.
 // Returns an array [rotation, immediate].
 function encodeWithRotation(n: any | number | string | Long, bits:number, rotBits: number, immBits: number) : number[] {

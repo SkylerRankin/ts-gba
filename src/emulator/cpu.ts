@@ -12,6 +12,7 @@ type CPUType = {
     statusRegisters: number[][],
     operatingMode: number,
     operatingState: OperatingState,
+    history: string[],
     loadProgramFromText: (program: string[]) => void,
     reset: () => void,
     step: () => void,
@@ -19,11 +20,19 @@ type CPUType = {
     updateStatusRegister: (update: StatusRegisterUpdate) => void
     getStatusRegister: (reg: StatusRegister) => number,
     updateGeneralRegister: (reg: number, value: number) => void
-    getGeneralRegister: (reg: number) => number
+    getGeneralRegister: (reg: number) => number,
+    pushToHistory: (v: string) => void
 }
 
-// Operating Modes; an index 0-6 stores the current mode
-const OperatingModeCodes = [0b10000, 0b10001, 0b10010, 0b10011, 0b10111, 0b11011, 0b11111];
+const OperatingModeCodes = {
+    'usr': 0b10000,
+    'fiq': 0b10001,
+    'irq': 0b10010,
+    'svc': 0b10011,
+    'abt': 0b10111,
+    'sys': 0b11011,
+    'und': 0b11111
+};
 const OperatingModeNames = ['usr', 'fiq', 'irq', 'svc', 'abt', 'sys', 'und'];
 type OperatingMode = 'usr' | 'fiq' | 'irq' | 'svc' | 'abt' | 'sys' | 'und';
 // CPSR[5] = 1 for Thumb, 0 for ARM
@@ -74,6 +83,7 @@ class CPU implements CPUType {
     statusRegisters = [] as number[][];
     operatingMode = 0;
     operatingState = 'ARM' as OperatingState;
+    history = [] as string[];
 
     constructor() {
         for (let i = 0; i < 7; i++) {
@@ -110,16 +120,15 @@ class CPU implements CPUType {
         const pc = this.getGeneralRegister(Reg.PC);
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
         let instruction = 0;
-        for (let i = 0; i < 4; i++) {
-            instruction += this.rom[pc - 8 + i] << ((3 - i) * 8);
+        const instructionSize = this.operatingState === 'ARM' ? 4 : 2;
+        for (let i = 0; i < instructionSize; i++) {
+            instruction += this.rom[pc - 8 + i] << ((instructionSize - 1 - i) * 8);
         }
         const condition = instruction >> 27;
         if (this.conditionIsMet(condition)) {
             process(this, instruction);
         }
-
-        if (this.operatingState === 'ARM') this.updateGeneralRegister(Reg.PC, pc + 4);
-        else this.updateGeneralRegister(Reg.PC, pc + 2);
+        this.updateGeneralRegister(Reg.PC, pc + instructionSize);
     }
 
     /**
@@ -129,9 +138,10 @@ class CPU implements CPUType {
         this.rom = [];
         this.generalRegisters.fill(new Array<number>(16).fill(0), 0, this.generalRegisters.length);
         this.statusRegisters.fill(new Array<number>(2).fill(0), 0, this.generalRegisters.length);
-        this.setModeBits(OperatingModeCodes[0]);
+        this.setModeBits(OperatingModeCodes.usr);
         this.setStateBit(0);
         this.updateGeneralRegister(Reg.PC, 8);
+        this.history = [];
     }
 
     conditionIsMet(condition: number) : boolean {
@@ -151,13 +161,31 @@ class CPU implements CPUType {
         this.statusRegisters[0][0] = cpsr;
     }
 
+    getConditionCodeFlag(flag: 'n' | 'z' | 'c' | 'v') : number {
+        let cpsr = this.getStatusRegister('CPSR');
+        switch (flag) {
+            case 'n': return (cpsr >>> 31) & 0x1;
+            case 'z': return (cpsr >>> 30) & 0x1;
+            case 'c': return (cpsr >>> 29) & 0x1;
+            case 'v': return (cpsr >>> 28) & 0x1;
+        }
+    }
+
     setModeBits(value: number) : void {
-        if (OperatingModeCodes.includes(value)) {
+        if (Object.values(OperatingModeCodes).includes(value)) {
             this.statusRegisters[0][0] &= ~0x1F;
             this.statusRegisters[0][0] |= value;
-            this.operatingMode = OperatingModeCodes.indexOf(value);
+            this.operatingMode = Object.values(OperatingModeCodes).indexOf(value);
         } else {
             throw `Invalid mode bits ${value.toString(2)}`;
+        }
+    }
+
+    cpsrToSPSR() : void {
+        if (this.operatingMode === 0 || this.operatingMode === 5) {
+            // No SPSR in User or System mode, so nothing to copy.
+        } else {
+            this.statusRegisters[0][0] = this.statusRegisters[this.operatingMode][1];
         }
     }
 
@@ -219,7 +247,9 @@ class CPU implements CPUType {
 
     getStateString() : string {
         const modeBits = this.getStatusRegister('CPSR') & 0x1F;
-        const modeName = OperatingModeNames[OperatingModeCodes.indexOf(modeBits)].toUpperCase() || 'ERR';
+        const modeName = Object.values(OperatingModeCodes).includes(modeBits) ?
+            OperatingModeNames[Object.values(OperatingModeCodes).indexOf(modeBits)].toUpperCase() :
+            'ERR';
         const state = (this.getStatusRegister('CPSR') & 0x20) === 0 ? 'ARM' : 'THB';
         let registers = '';
         if (this.operatingState === 'ARM') {
@@ -233,6 +263,10 @@ class CPU implements CPUType {
         const cpsr = this.getStatusRegister('CPSR');
         const nzcv = (cpsr >>> 0).toString(2).padStart(32, '0').slice(0, 4);
         return `${state} ${modeName} NZCV:[${nzcv}] Reg:[${registers}]`;
+    }
+
+    pushToHistory(v: string) : void {
+        this.history.push(v);
     }
 
 }
