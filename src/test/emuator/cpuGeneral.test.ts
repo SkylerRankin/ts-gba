@@ -15,8 +15,8 @@ test('CPU state strings', () => {
     cpu.setStateBit(0);
     cpu.setModeBits(0b11011);
     cpu.updateStatusRegister(['n', 'z', 'c', 'v']);
-    cpu.updateGeneralRegister(0, 0xFF);
-    cpu.updateGeneralRegister(Reg.PC, 0xC000);
+    cpu.setGeneralRegister(0, 0xFF);
+    cpu.setGeneralRegister(Reg.PC, 0xC000);
     let actual = cpu.getStateString();
     expect(actual).toBe(expected);
 
@@ -35,9 +35,9 @@ test('CPU state strings', () => {
     cpu.setStateBit(1);
     cpu.setConditionCodeFlags('z');
     cpu.setModeBits(0b10000);
-    cpu.updateGeneralRegister(0, 0x1F);
-    cpu.updateGeneralRegister(10, 0x999);
-    cpu.updateGeneralRegister(4, 0xC01);
+    cpu.setGeneralRegister(0, 0x1F);
+    cpu.setGeneralRegister(10, 0x999);
+    cpu.setGeneralRegister(4, 0xC01);
 
     actual = cpu.getStateString();
     expect(actual).toBe(expected);

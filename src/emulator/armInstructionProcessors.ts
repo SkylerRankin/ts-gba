@@ -1,5 +1,6 @@
+import { start } from 'repl';
 import { CPU, Reg } from './cpu';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits } from './math';
 
 type DataProcessingFunction = (param: DataProcessingParameter) => number
 type DataProcessingParameter = {
@@ -11,7 +12,7 @@ type DataProcessingParameter = {
     shiftCarry: number
 }
 
-const process = (cpu: CPU, i: number) : void => {
+const processARM = (cpu: CPU, i: number) : void => {
 
     const bits = (i >>> 0).toString(2).padStart(32, '0')
         .split('').map((x: string) : number => parseInt(x)).reverse();
@@ -146,6 +147,7 @@ const processDataProcessing = (cpu: CPU, i: number) : void => {
 }
 
 /**
+ * Addressing Mode 1
  * This returns an array [value, carry].
  * Some instructions set the carry condition flag based on the shifting
  * in the shift operand, so it is returned along with the value.
@@ -203,12 +205,206 @@ const getShiftOperandValue = (cpu: CPU, i: number, iFlag: number) : number[] => 
     return [value, carry];
 }
 
+/**
+ * Addressing Mode 2 and 3
+ * Decodes an address for load and store instructions to access memory.
+ * Relied on register Rn at bits 19:16.
+ * 
+ * Addressing Mode 2
+ * 01 I PUBWL
+ * 01 0 1UB0L - Immediate offset
+ * 01 1 1UB0L - Register offset
+ * 01 1 1UB0L - Scaled register offset
+ * 01 0 1UB1L - Immediate pre-indexed
+ * 01 1 1UB1L - Register pre-index
+ * 01 1 1UB1L - Scaled register pre-indexed
+ * 01 0 0UB0L - Immediate post-indexed
+ * 01 1 0UB0L - Register post-indexed
+ * 01 1 0UB0L - Scaled register post-indexed
+
+ * Addressing Mode 3
+ * 00 0 PUBWL
+ * 00 0 1U10L - Immediate offset
+ * 00 0 1U00L - Register offset
+ * 00 0 1U11L - Immediate pre-indexed
+ * 00 0 1U01L - Register pre-indexed
+ * 00 0 0U10L - Immediate post-indexed
+ * 00 0 0U00L - Register post-indexed
+ * 
+ */
+const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
+    const bits = (i >>> 0).toString(2).padStart(32, '0')
+        .split('').map((x: string) : number => parseInt(x)).reverse();
+    const mode = ((i >>> 26) & 0x3) === 0x1 ? 2 : 3;
+    const p = bits[24];
+    const u = bits[23];
+    const b = bits[22];
+    const w = bits[21];
+    const l = bits[20];
+    const rn = (i >>> 16) & 0xF;
+    const rnValue = cpu.getGeneralRegister(rn);
+    let address = 0;
+
+    if (mode === 2) {
+        const immediate = bits[25] === 0;
+        if (immediate) {
+            const offset = i & 0xFFF;
+            const sign = u === 1 ? 1 : -1;
+            
+            if (p === 1 && w === 0) {
+                // Immediate offset; does not set Rn
+                address = rnValue + sign * offset;
+            } else if (p === 1 && w === 1) {
+                // Immediate pre-indexed
+                address = rnValue + sign * offset;
+                cpu.setGeneralRegister(rn, address);
+            } else if (p === 0 && w === 0) {
+                // Immediate post-indexed
+                address = rnValue;
+                cpu.setGeneralRegister(rn, rnValue + sign * offset);
+            }
+        } else {
+            const sign = u === 1 ? 1 : -1;
+            const shiftImmediate = (i >>> 7) & 0xF;
+            const shiftType = (i >>> 5) & 0x3;
+            const rm = i & 0xF;
+            const rmValue = cpu.getGeneralRegister(rm);
+            const cFlag = 0;
+            let index = 0;
+
+            switch (shiftType) {
+                case 0b00:
+                    // LSL
+                    [index] = logicalShiftLeft(rmValue, shiftImmediate);
+                    break;
+                case 0b01:
+                    // LSR
+                    if (shiftImmediate !== 0) {
+                        [index] = logicalShiftRight(rmValue, shiftImmediate);
+                    }
+                    break;
+                case 0b10:
+                    // ASR
+                    if (shiftImmediate === 0 && rmValue < 0) {
+                        index = 0xFFFFFFFF;
+                    } else if (shiftImmediate !== 0) {
+                        [index] = arithmeticShiftRight(rmValue, shiftImmediate);
+                    }
+                    break;
+                case 0b11:
+                    // ROR/RRX
+                    if (shiftImmediate === 0) {
+                        index = logicalShiftLeft(cFlag, 31)[0] | logicalShiftRight(rmValue, 1)[0];
+                    } else {
+                        index = rotateRight(rmValue, shiftImmediate, 32);
+                    }
+                    break;
+            }
+
+            if (p === 1 && w === 0) {
+                // Register offset; does not set Rn
+                address = rnValue + sign * index;
+            } else if (p === 1 && w === 1) {
+                // Register pre-indexed
+                address = rnValue + sign * index;
+                cpu.setGeneralRegister(rn, address);
+            } else if (p === 0 && w === 0) {
+                // Register post-indexed
+                address = rnValue;
+                cpu.setGeneralRegister(rn, rnValue + sign * index);
+            }
+        }
+    } else if (mode === 3) {
+        const immediate = bits[22] === 1;
+        const sign = u === 1 ? 1 : -1;
+        let offset = 0;
+        if (immediate) {
+            const immediateHigh = (i >>> 8) & 0xF;
+            const immediateLow = i & 0xF;
+            offset = (immediateHigh << 4) | immediateLow;
+        } else {
+            const rm = i & 0xF;
+            offset = cpu.getGeneralRegister(rm);
+        }
+
+        if (p === 1 && w === 0) {
+            // Offset; does not change base register
+            address = rnValue + sign * offset;
+        } else if (p === 1 && w === 1) {
+            // Pre-indexed
+            address = rnValue + sign * offset;
+            cpu.setGeneralRegister(rn, address);
+        } else if (p === 0 && w === 0) {
+            // Post-indexed
+            address = rnValue;
+            cpu.setGeneralRegister(rn, rnValue + sign * offset);
+        }
+    }
+
+    return address;
+}
+
+/**
+ * Addressing Mode 4
+ * Returns an array [startAddress, endAddress], marking the start and end
+ * addresses to read/set a series of values in memory.
+ */
+const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
+    const opcode = (i >>> 23) & 0x3;
+    const w = (i >>> 21) & 0x1;
+    const regList = i & 0xFFFF;
+    const rn = (i >>> 16) & 0xF;
+    const bitsSet = numberOfSetBits(regList);
+    let rnValue = cpu.getGeneralRegister(rn);
+    let startAddress = 0;
+    let endAddress = 0;
+    switch (opcode) {
+        case 0b00:
+            // Decrement After
+            startAddress = rnValue - (bitsSet * 4) + 4;
+            endAddress = rnValue;
+            if (w === 1) {
+                rnValue -= (bitsSet * 4);
+                cpu.setGeneralRegister(rn, rnValue);
+            }
+            break;
+        case 0b01:
+            // Increment After
+            startAddress = rnValue;
+            endAddress = rnValue + (bitsSet * 4) - 4
+            if (w === 1) {
+                rnValue += (bitsSet * 4);
+                cpu.setGeneralRegister(rn, rnValue);
+            }
+            break;
+        case 0b10:
+            // Decrement Before
+            startAddress = rnValue - (bitsSet * 4);
+            endAddress - rnValue - 4;
+            if (w === 1) {
+                rnValue -= (bitsSet * 4);
+                cpu.setGeneralRegister(rn, rnValue);
+            }
+            break;
+        case 0b11:
+            // Increment Before
+            startAddress = rnValue + 4;
+            endAddress = rnValue + (bitsSet * 4);
+            if (w === 1) {
+                rnValue += (bitsSet * 4);
+                cpu.setGeneralRegister(rn, rnValue);
+            }
+            break;
+    }
+    return [startAddress, endAddress];
+}
+
 // Data Processing Functions
 
 const processAnd = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
     cpu.pushToHistory('AND');
-    cpu.updateGeneralRegister(rd, value1 & value2);
+    cpu.setGeneralRegister(rd, value1 & value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         if (rd === 15) {
@@ -226,7 +422,7 @@ const processAnd = (data: DataProcessingParameter) : number => {
 const processEor = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
     cpu.pushToHistory('EOR');
-    cpu.updateGeneralRegister(rd, value1 ^ value2);
+    cpu.setGeneralRegister(rd, value1 ^ value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         if (rd === 15) {
@@ -244,7 +440,7 @@ const processEor = (data: DataProcessingParameter) : number => {
 const processSub = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
     cpu.pushToHistory('SUB');
-    cpu.updateGeneralRegister(rd, value1 - value2);
+    cpu.setGeneralRegister(rd, value1 - value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -269,7 +465,7 @@ const processSub = (data: DataProcessingParameter) : number => {
 const processRsb = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     cpu.pushToHistory('RSB');
-    cpu.updateGeneralRegister(rd, value2 - value1);
+    cpu.setGeneralRegister(rd, value2 - value1);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -291,7 +487,7 @@ const processRsb = (data: DataProcessingParameter) : number => {
 const processAdd = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     cpu.pushToHistory('ADD');
-    cpu.updateGeneralRegister(rd, (value1 + value2) & 0xFFFFFFFF);
+    cpu.setGeneralRegister(rd, (value1 + value2) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -314,7 +510,7 @@ const processAdc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
     cpu.pushToHistory('ADC');
-    cpu.updateGeneralRegister(rd, (value1 + value2 + cFlag) & 0xFFFFFFFF);
+    cpu.setGeneralRegister(rd, (value1 + value2 + cFlag) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -337,7 +533,7 @@ const processSbc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
     cpu.pushToHistory('SBC');
-    cpu.updateGeneralRegister(rd, (value1 - value2 - cFlag) & 0xFFFFFFFF);
+    cpu.setGeneralRegister(rd, (value1 - value2 - cFlag) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -360,7 +556,7 @@ const processRsc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
     cpu.pushToHistory('RSC');
-    cpu.updateGeneralRegister(rd, (value2 - value1 - cFlag) & 0xFFFFFFFF);
+    cpu.setGeneralRegister(rd, (value2 - value1 - cFlag) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -450,7 +646,7 @@ const processCmn = (data: DataProcessingParameter) : number => {
 const processOrr = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
     cpu.pushToHistory('ORR');
-    cpu.updateGeneralRegister(rd, value1 | value2);
+    cpu.setGeneralRegister(rd, value1 | value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         if (rd === 15) {
@@ -468,7 +664,7 @@ const processOrr = (data: DataProcessingParameter) : number => {
 const processMov = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
     cpu.pushToHistory('MOV');
-    cpu.updateGeneralRegister(rd, value2);
+    cpu.setGeneralRegister(rd, value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         if (rd === 15) {
@@ -486,7 +682,7 @@ const processMov = (data: DataProcessingParameter) : number => {
 const processBic = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
     cpu.pushToHistory('BIC');
-    cpu.updateGeneralRegister(rd, value1 & (~value2));
+    cpu.setGeneralRegister(rd, value1 & (~value2));
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         if (rd === 15) {
@@ -504,7 +700,7 @@ const processBic = (data: DataProcessingParameter) : number => {
 const processMvn = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
     cpu.pushToHistory('MVN');
-    cpu.updateGeneralRegister(rd, ~value2);
+    cpu.setGeneralRegister(rd, ~value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         if (rd === 15) {
@@ -528,10 +724,10 @@ const processBBL = (cpu: CPU, i: number) : void => {
     if (((imm >>> 23) & 0x1) === 1) imm += 0xFF000000;
     imm = imm << 2;
     const pc = cpu.getGeneralRegister(Reg.PC);
-    cpu.updateGeneralRegister(Reg.PC, pc + imm);
+    cpu.setGeneralRegister(Reg.PC, pc + imm);
     if (lFlag) {
         const instructionSize = cpu.operatingState === 'ARM' ? 4 : 2;
-        cpu.updateGeneralRegister(Reg.LR, pc + instructionSize);
+        cpu.setGeneralRegister(Reg.LR, pc + instructionSize);
     }
 }
 
@@ -545,67 +741,206 @@ const processBX = (cpu: CPU, i: number) : void => {
     const rm = i & 0xF;
     const pc = rm & 0xFFFFFFFE;
     // cpu.updateStatusRegister();
-    cpu.updateGeneralRegister(Reg.PC, pc);
+    cpu.setGeneralRegister(Reg.PC, pc);
 }
 
 // Load & Store Instructions
 
 const processLDR = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('LDR');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = cpu.getBytesFromMemory(address, 4);
+    let value = byteArrayToInt32(bytes, cpu.bigEndian);
+    switch (address & 0x3) {
+        case 0b01: value = rotateRight(value, 8, 32); break;
+        case 0b10: value = rotateRight(value, 16, 32); break;
+        case 0b11: value = rotateRight(value, 24, 32); break;
+    }
+
+    if (rd === 15) {
+        const pc = cpu.getGeneralRegister(Reg.PC);
+        const newPC = pc & 0xFFFFFFFC;
+        cpu.setGeneralRegister(Reg.PC, newPC);
+    } else {
+        cpu.setGeneralRegister(rd, value);
+    }
 }
 
 const processLDRB = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('LDRB');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const value = cpu.getBytesFromMemory(address, 1)[0];
+    cpu.setGeneralRegister(rd, value);
 }
 
 const processLDRBT = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('LDRBT');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const value = cpu.getBytesFromMemory(address, 1)[0];
+    cpu.setGeneralRegister(rd, value);
 }
 
 const processLDRH = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('LDRH');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = cpu.getBytesFromMemory(address, 2);
+    const value = byteArrayToInt32(bytes, cpu.bigEndian);
+    cpu.setGeneralRegister(rd, value);
 }
 
 const processLDRSB = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('LDRSB');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const value = signExtend(cpu.getBytesFromMemory(address, 1)[0], 8);
+    cpu.setGeneralRegister(rd, value);
 }
 
 const processLDRSH = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('LDRSH');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const value = signExtend(cpu.getBytesFromMemory(address, 2)[0], 16);
+    cpu.setGeneralRegister(rd, value);
 }
 
 const processLDRT = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('LDRT');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = cpu.getBytesFromMemory(address, 4);
+    let value = byteArrayToInt32(bytes, cpu.bigEndian);
+    switch (address & 0x3) {
+        case 0b01: value = rotateRight(value, 8, 32); break;
+        case 0b10: value = rotateRight(value, 16, 32); break;
+        case 0b11: value = rotateRight(value, 24, 32); break;
+    }
+    cpu.setGeneralRegister(rd, value);
 }
 
 const processSTR = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('STR');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+    cpu.setBytesInMemory(address, bytes);
 }
 
 const processSTRB = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('STRB');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
+    cpu.setBytesInMemory(address, bytes);
 }
 
 const processSTRBT = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('STRBT');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
+    cpu.setBytesInMemory(address, bytes);
 }
 
 const processSTRH = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('STRH');
+    const rd = (i >>> 12) & 0xF;
+    const rdValue = cpu.getGeneralRegister(rd);
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = new Uint8Array([rdValue & 0xFF, (rdValue >> 8) & 0xFF]);
+    if (cpu.bigEndian) bytes.reverse();
+    cpu.setBytesInMemory(address, bytes);
 }
 
 const processSTRT = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('STRT');
+    const rd = (i >>> 12) & 0xF;
+    const address = getLoadStoreAddress(cpu, i);
+    const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+    cpu.setBytesInMemory(address, bytes);
 }
 
 // Load & Store Multiple Instructions
 
 const processLDM = (cpu: CPU, i: number, type: number) : void => {
     cpu.pushToHistory(`LDM (${type})`);
+    const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
+    const regList = (i & 0xFFFF);
+    const bitsSet = numberOfSetBits(regList);
+    let address = startAddress;
+
+    switch (type) {
+        case 1:
+            for (let i = 0; i <= 14; i++) {
+                if (((bitsSet >>> i) & 0x1) === 1) {
+                    const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+                    cpu.setGeneralRegister(i, riValue);
+                }
+            }
+            if (((bitsSet >>> 15) & 0x1) === 1) {
+                const value = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+                const newPC = value & 0xFFFFFFFC;
+                cpu.setGeneralRegister(Reg.PC, newPC);
+                address += 4;
+            }
+
+            
+            break;
+        case 2:
+            for (let i = 0; i <= 14; i++) {
+                if (((bitsSet >>> i) & 0x1) === 1) {
+                    const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+                    cpu.setGeneralRegisterByMode(i, riValue, 'usr');
+                    address += 4;
+                }
+            }
+            break;
+        case 3:
+            for (let i = 0; i <= 14; i++) {
+                if (((bitsSet >>> i) & 0x1) === 1) {
+                    const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+                    cpu.setGeneralRegisterByMode(i, riValue, 'usr');
+                    address += 4;
+                }
+            }
+            cpu.cpsrToSPSR();
+            const value = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+            const t = cpu.getStatusRegisterFlag('t');
+            const newPC = t === 1 ?
+                value & 0xFFFFFFFE :
+                value & 0xFFFFFFFC;
+            cpu.setGeneralRegister(Reg.PC, newPC);
+            address += 4;
+            break;
+    }
+
+    if (address - 4 !== endAddress) {
+        console.error(`LDM (${type}) failure: address ${address} does not match expected end address ${endAddress}`);
+    }
 }
 
 const processSTM = (cpu: CPU, i: number, type: number) : void => {
     cpu.pushToHistory(`STM (${type})`);
+    const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
+    const regList = i & 0xFFFF;
+    let address = startAddress;
+    for (let i = 0; i <= 15; i++) {
+        if (((regList >> i) & 0x1) === 1) {
+            const riValue = type === 1 ?
+                cpu.getGeneralRegister(i) :
+                cpu.getGeneralRegisterByMode(i, 'usr');
+            const bytes = int32ToByteArray(riValue, cpu.bigEndian);
+            cpu.setBytesInMemory(address, bytes);
+            address += 4;
+        }
+    }
+    if (endAddress !== address - 4) {
+        console.error(`STM failure: address ${address} does not match expected end address ${endAddress}`);
+    }
 }
 
 // Multiply Instructions
@@ -693,4 +1028,4 @@ const processSTC = (cpu: CPU, i: number) : void => {
     cpu.pushToHistory('STC');
 }
 
-export { process }
+export { processARM }

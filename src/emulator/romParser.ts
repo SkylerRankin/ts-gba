@@ -1,7 +1,7 @@
 const parseROMBuffer = (buffer: any) => {
     const headerBuffer: Uint8Array = new Uint8Array(buffer.slice(0, 192));
     const rom: Uint8Array = new Uint8Array(buffer.slice(192));
-    let header = parseHeader(headerBuffer, rom.length);
+    const header = parseHeader(headerBuffer, rom.length);
     return {romHeader: header};
 }
 

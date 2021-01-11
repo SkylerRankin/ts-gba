@@ -1,4 +1,7 @@
-import { encodeWithRotation, rotateRight, rotateLeft } from '../../emulator/math';
+import { executionAsyncId } from 'async_hooks';
+import {
+    encodeWithRotation, rotateRight, rotateLeft, signExtend,
+    byteArrayToInt32, int32ToByteArray } from '../../emulator/math';
 
 test('rotateRight', () => {
     expect(rotateRight(15, 3, 8)).toBe(225);
@@ -24,4 +27,22 @@ test('encodeWithRotation', () => {
     expect(encodeWithRotation('0x0A10000', 32, 4, 8)).toStrictEqual([8, 161]);
     expect(encodeWithRotation('0xAF0', 32, 4, 8)).toStrictEqual([14, 175]);
     expect(encodeWithRotation('0xC0000001', 32, 4, 8)).toStrictEqual([1, 7]);
+});
+
+test('signExtend', () => {
+    expect(signExtend(1, 1)).toBe(-1);
+    expect(signExtend(1, 2)).toBe(1);
+    expect(signExtend(1, 20)).toBe(1);
+    expect(signExtend(4, 1)).toBe(0);
+    expect(signExtend(0xCCCCDE7, 32)).toBe(0xCCCCDE7);
+    expect(signExtend(-10, 5)).toBe(-10);
+});
+
+test('byteArrayToInt32 and int32ToByteArray', () => {
+    const a = Uint8Array.from([0xFF, 0, 0xAA, 0]);
+    const b = 0xFF00AA00;
+    expect(byteArrayToInt32(a, true)).toBe(0xFF00AA00);
+    expect(byteArrayToInt32(a, false)).toBe(0xAA00FF);
+    expect(int32ToByteArray(b, true)).toStrictEqual(a);
+    expect(int32ToByteArray(b, false)).toStrictEqual(Uint8Array.from([0, 0xAA, 0, 0xFF]));
 });

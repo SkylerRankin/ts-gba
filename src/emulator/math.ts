@@ -68,4 +68,44 @@ function encodeWithRotation(n: any | number | string | Long, bits:number, rotBit
     return [r / 2, n.toInt()];
 }
 
-export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight, arithmeticShiftRight, logicalShiftLeft }
+// Sign extends a number n in `bits` bits to the same number in 32 bits.
+const signExtend = (n: number, bits: number) : number => {
+    if (((n >>> (bits - 1)) & 0x1) === 0 || bits === 32) {
+        return n & (2**bits - 1);
+    } else {
+        const diff = 32 - bits;
+        return (n & (2**bits - 1)) | ((2**diff - 1) << bits);
+    }
+}
+
+const byteArrayToInt32 = (a: Uint8Array, bigEndian: boolean) : number => {
+    const data = new Uint8Array(a);
+    if (bigEndian) data.reverse();
+    let result = 0;
+    for (let i = 0; i < data.length; i++) {
+        result |= data[i] << (i * 8);
+    }
+    return result >>> 0;
+}
+
+const int32ToByteArray = (n: number, bigEndian: boolean) : Uint8Array => {
+    const a = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) {
+        a[i] = (n >>> (i * 8)) & 0xFF;
+    }
+    if (bigEndian) a.reverse();
+    return a;
+}
+
+const numberOfSetBits = (n: number) : number => {
+    let count = 0;
+    while (n > 0) {
+        count += n & 0x1;
+        n = n >> 1;
+    }
+    return count;
+}
+
+export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
+    arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
+    int32ToByteArray, numberOfSetBits }

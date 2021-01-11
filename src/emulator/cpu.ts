@@ -1,5 +1,6 @@
 import { assembleInstruction } from './assembler';
-import { process } from './instructionProcessors';
+import { processARM } from './armInstructionProcessors';
+import { processTHUMB } from './thumbInstructionProcessors';
 
 /**
  * A simulator for a CPU that implements the ARM ISA.
@@ -8,20 +9,26 @@ import { process } from './instructionProcessors';
 
 type CPUType = {
     rom: number[],
+    memory: Uint8Array,
     generalRegisters: number[][],
     statusRegisters: number[][],
     operatingMode: number,
     operatingState: OperatingState,
     history: string[],
+    bigEndian: boolean,
     loadProgramFromText: (program: string[]) => void,
     reset: () => void,
     step: () => void,
     atBreakpoint: () => boolean,
     updateStatusRegister: (update: StatusRegisterUpdate) => void
     getStatusRegister: (reg: StatusRegister) => number,
-    updateGeneralRegister: (reg: number, value: number) => void
+    setGeneralRegister: (reg: number, value: number) => void,
+    setGeneralRegisterByMode(reg: number, value: number, mode: OperatingMode) : void,
     getGeneralRegister: (reg: number) => number,
-    pushToHistory: (v: string) => void
+    getGeneralRegisterByMode: (reg: number, mode: OperatingMode) => number,
+    pushToHistory: (v: string) => void,
+    getBytesFromMemory(address: number, bytes: number) : Uint8Array,
+    setBytesInMemory(address: number, bytes: Uint8Array) : void,
 }
 
 const OperatingModeCodes = {
@@ -79,11 +86,13 @@ type StatusRegisterUpdate = StatusRegisterKey[];
 
 class CPU implements CPUType {
     rom = [] as number[];
+    memory = new Uint8Array(0xFFFFFF).fill(0);
     generalRegisters = [] as number[][];
     statusRegisters = [] as number[][];
     operatingMode = 0;
     operatingState = 'ARM' as OperatingState;
     history = [] as string[];
+    bigEndian = false;
 
     constructor() {
         for (let i = 0; i < 7; i++) {
@@ -126,9 +135,11 @@ class CPU implements CPUType {
         }
         const condition = instruction >> 27;
         if (this.conditionIsMet(condition)) {
-            process(this, instruction);
+            this.operatingState === 'ARM' ?
+                processARM(this, instruction) :
+                processTHUMB(this, instruction);
         }
-        this.updateGeneralRegister(Reg.PC, pc + instructionSize);
+        this.setGeneralRegister(Reg.PC, pc + instructionSize);
     }
 
     /**
@@ -140,7 +151,7 @@ class CPU implements CPUType {
         this.statusRegisters.fill(new Array<number>(2).fill(0), 0, this.generalRegisters.length);
         this.setModeBits(OperatingModeCodes.usr);
         this.setStateBit(0);
-        this.updateGeneralRegister(Reg.PC, 8);
+        this.setGeneralRegister(Reg.PC, 8);
         this.history = [];
     }
 
@@ -168,6 +179,20 @@ class CPU implements CPUType {
             case 'z': return (cpsr >>> 30) & 0x1;
             case 'c': return (cpsr >>> 29) & 0x1;
             case 'v': return (cpsr >>> 28) & 0x1;
+        }
+    }
+
+    getStatusRegisterFlag(flag: StatusRegisterKey) : number {
+        let cpsr = this.getStatusRegister('CPSR');
+        switch (flag) {
+            case 'n': return (cpsr >>> 31) & 0x1;
+            case 'z': return (cpsr >>> 30) & 0x1;
+            case 'c': return (cpsr >>> 29) & 0x1;
+            case 'v': return (cpsr >>> 28) & 0x1;
+            case 'q': return (cpsr >>> 27) & 0x1;
+            case 'i': return (cpsr >>> 7) & 0x1;
+            case 'f': return (cpsr >>> 6) & 0x1;
+            case 't': return (cpsr >>> 5) & 0x1;
         }
     }
 
@@ -229,12 +254,16 @@ class CPU implements CPUType {
         }
     }
 
-    updateGeneralRegister(reg: number, value: number): void {
+    setGeneralRegister(reg: number, value: number): void {
         if (BankedRegisters[this.operatingState][this.operatingMode].includes(reg)) {
             this.generalRegisters[this.operatingMode][reg] = value;
         } else {
             this.generalRegisters[0][reg] = value;
         }
+    }
+
+    setGeneralRegisterByMode(reg: number, value: number, mode: OperatingMode) : void {
+        this.generalRegisters[OperatingModeNames.indexOf(mode)][reg] = value;
     }
 
     getGeneralRegister(reg: number): number {
@@ -243,6 +272,10 @@ class CPU implements CPUType {
         } else {
             return this.generalRegisters[0][reg];
         }
+    }
+
+    getGeneralRegisterByMode(reg: number, mode: OperatingMode) : number {
+        return this.generalRegisters[OperatingModeNames.indexOf(mode)][reg];
     }
 
     getStateString() : string {
@@ -267,6 +300,27 @@ class CPU implements CPUType {
 
     pushToHistory(v: string) : void {
         this.history.push(v);
+    }
+
+    getBytesFromMemory(address: number, bytes: number) : Uint8Array {
+        if (address < 0 || address >= this.memory.length) {
+            console.error(`Out of bounds memory access: address 0x${address.toString(16)}, ${bytes} bytes`);
+            return new Uint8Array(bytes).fill(0);
+        }
+        const result = new Uint8Array(bytes);
+        for (let i = 0; i < bytes; i++) {
+            result[i] = this.memory[address + i];
+        }
+        return result;
+    }
+
+    setBytesInMemory(address: number, bytes: Uint8Array) : void {
+        if (address < 0 || address >= this.memory.length) {
+            console.error(`Out of bounds memory access: address 0x${address.toString(16)}, ${bytes} bytes`);
+        }
+        for (let i = 0; i < bytes.length; i++) {
+            this.memory[address + i] = bytes[i];
+        }
     }
 
 }
