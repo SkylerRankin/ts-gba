@@ -29,7 +29,7 @@ test('CPU state strings', () => {
         .setRegister(0, 0x1F)
         .setRegister(10, 0x999)
         .setRegister(4, 0xC01)
-        .setRegister(Reg.PC, 0x8)
+        .setRegister(Reg.PC, 0x08000008)
         .build();
 
     cpu.setStateBit(1);

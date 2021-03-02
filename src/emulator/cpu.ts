@@ -1,6 +1,8 @@
-import { assembleInstruction } from './assembler';
-import { processARM } from './armInstructionProcessors';
+import { processARM, ProcessedInstructionOptions } from './armInstructionProcessors';
 import { processTHUMB } from './thumbInstructionProcessors';
+import { Memory } from './memory';
+import { StateHistory } from './stateHistory';
+import { byteArrayToInt32 } from './math';
 
 /**
  * A simulator for a CPU that implements the ARM ISA.
@@ -8,25 +10,27 @@ import { processTHUMB } from './thumbInstructionProcessors';
  */
 
 type CPUType = {
-    rom: number[],
-    memory: Uint8Array,
+    memory: Memory,
     generalRegisters: number[][],
     statusRegisters: number[][],
     operatingMode: number,
     operatingState: OperatingState,
-    history: string[],
+    history: StateHistory,
     bigEndian: boolean,
-    loadProgramFromText: (program: string[]) => void,
     reset: () => void,
     step: () => void,
     atBreakpoint: () => boolean,
-    updateStatusRegister: (update: StatusRegisterUpdate) => void
+    
+    updateStatusRegister: (update: StatusRegisterUpdate) => void,
+    getStatusRegisterFlag(flag: StatusRegisterKey) : number,
+    setStatusRegisterFlag(flag: StatusRegisterKey, value: number) : void,
     getStatusRegister: (reg: StatusRegister) => number,
+
     setGeneralRegister: (reg: number, value: number) => void,
     setGeneralRegisterByMode(reg: number, value: number, mode: OperatingMode) : void,
     getGeneralRegister: (reg: number) => number,
     getGeneralRegisterByMode: (reg: number, mode: OperatingMode) => number,
-    pushToHistory: (v: string) => void,
+
     getBytesFromMemory(address: number, bytes: number) : Uint8Array,
     setBytesInMemory(address: number, bytes: Uint8Array) : void,
 }
@@ -80,18 +84,21 @@ const BankedRegisters = {
     ]
 };
 
+/**
+ * Status register flag values:
+ * t = 0 for ARM, 1 for Thumb
+ */
 type StatusRegister = 'CPSR' | 'SPSR';
 type StatusRegisterKey = 'n' | 'z' | 'c' | 'v' | 'q' | 'i' | 'f' | 't';
 type StatusRegisterUpdate = StatusRegisterKey[];
 
 class CPU implements CPUType {
-    rom = [] as number[];
-    memory = new Uint8Array(0xFFFFFF).fill(0);
+    memory = new Memory();
     generalRegisters = [] as number[][];
     statusRegisters = [] as number[][];
     operatingMode = 0;
     operatingState = 'ARM' as OperatingState;
-    history = [] as string[];
+    history = new StateHistory();
     bigEndian = false;
 
     constructor() {
@@ -102,21 +109,8 @@ class CPU implements CPUType {
         this.statusRegisters[0][0] = (0b1011 << 28 >>> 0) || 0b11011;
     }
 
-    loadProgramFromText(program: string[]) : void {
-        this.rom = [];
-        let address = 0;
-        program.forEach((instruction: string) => {
-            try {
-                this.rom[address] = assembleInstruction(instruction);
-                address++;
-            } catch (e) {
-                console.log(e);
-            }
-        });
-    }
-
     loadProgram(program: number[]) : void {
-        this.rom = program;
+        this.memory.loadROM(program);
     }
 
     atBreakpoint() : boolean {
@@ -126,33 +120,38 @@ class CPU implements CPUType {
     }
 
     step() : void {
+        this.history.startLog();
+        this.history.logCPU(this);
+
         const pc = this.getGeneralRegister(Reg.PC);
-        // PC points to the instruction after the next instruction, so we subtract 8 bytes.
-        let instruction = 0;
         const instructionSize = this.operatingState === 'ARM' ? 4 : 2;
-        for (let i = 0; i < instructionSize; i++) {
-            instruction += this.rom[pc - 8 + i] << ((instructionSize - 1 - i) * 8);
-        }
+        // PC points to the instruction after the next instruction, so we subtract 8 bytes.
+        const instruction = byteArrayToInt32(this.memory.getBytes(pc - 8, instructionSize), this.bigEndian);
         const condition = instruction >> 27;
+        let options: ProcessedInstructionOptions | undefined;
         if (this.conditionIsMet(condition)) {
-            this.operatingState === 'ARM' ?
+            options = this.operatingState === 'ARM' ?
                 processARM(this, instruction) :
                 processTHUMB(this, instruction);
         }
-        this.setGeneralRegister(Reg.PC, pc + instructionSize);
+
+        if (!options) return;
+        if (options.incrementPC) this.setGeneralRegister(Reg.PC, pc + instructionSize);
+
+        this.history.endLog();
     }
 
     /**
      * Clears out all registers and memory. Sets CPU to ARM user mode.
      */
     reset() : void {
-        this.rom = [];
+        this.memory.reset();
         this.generalRegisters.fill(new Array<number>(16).fill(0), 0, this.generalRegisters.length);
         this.statusRegisters.fill(new Array<number>(2).fill(0), 0, this.generalRegisters.length);
         this.setModeBits(OperatingModeCodes.usr);
         this.setStateBit(0);
-        this.setGeneralRegister(Reg.PC, 8);
-        this.history = [];
+        this.setGeneralRegister(Reg.PC, 0x08000008);
+        this.history.reset();
     }
 
     conditionIsMet(condition: number) : boolean {
@@ -194,6 +193,24 @@ class CPU implements CPUType {
             case 'f': return (cpsr >>> 6) & 0x1;
             case 't': return (cpsr >>> 5) & 0x1;
         }
+    }
+
+    setStatusRegisterFlag(flag: StatusRegisterKey, value: number) : void {
+        let cpsr = this.getStatusRegister('CPSR');
+        switch (flag) {
+            case 'n': cpsr &= (value << 31); break;
+            case 'z': cpsr &= (value << 30); break;
+            case 'c': cpsr &= (value << 29); break;
+            case 'v': cpsr &= (value << 28); break;
+            case 'q': cpsr &= (value << 27); break;
+            case 'i': cpsr &= (value << 7); break;
+            case 'f': cpsr &= (value << 6); break;
+            case 't':
+                cpsr &= (value << 5);
+                this.operatingState = value === 0 ? 'ARM' : 'THUMB';
+                break;
+        }
+        this.statusRegisters[0][0] = cpsr;
     }
 
     setModeBits(value: number) : void {
@@ -298,29 +315,12 @@ class CPU implements CPUType {
         return `${state} ${modeName} NZCV:[${nzcv}] Reg:[${registers}]`;
     }
 
-    pushToHistory(v: string) : void {
-        this.history.push(v);
-    }
-
     getBytesFromMemory(address: number, bytes: number) : Uint8Array {
-        if (address < 0 || address >= this.memory.length) {
-            console.error(`Out of bounds memory access: address 0x${address.toString(16)}, ${bytes} bytes`);
-            return new Uint8Array(bytes).fill(0);
-        }
-        const result = new Uint8Array(bytes);
-        for (let i = 0; i < bytes; i++) {
-            result[i] = this.memory[address + i];
-        }
-        return result;
+        return this.memory.getBytes(address, bytes);
     }
 
     setBytesInMemory(address: number, bytes: Uint8Array) : void {
-        if (address < 0 || address >= this.memory.length) {
-            console.error(`Out of bounds memory access: address 0x${address.toString(16)}, ${bytes} bytes`);
-        }
-        for (let i = 0; i < bytes.length; i++) {
-            this.memory[address + i] = bytes[i];
-        }
+        this.memory.setBytes(address, bytes);
     }
 
 }

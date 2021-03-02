@@ -1,7 +1,9 @@
-import { start } from 'repl';
 import { CPU, Reg } from './cpu';
 import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits } from './math';
 
+type ProcessedInstructionOptions = {
+    incrementPC: boolean
+};
 type DataProcessingFunction = (param: DataProcessingParameter) => number
 type DataProcessingParameter = {
     cpu: CPU,
@@ -12,7 +14,7 @@ type DataProcessingParameter = {
     shiftCarry: number
 }
 
-const processARM = (cpu: CPU, i: number) : void => {
+const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
     const bits = (i >>> 0).toString(2).padStart(32, '0')
         .split('').map((x: string) : number => parseInt(x)).reverse();
@@ -111,9 +113,12 @@ const processARM = (cpu: CPU, i: number) : void => {
 
     // Data processing instructions
     if ((i & 0x0C000000) === 0) return processDataProcessing(cpu, i);
+
+    // In case of no instruction match.
+    return { incrementPC: true };
 }
 
-const processDataProcessing = (cpu: CPU, i: number) : void => {
+const processDataProcessing = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const opcode = (i >>> 21) & 0xF;
     const sFlag = (i >>> 20) & 0x1;
     const iFlag = (i >>> 25) & 0x1;
@@ -144,6 +149,7 @@ const processDataProcessing = (cpu: CPU, i: number) : void => {
     if (processingFunction) {
         processingFunction({cpu, value1, value2, rd, sFlag, shiftCarry});
     }
+    return { incrementPC: true };
 }
 
 /**
@@ -403,7 +409,7 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
 
 const processAnd = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('AND');
+    cpu.history.setInstructionName('AND');
     cpu.setGeneralRegister(rd, value1 & value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -421,7 +427,7 @@ const processAnd = (data: DataProcessingParameter) : number => {
 
 const processEor = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('EOR');
+    cpu.history.setInstructionName('EOR');
     cpu.setGeneralRegister(rd, value1 ^ value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -439,7 +445,7 @@ const processEor = (data: DataProcessingParameter) : number => {
 
 const processSub = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('SUB');
+    cpu.history.setInstructionName('SUB');
     cpu.setGeneralRegister(rd, value1 - value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -464,7 +470,7 @@ const processSub = (data: DataProcessingParameter) : number => {
 
 const processRsb = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
-    cpu.pushToHistory('RSB');
+    cpu.history.setInstructionName('RSB');
     cpu.setGeneralRegister(rd, value2 - value1);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -486,7 +492,7 @@ const processRsb = (data: DataProcessingParameter) : number => {
 
 const processAdd = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
-    cpu.pushToHistory('ADD');
+    cpu.history.setInstructionName('ADD');
     cpu.setGeneralRegister(rd, (value1 + value2) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -509,7 +515,7 @@ const processAdd = (data: DataProcessingParameter) : number => {
 const processAdc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
-    cpu.pushToHistory('ADC');
+    cpu.history.setInstructionName('ADC');
     cpu.setGeneralRegister(rd, (value1 + value2 + cFlag) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -532,7 +538,7 @@ const processAdc = (data: DataProcessingParameter) : number => {
 const processSbc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
-    cpu.pushToHistory('SBC');
+    cpu.history.setInstructionName('SBC');
     cpu.setGeneralRegister(rd, (value1 - value2 - cFlag) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -555,7 +561,7 @@ const processSbc = (data: DataProcessingParameter) : number => {
 const processRsc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
-    cpu.pushToHistory('RSC');
+    cpu.history.setInstructionName('RSC');
     cpu.setGeneralRegister(rd, (value2 - value1 - cFlag) & 0xFFFFFFFF);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -577,7 +583,7 @@ const processRsc = (data: DataProcessingParameter) : number => {
 
 const processTst = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('TST');
+    cpu.history.setInstructionName('TST');
     const aluOut = value1 & value2;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -590,7 +596,7 @@ const processTst = (data: DataProcessingParameter) : number => {
 
 const processTeq = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('TEQ');
+    cpu.history.setInstructionName('TEQ');
     const aluOut = value1 ^ value2;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -603,7 +609,7 @@ const processTeq = (data: DataProcessingParameter) : number => {
 
 const processCmp = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag} = data;
-    cpu.pushToHistory('CMP');
+    cpu.history.setInstructionName('CMP');
     const aluOut = value1 - value2;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -624,7 +630,7 @@ const processCmp = (data: DataProcessingParameter) : number => {
 
 const processCmn = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag} = data;
-    cpu.pushToHistory('CMN');
+    cpu.history.setInstructionName('CMN');
     const aluOut = value1 + value2;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -645,7 +651,7 @@ const processCmn = (data: DataProcessingParameter) : number => {
 
 const processOrr = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('ORR');
+    cpu.history.setInstructionName('ORR');
     cpu.setGeneralRegister(rd, value1 | value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -663,7 +669,7 @@ const processOrr = (data: DataProcessingParameter) : number => {
 
 const processMov = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('MOV');
+    cpu.history.setInstructionName('MOV');
     cpu.setGeneralRegister(rd, value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -681,7 +687,7 @@ const processMov = (data: DataProcessingParameter) : number => {
 
 const processBic = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('BIC');
+    cpu.history.setInstructionName('BIC');
     cpu.setGeneralRegister(rd, value1 & (~value2));
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -699,7 +705,7 @@ const processBic = (data: DataProcessingParameter) : number => {
 
 const processMvn = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
-    cpu.pushToHistory('MVN');
+    cpu.history.setInstructionName('MVN');
     cpu.setGeneralRegister(rd, ~value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -717,37 +723,43 @@ const processMvn = (data: DataProcessingParameter) : number => {
 
 // Branch Instructions
 
-const processBBL = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('BBL');
+const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('BBL');
+    const pcOffset = 8;
     const lFlag = (i >>> 24) & 0x1;
     let imm = i & 0xFFFFFF;
     if (((imm >>> 23) & 0x1) === 1) imm += 0xFF000000;
     imm = imm << 2;
     const pc = cpu.getGeneralRegister(Reg.PC);
-    cpu.setGeneralRegister(Reg.PC, pc + imm);
+    // console.log(`pc=${pc.toString(16)} imm=${imm.toString(16)} pc=${(pc + imm).toString(16)}`);
+    cpu.setGeneralRegister(Reg.PC, pc + imm + pcOffset);
     if (lFlag) {
         const instructionSize = cpu.operatingState === 'ARM' ? 4 : 2;
         cpu.setGeneralRegister(Reg.LR, pc + instructionSize);
     }
+    return { incrementPC: false };
 }
 
-const processBLX = (cpu: CPU, i: number, type: number) : void => {
-    cpu.pushToHistory(`BLX (${type})`);
+const processBLX = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName(`BLX (${type})`);
+    return { incrementPC: true };
 
 }
 
-const processBX = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('BX');
+const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('BX');
     const rm = i & 0xF;
-    const pc = rm & 0xFFFFFFFE;
-    // cpu.updateStatusRegister();
+    const rmValue = cpu.getGeneralRegister(rm);
+    const pc = rmValue & 0xFFFFFFFE;
+    cpu.setStatusRegisterFlag('t', rmValue & 0x1);
     cpu.setGeneralRegister(Reg.PC, pc);
+    return { incrementPC: false };
 }
 
 // Load & Store Instructions
 
-const processLDR = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDR');
+const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDR');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = cpu.getBytesFromMemory(address, 4);
@@ -765,51 +777,57 @@ const processLDR = (cpu: CPU, i: number) : void => {
     } else {
         cpu.setGeneralRegister(rd, value);
     }
+    return { incrementPC: true };
 }
 
-const processLDRB = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDRB');
+const processLDRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDRB');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const value = cpu.getBytesFromMemory(address, 1)[0];
     cpu.setGeneralRegister(rd, value);
+    return { incrementPC: true };
 }
 
-const processLDRBT = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDRBT');
+const processLDRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDRBT');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const value = cpu.getBytesFromMemory(address, 1)[0];
     cpu.setGeneralRegister(rd, value);
+    return { incrementPC: true };
 }
 
-const processLDRH = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDRH');
+const processLDRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDRH');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = cpu.getBytesFromMemory(address, 2);
     const value = byteArrayToInt32(bytes, cpu.bigEndian);
     cpu.setGeneralRegister(rd, value);
+    return { incrementPC: true };
 }
 
-const processLDRSB = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDRSB');
+const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDRSB');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const value = signExtend(cpu.getBytesFromMemory(address, 1)[0], 8);
     cpu.setGeneralRegister(rd, value);
+    return { incrementPC: true };
 }
 
-const processLDRSH = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDRSH');
+const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDRSH');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const value = signExtend(cpu.getBytesFromMemory(address, 2)[0], 16);
     cpu.setGeneralRegister(rd, value);
+    return { incrementPC: true };
 }
 
-const processLDRT = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDRT');
+const processLDRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDRT');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = cpu.getBytesFromMemory(address, 4);
@@ -820,54 +838,60 @@ const processLDRT = (cpu: CPU, i: number) : void => {
         case 0b11: value = rotateRight(value, 24, 32); break;
     }
     cpu.setGeneralRegister(rd, value);
+    return { incrementPC: true };
 }
 
-const processSTR = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('STR');
+const processSTR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('STR');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
     cpu.setBytesInMemory(address, bytes);
+    return { incrementPC: true };
 }
 
-const processSTRB = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('STRB');
+const processSTRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('STRB');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
     cpu.setBytesInMemory(address, bytes);
+    return { incrementPC: true };
 }
 
-const processSTRBT = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('STRBT');
+const processSTRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('STRBT');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
     cpu.setBytesInMemory(address, bytes);
+    return { incrementPC: true };
 }
 
-const processSTRH = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('STRH');
+const processSTRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('STRH');
     const rd = (i >>> 12) & 0xF;
     const rdValue = cpu.getGeneralRegister(rd);
     const address = getLoadStoreAddress(cpu, i);
     const bytes = new Uint8Array([rdValue & 0xFF, (rdValue >> 8) & 0xFF]);
     if (cpu.bigEndian) bytes.reverse();
     cpu.setBytesInMemory(address, bytes);
+    return { incrementPC: true };
 }
 
-const processSTRT = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('STRT');
+const processSTRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('STRT');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
     cpu.setBytesInMemory(address, bytes);
+    return { incrementPC: true };
 }
 
 // Load & Store Multiple Instructions
 
-const processLDM = (cpu: CPU, i: number, type: number) : void => {
-    cpu.pushToHistory(`LDM (${type})`);
+const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName(`LDM (${type})`);
     const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
     const regList = (i & 0xFFFF);
     const bitsSet = numberOfSetBits(regList);
@@ -887,8 +911,6 @@ const processLDM = (cpu: CPU, i: number, type: number) : void => {
                 cpu.setGeneralRegister(Reg.PC, newPC);
                 address += 4;
             }
-
-            
             break;
         case 2:
             for (let i = 0; i <= 14; i++) {
@@ -919,12 +941,13 @@ const processLDM = (cpu: CPU, i: number, type: number) : void => {
     }
 
     if (address - 4 !== endAddress) {
-        console.error(`LDM (${type}) failure: address ${address} does not match expected end address ${endAddress}`);
+        console.error(`LDM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
     }
+    return { incrementPC: true };
 }
 
-const processSTM = (cpu: CPU, i: number, type: number) : void => {
-    cpu.pushToHistory(`STM (${type})`);
+const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName(`STM (${type})`);
     const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
     const regList = i & 0xFFFF;
     let address = startAddress;
@@ -938,94 +961,157 @@ const processSTM = (cpu: CPU, i: number, type: number) : void => {
             address += 4;
         }
     }
+
     if (endAddress !== address - 4) {
-        console.error(`STM failure: address ${address} does not match expected end address ${endAddress}`);
+        console.error(`STM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
     }
+    return { incrementPC: true };
 }
 
 // Multiply Instructions
 
-const processMUL = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('MUL');
+const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('MUL');
+    const rd = (i >>> 16) & 0xF;
+    const rs = (i >>> 8) & 0xF;
+    const rm = i & 0xF;
+    const sFlag = (i >>> 20) & 0x1;
+    const result = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs)) & 0xFFFFFFFF;
+    cpu.setGeneralRegister(rd, result);
+    if (sFlag) {
+        cpu.clearConditionCodeFlags();
+        if (result === 0) cpu.setConditionCodeFlags('z');
+        if (result < 0) cpu.setConditionCodeFlags('n');
+    }
+    return { incrementPC: true };
 }
 
-const processMLA = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('MLA');
+const processMLA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('MLA');
+    const rd = (i >>> 16) & 0xF;
+    const rn = (i >>> 12) & 0xF;
+    const rs = (i >>> 8) & 0xF;
+    const rm = i & 0xF;
+    const sFlag = (i >>> 20) & 0x1;
+    const result = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs) + cpu.getGeneralRegister(rn))
+        & 0xFFFFFFFF;
+    cpu.setGeneralRegister(rd, result);
+    if (sFlag) {
+        cpu.clearConditionCodeFlags();
+        if (result === 0) cpu.setConditionCodeFlags('z');
+        if (result < 0) cpu.setConditionCodeFlags('n');
+    }
+    return { incrementPC: true };
 }
 
-const processSMULL = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('SMULL');
+const processSMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('SMULL');
+    const rdHi = (i >>> 16) & 0xF;
+    const rdLo = (i >>> 12) & 0xF;
+    const rs = (i >>> 8) & 0xF;
+    const rm = i & 0xF;
+    const sFlag = (i >>> 20) & 0x1;
+    // TODO Supposed to be signed multiplication; how to ensure this>
+    const rdHiValue = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs));
+    const rdLoValue = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs));
+    // TODO rdHiValue should only be bits [63:32], rdLoValue should be bits [31:0]
+    // How to get high bits, bit operations make the numbers 32 bits
+    cpu.setGeneralRegister(rdHi, rdHiValue);
+    cpu.setGeneralRegister(rdLo, rdLoValue);
+
+    if (sFlag) {
+        cpu.clearConditionCodeFlags();
+        if (rdHiValue === 0 && rdLoValue === 0) cpu.setConditionCodeFlags('z');
+        if (rdHiValue < 0) cpu.setConditionCodeFlags('n');
+    }
+    return { incrementPC: true };
 }
 
-const processUMULL = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('UMULL');
+const processUMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('UMULL');
+    return { incrementPC: true };
 }
 
-const processSMLAL = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('SMLAL');
+const processSMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('SMLAL');
+    return { incrementPC: true };
 }
 
-const processUMLAL = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('UMLAL');
+const processUMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('UMLAL');
+    return { incrementPC: true };
 }
 
 // Miscellaneous Arithmetic Instructions
 
- const processCLZ = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('CLZ');
+ const processCLZ = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('CLZ');
+    return { incrementPC: true };
  }
 
  // Status Register Instructions
 
-const processMRS = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('MRS');
+const processMRS = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('MRS');
+    return { incrementPC: true };
 }
 
 // type = 1 => immediate operand, 2 => register operand
-const processMSR = (cpu: CPU, i: number, type: number) : void => {
-    cpu.pushToHistory(`MSR`);
+const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName(`MSR`);
+    return { incrementPC: true };
 }
 
 // Semaphore Instructions
 
-const processSWP = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('SWP');
+const processSWP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('SWP');
+    return { incrementPC: true };
 }
 
-const processSWPB = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('SWPB');
+const processSWPB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('SWPB');
+    return { incrementPC: true };
 }
 
 // Exception Generating Instructions
 
-const processBKPT = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('BKPT');
+const processBKPT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('BKPT');
+    return { incrementPC: true };
 }
 
-const processSWI = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('SWI');
+const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('SWI');
+    return { incrementPC: true };
 }
 
 // Co-Processor Instructions
 
-const processCDP = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('CDP');
+const processCDP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('CDP');
+    return { incrementPC: true };
 }
 
-const processLDC = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('LDC');
+const processLDC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('LDC');
+    return { incrementPC: true };
 }
 
-const processMCR = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('MCR');
+const processMCR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('MCR');
+    return { incrementPC: true };
 }
 
-const processMRC = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('MRC');
+const processMRC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('MRC');
+    return { incrementPC: true };
 }
 
-const processSTC = (cpu: CPU, i: number) : void => {
-    cpu.pushToHistory('STC');
+const processSTC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.history.setInstructionName('STC');
+    return { incrementPC: true };
 }
 
 export { processARM }
+export type { ProcessedInstructionOptions }
