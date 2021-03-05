@@ -146,12 +146,14 @@ class CPU implements CPUType {
      */
     reset() : void {
         this.memory.reset();
+        this.history.reset();
         this.generalRegisters.fill(new Array<number>(16).fill(0), 0, this.generalRegisters.length);
         this.statusRegisters.fill(new Array<number>(2).fill(0), 0, this.generalRegisters.length);
+        this.operatingState = 'ARM';
+        this.bigEndian = false;
         this.setModeBits(OperatingModeCodes.usr);
         this.setStateBit(0);
         this.setGeneralRegister(Reg.PC, 0x08000008);
-        this.history.reset();
     }
 
     conditionIsMet(condition: number) : boolean {

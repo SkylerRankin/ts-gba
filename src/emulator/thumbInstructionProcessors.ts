@@ -113,96 +113,515 @@ const processBLX2 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processADC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('ADC');
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = cpu.getGeneralRegister(rd) + cpu.getGeneralRegister(rm) + cpu.getStatusRegisterFlag('c');
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+    // CarryFrom and OverflowFrom unimplemented
+    cpu.setStatusRegisterFlag('c', 0);
+    cpu.setStatusRegisterFlag('v', 0);
     return { incrementPC: true };
 }
 
 const processADD = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`ADD (${type})`);
+    let rd;
+    let op1;
+    let op2;
+    switch (type) {
+        case 1: {
+            rd = i & 0x7;
+            const imm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            op1 = imm;
+            op2 = cpu.getGeneralRegister(rn);
+            break;
+        }
+        case 2: {
+            rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            op1 = cpu.getGeneralRegister(rd);
+            op2 = imm;
+            break;
+        }
+        case 3: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            rd = i & 0x7;
+            op1 = rn;
+            op2 = rm;
+            break;
+        }
+        case 4: {
+            const h1 = (i >>> 7) & 0x1;
+            const h2 = (i >>> 6) & 0x1;
+            const rmLow = (i >>> 3) & 0x7;
+            const rdLow = i & 0x7;
+            const rm = (h2 << 3) | rmLow;
+            rd = (h1 << 3) | rdLow;
+            op1 = cpu.getGeneralRegister(rd);
+            op2 = cpu.getGeneralRegister(rm);
+            break;
+        }
+        case 5: {
+            rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            op1 = cpu.getGeneralRegister(Reg.PC) & 0xFFFFFFFC;
+            op2 = imm << 2;
+            break;
+        }
+        case 6: {
+            rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            op1 = cpu.getGeneralRegister(Reg.SP);
+            op2 = imm << 2;
+            break;
+        }
+        case 7: {
+            rd = Reg.SP;
+            op1 = cpu.getGeneralRegister(Reg.SP);
+            op2 = (i & 0x7F) << 2;
+            break;
+        }
+    }
+    
+    if (rd && op1 && op2) {
+        const result = op1 + op2;
+        cpu.setGeneralRegister(rd, result);
+        if (type <= 3) {
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            // CarryFrom and OverflowFrom unimplemented
+            cpu.setStatusRegisterFlag('c', 0);
+            cpu.setStatusRegisterFlag('v', 0);
+        }
+    }
     return { incrementPC: true };
 }
 
 const processAND = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('AND');
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = cpu.getGeneralRegister(rm) & cpu.getGeneralRegister(rd);
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
     return { incrementPC: true };
 }
 
 const processASR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`ASR (${type})`);
+    if (type === 1) {
+        const imm = (i >>> 6) & 0x1F;
+        const rm = (i >>> 3) & 0x7;
+        const rmValue = cpu.getGeneralRegister(rm);
+        const rd = i & 0x7;
+        let result;
+        if (imm === 0) {
+            const rm31 = (rm >>> 31) & 0x1;
+            cpu.setStatusRegisterFlag('c', rm31);
+            result = rm31 === 0 ? 0 : 0xFFFFFFFF;
+        } else {
+            cpu.setStatusRegisterFlag('c', (rmValue >>> (imm - 1)) & 0x1);
+            const [shift, carryOut] = arithmeticShiftRight(rmValue, imm);
+            result = shift;
+        }
+        cpu.setGeneralRegister(rd, result);
+        cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+        cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+    } else if (type === 2) {
+        const rs = (i >>> 3) & 0x7;
+        const rsValue = cpu.getGeneralRegister(rs);
+        const rs7_0 = rsValue & 0xFF;
+        const rd = i & 0x7;
+        let result;
+        if (rs7_0 === 0) {
+            // Do nothing
+            result = cpu.getGeneralRegister(rd);
+        } else if (rs7_0 < 32) {
+            cpu.setStatusRegisterFlag('c', (rd >>> (rs7_0 - 1)) & 0x1);
+            const [shift, carryOut] = arithmeticShiftRight(rd, rs7_0);
+            result = shift;
+        } else {
+            const rd31 = (cpu.getGeneralRegister(rd) >>> 31) & 0x1;
+            cpu.setStatusRegisterFlag('c', rd31);
+            result = rd31 === 0 ? 0 : 0xFFFFFFFF;
+        }
+        cpu.setGeneralRegister(rd, result);
+        cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+        cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);   
+    }
     return { incrementPC: true };
 }
 
 const processBIC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BIC');
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = cpu.getGeneralRegister(rd) & (~cpu.getGeneralRegister(rm));
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
     return { incrementPC: true };
 }
 
 const processCMN = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('CMN');
+    const rm = (i >>> 3) & 0x7;
+    const rn = i & 0x7;
+    const aluOut = cpu.getGeneralRegister(rm) + cpu.getGeneralRegister(rn);
+    cpu.setStatusRegisterFlag('n', (aluOut >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', aluOut === 0 ? 1 : 0);
+    // TODO c and v flags
+    cpu.setStatusRegisterFlag('c', 0);
+    cpu.setStatusRegisterFlag('v', 0);
     return { incrementPC: true };
 }
 
 const processCMP = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`CMP (${type})`);
+    let aluOut;
+    switch (type) {
+        case 1: {
+            const rn = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            aluOut = cpu.getGeneralRegister(rn) - imm;
+            break;
+        }
+        case 2: {
+            const rm = (i >>> 3) & 0x7;
+            const rn = i & 0x3;
+            aluOut = cpu.getGeneralRegister(rn) - cpu.getGeneralRegister(rm);
+            break;
+        }
+        case 3: {
+            const h1 = (i >>> 7) & 0x1;
+            const h2 = (i >>> 6) & 0x1;
+            const rmLow = (i >>> 3) & 0x7;
+            const rnLow = i && 0x7;
+            const rm = (1 << h1) | rmLow;
+            const rn = (1 << h2) | rnLow;
+            aluOut = cpu.getGeneralRegister(rn) - cpu.getGeneralRegister(rm);
+            break;
+        }
+    }
+
+    if (aluOut) {
+        cpu.setStatusRegisterFlag('n', (aluOut >>> 31) & 0x1);
+        cpu.setStatusRegisterFlag('z', aluOut === 0 ? 1 : 0);
+        // TODO
+        // cpu.setStatusRegisterFlag('c', (aluOut >>> 31) & 0x1);
+        // cpu.setStatusRegisterFlag('v', (aluOut >>> 31) & 0x1);
+    }
+
     return { incrementPC: true };
 }
 
 const processEOR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('EOR');
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = cpu.getGeneralRegister(rd) ^ cpu.getGeneralRegister(rm);
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
     return { incrementPC: true };
 }
 
 const processLSL = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`LSL (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rm = (i >>> 3) & 0x7;
+            const rmValue = cpu.getGeneralRegister(rm);
+            const rd = i & 0x7;
+            let result;
+            if (imm === 0) {
+                result = rmValue;
+            } else {
+                cpu.setStatusRegisterFlag('c', (rmValue >>> (32 - imm)) & 0x1);
+                const [shift, carry] = logicalShiftLeft(rmValue, imm);
+                result = shift;
+            }
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            break;
+        }
+        case 2: {
+            const rs = (i >>> 3) & 0x7;
+            const rsValue = cpu.getGeneralRegister(rs);
+            const rd = i & 0x7;
+            const rdValue = cpu.getGeneralRegister(rd);
+            let result;
+            if ((rsValue & 0xFF) === 0) {
+                result = rdValue;
+            } else if ((rsValue & 0xFF) < 32) {
+                cpu.setStatusRegisterFlag('c', (rdValue >>> (32 - (rsValue & 0xFF))) & 0x1);
+                const [shift, carry] = logicalShiftLeft(rdValue, (rsValue & 0xFF));
+                result = shift;
+            } else if ((rsValue & 0xFF) === 32) {
+                cpu.setStatusRegisterFlag('c', rdValue & 0x1);
+                result = 0;
+            } else {
+                cpu.setStatusRegisterFlag('c', 0);
+                result = 0;
+            }
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processLSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`LSR (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rm = (i >>> 3) & 0x7;
+            const rmValue = cpu.getGeneralRegister(rm);
+            const rd = i & 0x7;
+            const rdValue = cpu.getGeneralRegister(rd);
+            let result;
+            if (imm === 0) {
+                cpu.setStatusRegisterFlag('c', (rdValue >>> 31) & 0x1);
+                result = 0;
+            } else {
+                cpu.setStatusRegisterFlag('c', (rdValue >>> (imm - 1)) & 0x1);
+                const [shift, carry] = logicalShiftRight(rmValue, imm);
+                result = shift;
+            }
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            break;
+        }
+        case 2: {
+            const rs = (i >>> 3) & 0x7;
+            const rsValue = cpu.getGeneralRegister(rs);
+            const rd = i & 0x7;
+            const rdValue = cpu.getGeneralRegister(rd);
+            let result;
+            if ((rsValue & 0xFF) === 0) {
+                result = rdValue;
+            } else if ((rsValue & 0xFF) < 32) {
+                cpu.setStatusRegisterFlag('c', (rdValue >>> ((rsValue & 0xFF) - 1)) & 0x1);
+                const [shift, carry] = logicalShiftRight(rdValue, (rsValue & 0xFF));
+                result = shift;
+            } else if ((rsValue & 0xFF) === 32) {
+                cpu.setStatusRegisterFlag('c', (rdValue >>> 31) & 0x1);
+                result = 0;
+            } else {
+                cpu.setStatusRegisterFlag('c', 0);
+                result = 0;
+            }
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processMOV = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`MOV (${type})`);
+
+    switch (type) {
+        case 1: {
+            const rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            cpu.setGeneralRegister(rd, imm);
+            cpu.setStatusRegisterFlag('n', (imm >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', imm === 0 ? 1 : 0);
+            break;
+        }
+        case 2: {
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const result = cpu.getGeneralRegister(rn);
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            cpu.setStatusRegisterFlag('c', 0);
+            cpu.setStatusRegisterFlag('v', 0);
+            break;
+        }
+        case 3: {
+            const h1 = (i >>> 7) & 0x1;
+            const h2 = (i >>> 6) & 0x1;
+            const rmLow = (i >>> 3) & 0x7;
+            const rdLow = i & 0x7;
+            const rm = (h2 << 3) | rmLow;
+            const rd = (h1 << 3) | rdLow;
+            cpu.setGeneralRegister(rd, cpu.getGeneralRegister(rm));
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('MUL');
+
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rd)) & 0xFFFFFFFF;
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+
     return { incrementPC: true };
 }
 
 const processMVN = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('MVN');
+
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = ~cpu.getGeneralRegister(rm);
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+
     return { incrementPC: true };
 }
 
 const processNEG = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('NEG');
+
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = 0 - cpu.getGeneralRegister(rm);
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+    // TODO set c and v flags
+
     return { incrementPC: true };
 }
 
 const processORR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('ORR');
+
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const result = cpu.getGeneralRegister(rd) | cpu.getGeneralRegister(rm);
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+
     return { incrementPC: true };
 }
 
 const processROR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('ROR');
+
+    const rs = (i >>> 3) & 0x7;
+    const rsValue = cpu.getGeneralRegister(rs);
+    const rd = i & 0x7;
+    const rdValue = cpu.getGeneralRegister(rd);
+    let result;
+
+    if ((rsValue & 0xFF) === 0) {
+        result = rdValue;
+    } else if ((rsValue & 0x1F) === 0) {
+        cpu.setStatusRegisterFlag('c', (rdValue >>> 31) & 0x1);
+        result = rdValue;
+    } else {
+        cpu.setStatusRegisterFlag('c', (rdValue >>> ((rsValue & 0x1F) - 1)) & 0x1);
+        result = rotateRight(rdValue, (rs & 0x1F), 32);
+    }
+
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+
     return { incrementPC: true };
 }
 
 const processSBC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SBC');
+
+    const rm = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const notC = cpu.getStatusRegisterFlag('c') === 1 ? 0 : 1;
+    const result = (cpu.getGeneralRegister(rd) - cpu.getGeneralRegister(rm)) - notC;
+    cpu.setGeneralRegister(rd, result);
+    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+    // TODO set c and v
+
     return { incrementPC: true };
 }
 
 const processSUB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`SUB (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const result = cpu.getGeneralRegister(rn) - imm;
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            // TODO
+            break;
+        }
+        case 2: {
+            const rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            const result = cpu.getGeneralRegister(rd) - imm;
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            // TODO
+            break;
+        }
+        case 3: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const result = cpu.getGeneralRegister(rn) - cpu.getGeneralRegister(rm);
+            cpu.setGeneralRegister(rd, result);
+            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
+            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            // TODO
+            break;
+        }
+        case 4: {
+            const imm = i & 0x7F;
+            const result = cpu.getGeneralRegister(Reg.SP) - (imm << 2);
+            cpu.setGeneralRegister(Reg.SP, result);
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processTST = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('TST');
+
+    const rm = (i >>> 3) & 0x7;
+    const rn = i & 0x7;
+    const aluOut = cpu.getGeneralRegister(rn) & cpu.getGeneralRegister(rm);
+    cpu.setStatusRegisterFlag('n', (aluOut >>> 31) & 0x1);
+    cpu.setStatusRegisterFlag('z', aluOut === 0 ? 1 : 0);
+
     return { incrementPC: true };
 }
 

@@ -26,6 +26,6 @@ test('ThreeSquares program', () => {
     }
 
     for (let i = 0; i < cpu.history.logs.length; i++) {
-        console.log(cpu.history.toString(i));
+        // console.log(cpu.history.toString(i));
     }
 });

@@ -31,6 +31,7 @@ test('ARM: ADD, SUB', () => {
         stateString.setRegister(6, 0x020083EF).setRegister(Reg.PC, 0x0800000C + (4 * 9)).build(),
     ];
     cpu.reset();
+    cpu.bigEndian = true;
     cpu.loadProgram(program);
     for (let i = 0; i < stateStrings.length; i++) {
         cpu.step();
@@ -45,6 +46,7 @@ test('ARM: STM', () => {
     ];
 
     cpu.reset();
+    cpu.bigEndian = true;
     cpu.setGeneralRegister(0, 0x10);
     for (let i = 0; i < 10; i++) {
         cpu.setGeneralRegister(i, i);
