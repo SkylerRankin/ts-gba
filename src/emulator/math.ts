@@ -89,6 +89,18 @@ const byteArrayToInt32 = (a: Uint8Array, bigEndian: boolean) : number => {
 }
 
 const int32ToByteArray = (n: number, bigEndian: boolean) : Uint8Array => {
+    return intToByteArray(n, bigEndian, 4);
+}
+
+const int16ToByteArray = (n: number, bigEndian: boolean) : Uint8Array => {
+    return intToByteArray(n, bigEndian, 2);
+}
+
+const int8ToByteArray = (n: number, bigEndian: boolean) : Uint8Array => {
+    return intToByteArray(n, bigEndian, 1);
+}
+
+const intToByteArray = (n: number, bigEndian: boolean, bytes: number) : Uint8Array => {
     const a = new Uint8Array(4);
     for (let i = 0; i < 4; i++) {
         a[i] = (n >>> (i * 8)) & 0xFF;
@@ -106,6 +118,11 @@ const numberOfSetBits = (n: number) : number => {
     return count;
 }
 
+const asHex = (n: number) : string => {
+    return '0x' + n.toString(16).padStart(8, '0');
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
-    int32ToByteArray, numberOfSetBits }
+    int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
+    asHex }

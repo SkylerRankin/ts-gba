@@ -1,6 +1,10 @@
 import { CPU, Reg } from './cpu';
 import { ProcessedInstructionOptions } from './armInstructionProcessors';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
+    signExtend, byteArrayToInt32, int32ToByteArray, int16ToByteArray,
+    int8ToByteArray, 
+    numberOfSetBits,
+    asHex} from './math';
 
 const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
@@ -86,26 +90,78 @@ const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 // Branch Instructions
 const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`B (${type})`);
-    return { incrementPC: true };
+
+    switch (type) {
+        case 1: {
+            const cond = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            const pc = cpu.getGeneralRegister(Reg.PC);
+            const newPC = pc + (signExtend(imm, 32) << 1);
+            // TODO check condition correctly
+            if (cond > 0) {
+                cpu.setGeneralRegister(Reg.PC, newPC);
+            }
+            break;
+        }
+        case 2: {
+            const imm = i & 0x7FF;
+            const pc = cpu.getGeneralRegister(Reg.PC);
+            const newPC = pc + (signExtend(pc, 32) << 1);
+            cpu.setGeneralRegister(Reg.PC, newPC);
+        }
+    }
+
+    return { incrementPC: false };
 }
 
 const processBL_BLX1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BL');
-    return { incrementPC: true };
-}
 
-const processBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
-    cpu.history.setInstructionName('BL');
-    return { incrementPC: true };
+    const h = (i >>> 11) & 0x3;
+    const offset = i & 0x7FF;
+    const pc = cpu.getGeneralRegister(Reg.PC);
+
+    if (h === 0b10) {
+        cpu.setGeneralRegister(Reg.LR, pc + (signExtend(offset, 32) << 12));
+        return { incrementPC: true };
+    } else if (h === 0b11) {
+        const newPC = cpu.getGeneralRegister(Reg.LR) + (offset << 1);
+        cpu.setGeneralRegister(Reg.LR, (pc + 2) | 1);
+        cpu.setGeneralRegister(Reg.PC, newPC);
+    } else if (h === 0b01) {
+        const newPC = (cpu.getGeneralRegister(Reg.LR) + (offset << 1)) & 0xFFFFFFFC;
+        cpu.setGeneralRegister(Reg.LR, (pc + 2) | 1);
+        cpu.setGeneralRegister(Reg.PC, newPC);
+        cpu.setStatusRegisterFlag('t', 0);
+    }
+
+    return { incrementPC: false };
 }
 
 const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BX');
+
+    const h2 = (i >>> 6) & 0x1;
+    const rm = (i >>> 3) & 0x7;
+    const rmValue = cpu.getGeneralRegister(rm);
+    cpu.setStatusRegisterFlag('t', rmValue & 0x1);
+    cpu.setGeneralRegister(Reg.PC, rmValue & (~0x1));
+
     return { incrementPC: true };
 }
 
 const processBLX2 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BL');
+
+    const h2 = (i >>> 6) & 0x1;
+    const rmLow = (i >>> 3) & 0x7;
+    const rm = (h2 << 3) | rmLow;
+    const rmValue = cpu.getGeneralRegister(rm);
+    const pc = cpu.getGeneralRegister(Reg.PC);
+    cpu.setGeneralRegister(Reg.LR, (pc + 2) | 1);
+    cpu.setStatusRegisterFlag('t', rmValue & 0x1);
+    cpu.setGeneralRegister(Reg.PC, rmValue & (~0x1));
+
     return { incrementPC: true };
 }
 
@@ -629,41 +685,259 @@ const processTST = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`LDR (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + (imm * 4);
+            if ((address & 0x3) === 0) {
+                const data = cpu.getBytesFromMemory(address, 4);
+                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            } else {
+                cpu.history.currentLog.errors.push(`LDR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
+            }
+            break;
+        }
+        case 2: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+            if ((address & 0x3) === 0) {
+                const data = cpu.getBytesFromMemory(address, 4);
+                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            } else {
+                cpu.history.currentLog.errors.push(`LDR (2) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
+            }
+            break;
+        }
+        case 3: {
+            const rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            const pc = cpu.getGeneralRegister(Reg.PC);
+            const address = ((pc & ~(0b11)) << 2) + (imm + 4);
+            const data = cpu.getBytesFromMemory(address, 4);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            break;
+        }
+        case 4: {
+            const rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            const sp = cpu.getGeneralRegister(Reg.SP);
+            const address = sp + (imm * 4);
+            if ((address & 0x3) === 0) {
+                const data = cpu.getBytesFromMemory(address, 4);
+                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            } else {
+                cpu.history.currentLog.errors.push(`LDR (4) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
+            }
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processLDRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`LDRB (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + imm;
+            const data = cpu.getBytesFromMemory(address, 1);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            break;
+        }
+        case 2: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+            const data = cpu.getBytesFromMemory(address, 1);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processLDRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`LDRH (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + (imm * 2);
+            if ((address & 0x1) === 0) {
+                const data = cpu.getBytesFromMemory(address, 2);
+                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            } else {
+                cpu.history.currentLog.errors.push(`LDRH (1) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
+            }
+            break;
+        }
+        case 2: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+            if ((address & 0x1) === 0) {
+                const data = cpu.getBytesFromMemory(address, 2);
+                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            } else {
+                cpu.history.currentLog.errors.push(`LDRH (2) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
+            }
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDRSB');
+
+    const rm = (i >>> 6) & 0x7;
+    const rn = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+    const data = cpu.getBytesFromMemory(address, 1);
+    cpu.setGeneralRegister(rd, signExtend(data[0], 1));
+
     return { incrementPC: true };
 }
 
 const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDRSH');
+
+    const rm = (i >>> 6) & 0x7;
+    const rn = (i >>> 3) & 0x7;
+    const rd = i & 0x7;
+    const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+    if ((address & 0x1) === 0) {
+        const data = cpu.getBytesFromMemory(address, 2);
+        cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+    } else {
+        cpu.history.currentLog.errors.push(`LDRSH address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
+    }
+
     return { incrementPC: true };
 }
 
 const processSTR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`STR (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + (imm * 4);
+            if ((address & 0x11) === 0) {
+                const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+                cpu.setBytesInMemory(address, data);
+            } else {
+                cpu.history.currentLog.errors.push(`STR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
+            }
+            break;
+        }
+        case 2: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+            if ((address & 0x11) === 0) {
+                const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+                cpu.setBytesInMemory(address, data);
+            } else {
+                cpu.history.currentLog.errors.push(`STR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
+            }
+            break;
+        }
+        case 3: {
+            const rd = (i >>> 8) & 0x7;
+            const imm = i & 0xFF;
+            const sp = cpu.getGeneralRegister(Reg.SP);
+            const address = sp + (imm * 4);
+            if ((address & 0x11) === 0) {
+                const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+                cpu.setBytesInMemory(address, data);
+            } else {
+                cpu.history.currentLog.errors.push(`STR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
+            }
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processSTRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`STRB (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + imm;
+            const data = int8ToByteArray((rd & 0xF), cpu.bigEndian);
+            cpu.setBytesInMemory(address, data);
+            break;
+        }
+        case 2: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+            const data = int8ToByteArray((rd & 0xF), cpu.bigEndian);
+            cpu.setBytesInMemory(address, data);
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
 const processSTRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`STRH (${type})`);
+
+    switch (type) {
+        case 1: {
+            const imm = (i >>> 6) & 0x1F;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + (imm * 2);
+            if ((address & 0x3) === 0) {
+                const data = int16ToByteArray((rd & 0xFF), cpu.bigEndian);
+                cpu.setBytesInMemory(address, data);
+            } else {
+                cpu.history.currentLog.errors.push(`STRH (1) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
+            }
+            break;
+        }
+        case 2: {
+            const rm = (i >>> 6) & 0x7;
+            const rn = (i >>> 3) & 0x7;
+            const rd = i & 0x7;
+            const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
+            if ((address & 0x3) === 0) {
+                const data = int16ToByteArray((rd & 0xFF), cpu.bigEndian);
+                cpu.setBytesInMemory(address, data);
+            } else {
+                cpu.history.currentLog.errors.push(`STRH (1) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
+            }
+            break;
+        }
+    }
+
     return { incrementPC: true };
 }
 
@@ -671,21 +945,120 @@ const processSTRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
 
 const processLDMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDMIA');
+
+    const rn = (i >>> 8) & 0x7;
+    const regList = i & 0xFF;
+    const startAddress = cpu.getGeneralRegister(rn);
+    const endAddress = cpu.getGeneralRegister(rn) + (numberOfSetBits(regList) * 4) - 4;
+    let address = startAddress;
+    for (let i = 0; i <= 7; i++) {
+        if (((regList >>> i) & 0x1) === 1) {
+            let data = cpu.getBytesFromMemory(address, 4);
+            cpu.setGeneralRegister(i, byteArrayToInt32(data, cpu.bigEndian));
+            address += 4;
+        }
+    }
+
+    if (address - 4 !== endAddress) {
+        cpu.history.currentLog.errors.push(`Final address of 0x${address.toString(16).padStart(8, '0')} != expected end address 0x${endAddress.toString(16).padStart(8, '0')}`);
+    }
+
+    const rnValue = cpu.getGeneralRegister(rn);
+    cpu.setGeneralRegister(rn, rnValue + (numberOfSetBits(regList) * 4));
+
     return { incrementPC: true };
 }
 
 const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('POP');
-    return { incrementPC: true };
+
+    const r = (i >>> 8) & 0x1;
+    const regList = i & 0xFF;
+    const sp = cpu.getGeneralRegister(Reg.SP);
+    const startAddress = sp;
+    const endAddress = sp + 4 * (r + numberOfSetBits(regList));
+    let address = startAddress;
+
+    for (let i = 0; i <= 7; i++) {
+        if (((regList >>> i) & 0x1) === 1) {
+            const data = cpu.getBytesFromMemory(address, 4);
+            cpu.setGeneralRegister(i, byteArrayToInt32(data, cpu.bigEndian));
+            address += 4;
+        }
+    }
+
+    if (r === 1) {
+        const value = cpu.getBytesFromMemory(address, 4);
+        const newPC = byteArrayToInt32(value, cpu.bigEndian) & 0xFFFFFFFE;
+        cpu.setGeneralRegister(Reg.PC, newPC);
+        address += 4;
+    }
+
+    if (endAddress !== address) {
+        cpu.history.currentLog.errors.push(`End address ${asHex(address)} != expected end address ${asHex(endAddress)}.`);
+    }
+
+    cpu.setGeneralRegister(Reg.SP, endAddress);
+
+    return { incrementPC: r !== 1 };
 }
 
 const processPUSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('PUSH');
+
+    const r = (i >>> 8) & 0x1;
+    const regList = i & 0xFF;
+    const sp = cpu.getGeneralRegister(Reg.SP);
+    const startAddress = sp - 4 * (r + numberOfSetBits(regList));
+    const endAddress = sp - 4;
+    let address = startAddress;
+
+    for (let i = 0; i <= 7; i++) {
+        if (((regList >>> i) & 0x1) === 1) {
+            const data = int32ToByteArray(cpu.getGeneralRegister(i), cpu.bigEndian);
+            cpu.setBytesInMemory(address, data);
+            address += 4;
+        }
+    }
+
+    if (r === 1) {
+        const lr = cpu.getGeneralRegister(Reg.LR);
+        cpu.setBytesInMemory(address, int32ToByteArray(lr, cpu.bigEndian));
+        address += 4;
+    }
+
+    if (endAddress !== address) {
+        cpu.history.currentLog.errors.push(`Ending address ${asHex(address)} != expected (end address - 4) ${asHex(endAddress - 4)}.`);
+    }
+
+    cpu.setGeneralRegister(Reg.SP, sp - 4 * (r + numberOfSetBits(regList)));
+
     return { incrementPC: true };
 }
 
 const processSTMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('STMIA');
+
+    const rn = (i >>> 8) & 0x7;
+    const rnValue = cpu.getGeneralRegister(rn);
+    const regList = i & 0xFF;
+    const startAddress = cpu.getGeneralRegister(rn);
+    const endAddress = cpu.getGeneralRegister(rn) + (numberOfSetBits(regList) * 4) - 4;
+    let address = startAddress;
+    for (let i = 0; i <= 7; i++) {
+        if (((regList >>> i) & 0x1) === 1) {
+            const data = int32ToByteArray(cpu.getGeneralRegister(i), cpu.bigEndian);
+            cpu.setBytesInMemory(address, data);
+            address += 4;
+        }
+    }
+
+    if (endAddress != address - 4) {
+        cpu.history.currentLog.errors.push(`Ending address - 4 ${asHex(endAddress - 4)} != expected end address ${asHex(endAddress)}`);
+    }
+
+    cpu.setGeneralRegister(rn, rnValue + (numberOfSetBits(regList) * 4));
+
     return { incrementPC: true };
 }
 
@@ -693,11 +1066,13 @@ const processSTMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processBKPT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BKPT');
+    cpu.history.currentLog.errors.push('Not implemented.');
     return { incrementPC: true };
 }
 
 const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SWI');
+    cpu.history.currentLog.errors.push('Not implemented.');
     return { incrementPC: true };
 }
 

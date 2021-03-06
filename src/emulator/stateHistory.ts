@@ -6,7 +6,8 @@ type HistoryLog = {
     operatingMode: number,
     instructionName: string,
     instruction: number,
-    pc: number
+    pc: number,
+    errors: string[]
 };
 
 const emptyHistoryLog: HistoryLog = {
@@ -14,7 +15,8 @@ const emptyHistoryLog: HistoryLog = {
     operatingMode: 0,
     instructionName: '',
     instruction: 0,
-    pc: 0
+    pc: 0,
+    errors: []
 };
 
 interface StateHistoryType {
