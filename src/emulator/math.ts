@@ -131,7 +131,14 @@ const toBigEndianInt32 = (n: number): number => {
     ) >>> 0;
 }
 
+const toBigEndianInt16 = (n: number): number => {
+    return (
+        ((n & 0xff00) >>> 8) +
+        ((n & 0xff) << 8)
+    ) >>> 0;
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
-    asHex, toBigEndianInt32 }
+    asHex, toBigEndianInt32, toBigEndianInt16 }

@@ -1,0 +1,66 @@
+# A random example of each THUMBv4 instruction preceded by its little-endian encoding and instruction name.
+
+0x4841 [ADC] ADC R0, R1
+0x881c [ADD (1)] ADD R0, R1, #2
+0x0230 [ADD (2)] ADD R0, #2
+0x5318 [ADD (3)] ADD R3, R2, R1
+0x7044 [ADD (4)] ADD R0, R14
+0x08A0 [ADD (5)] ADD R0, PC, #8 * 4
+0x08a8 [ADD (6)] ADD R0, SP, #8 * 4
+0x08b0 [ADD (7)] ADD SP, #8 * 4
+0x0840 [AND] AND R0, R1
+0x8812 [ASR (1)] ASR R0, R1, #10
+0x0841 [ASR (2)] ASR R0, R1
+0x00d0 [B (1)] BEQ #4
+0x0be2 [B (2)] B #1050
+0x8843 [BIC] BIC R0, R1
+0x0abe [BKPT] BKPT #100
+0x08F8 [BL] BL ???
+0x0047 [BX] BX R0
+0xc842 [CMN] CMN R0, R1
+0x0128 [CMP (1)] CMP R0, #1
+0x8842 [CMP (2)] CMP R0, R1
+0x7045 [CMP (3)] CMP R0, R14
+0x4840 [EOR] EOR R0, R1
+0x0AC8 [LDMIA] LDMIA R0, {R1, R3}
+0x086c [LDR (1)] LDR R0, [R1, #16 * 4]
+0x8858 [LDR (2)] LDR R0, [R1, R2]
+0x1048 [LDR (3)] LDR R0, [PC, #16 * 4]
+0x1098 [LDR (4)] LDR R0, [SP, #16 * 4]
+0x487a [LDRB (1)] LDRB R0, [R1, #9]
+0x885c [LDRB (2)] LDRB R0, [R1, R2]
+0x4889 [LDRH (1)] LDRH R0, [R1, #5 * 2]
+0x885a [LDRH (2)] LDRH R0, [R1, R2]
+0x8856 [LDRSB] LDRSB R0, [R1, R2]
+0x885e [LDRSH] LDRSH R0, [R1, R2]
+0x8800 [LSL (1)] LSL R0, R1, #2
+0x8840 [LSL (2)] LSL R0, R1
+0x8808 [LSR (1)] LSR R0, R1, #2
+0xc840 [LSR (2)] LSR R0, R1
+0x4020 [MOV (1)] MOV R0, #64
+# MOV (2) is encoded as an ADD (1) instruction. For instance,
+# MOV R0, R1 is encoded the same as ADD R0, R1, #0.
+0x081C [ADD (1)] MOV R0, R1
+0x7046 [MOV (3)] MOV R0, R14
+0x4843 [MUL] MUL R0, R1
+0xc843 [MVN] MVN R0, R1
+0x4842 [NEG] NEG R0, R1
+0x0843 [ORR] ORR R0, R1
+0x12bc [POP] POP {R1, R4}
+0x12b4 [PUSH] PUSH {R1, R4}
+0xc841 [ROR] ROR R0, R1
+0x8841 [SBC] SBC R0, R1
+0x30c0 [STMIA] STMIA R0!, {R4, R5}
+0xc861 [STR (1)] STR R0, [R1, #7 * 4]
+0x8850 [STR (2)] STR R0, [R1, R2]
+0x2890 [STR (3)] STR R0, [SP, #40 * 4]
+0x4871 [STRB (1)] STRB R0, [R1, #5]
+0x8854 [STRB (2)] STRB R0, [R1, R2]
+0x4881 [STRH (1)] STRH R0, [R1, #5 * 2]
+0x8852 [STRH (2)] STRH R0, [R1, R2]
+0xc81f [SUB (1)] SUB R0, R1, #7
+0x1438 [SUB (2)] SUB R0, #20
+0x881a [SUB (3)] SUb R0, R1, R2
+0x88B0 [SUB (4)] SUB SP, #0x20
+0x03df [SWI] SWI #3
+0x0842 [TST] TST R0, R1

@@ -1,7 +1,6 @@
-import { executionAsyncId } from 'async_hooks';
 import {
     encodeWithRotation, rotateRight, rotateLeft, signExtend,
-    byteArrayToInt32, int32ToByteArray, toBigEndianInt32 } from '../../emulator/math';
+    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16 } from '../../emulator/math';
 
 test('rotateRight', () => {
     expect(rotateRight(15, 3, 8)).toBe(225);
@@ -50,4 +49,9 @@ test('byteArrayToInt32 and int32ToByteArray', () => {
 test('toBigEndianInt32', () => {
     expect(toBigEndianInt32(0x12345678)).toBe(0x78563412);
     expect(toBigEndianInt32(0x910002E1)).toBe(0xE1020091);
+});
+
+test('toBigEndianInt16', () => {
+    expect(toBigEndianInt16(0x1234)).toBe(0x3412);
+    expect(toBigEndianInt16(0x9100)).toBe(0x0091);
 });

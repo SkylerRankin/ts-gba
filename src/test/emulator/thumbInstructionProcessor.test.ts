@@ -1,13 +1,13 @@
-import { processARM } from "../../emulator/armInstructionProcessors";
+import { processTHUMB } from "../../emulator/thumbInstructionProcessors";
 import { CPU } from "../../emulator/cpu";
 import { readFileSync } from "fs";
-import { toBigEndianInt32 } from "../../emulator/math";
+import { toBigEndianInt16 } from "../../emulator/math";
 
 
-test("Identify ARM op-codes", () => {
+test("Identify THUMB op-codes", () => {
     const cpu = new CPU();
 
-    const test_cases = readFileSync("src/test/emulator/data/opcodes_arm.txt").toString()
+    const test_cases = readFileSync("src/test/emulator/data/opcodes_thumb.txt").toString()
         .split(/\r?\n/)
         .filter(line => !line.startsWith("#") && line.length > 0)
         .map(line => {
@@ -17,8 +17,8 @@ test("Identify ARM op-codes", () => {
         });
 
     test_cases.forEach(e => {
-        const bigEndianEncoding = toBigEndianInt32(e.encoding);
-        processARM(cpu, bigEndianEncoding);
+        const bigEndianEncoding = toBigEndianInt16(e.encoding);
+        processTHUMB(cpu, bigEndianEncoding);
         expect(cpu.history.currentLog.instructionName).toBe(e.name);
     });
 });
