@@ -14,8 +14,11 @@ type DataProcessingParameter = {
     shiftCarry: number
 }
 
+/**
+ * Takes a 32 bit ARM instruction in big-endian format, and executes that instruction
+ * on the given CPU.
+ */
 const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
-
     const bits = (i >>> 0).toString(2).padStart(32, '0')
         .split('').map((x: string) : number => parseInt(x)).reverse();
 
@@ -49,7 +52,7 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // Coprocessor Load & Store
     if (((i >>> 25) & 0x7) === 0b110) {
         if (bits[20] === 1) return processLDC(cpu, i);
-        if (bits[20] === 1) return processSTC(cpu, i);
+        if (bits[20] === 0) return processSTC(cpu, i);
     }
 
     // Coprocessor Data Processing and Register Transfers
@@ -724,9 +727,10 @@ const processMvn = (data: DataProcessingParameter) : number => {
 // Branch Instructions
 
 const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
-    cpu.history.setInstructionName('BBL');
     const pcOffset = 8;
     const lFlag = (i >>> 24) & 0x1;
+    cpu.history.setInstructionName(lFlag ? "BL" : "B");
+
     let imm = i & 0xFFFFFF;
     if (((imm >>> 23) & 0x1) === 1) imm += 0xFF000000;
     imm = imm << 2;

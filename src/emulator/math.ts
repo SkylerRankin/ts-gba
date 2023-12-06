@@ -122,7 +122,16 @@ const asHex = (n: number) : string => {
     return '0x' + n.toString(16).padStart(8, '0');
 }
 
+const toBigEndianInt32 = (n: number): number => {
+    return (
+        ((n & 0xff) << 24) +
+        ((n & 0xff00) << 8) +
+        ((n & 0xff0000) >>> 8) +
+        ((n & 0xff000000) >>> 24)
+    ) >>> 0;
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
-    asHex }
+    asHex, toBigEndianInt32 }

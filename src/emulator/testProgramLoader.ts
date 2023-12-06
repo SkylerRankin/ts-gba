@@ -14,7 +14,7 @@ const add = (cpu: CPUType) => {
     ];
     let address = 0;
     program.forEach(instruction => {
-        cpu.rom[address++] = assembleInstruction(instruction);
+        // cpu.rom[address++] = assembleInstruction(instruction);
     });
 }
 

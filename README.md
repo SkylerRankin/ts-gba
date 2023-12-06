@@ -1,3 +1,3 @@
-### ARM Emulator
+### ts-gba
 
-A TypeScript emulator for ARM instruction sets.
+A TypeScript GBA emulator.
