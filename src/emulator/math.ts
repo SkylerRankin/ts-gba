@@ -27,7 +27,8 @@ const arithmeticShiftRight = (n: number, s: number) : number[] => {
 const logicalShiftLeft = (n: number, s: number) : number[] => {
     if (s > 32) return [0, 0];
     if (s === 32) return [0, n & 0x1];
-    return [n << s, (n >>> (32 - s)) & 0x1];
+    if (s === 0) return [n, 0];
+    return [n << s >>> 0, (n >>> (32 - s)) & 0x1];
 }
 
 // Converts a number n into values r and i such that n = i >> 2r. This operation (>>) is a right rotation.

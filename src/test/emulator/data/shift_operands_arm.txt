@@ -1,0 +1,120 @@
+# A random example of each ARMv4 shift operand case, used by data processing instructions.
+# Each line consists of the following space-separated components:
+#   <big-endian instruction> <expected value> <expected carry>
+# In cases where the value of the CPSR C flag should be present, the "CFlag" string is used.
+
+# Immediate with non-zero rotation
+# Instruction: ADD R0, R1, #0x8000000E
+0xe281013a 0x8000000E 1
+
+# Immediate with zero rotation
+# Instruction: ADD R0, R1, #0xFF
+0xe28100ff 0xff CFlag
+
+# Register
+# Instruction: ADD R0, R1, R2
+0xe0810002 2 CFlag
+
+# Register (R15)
+# Instruction: ADD R0, R1, R15
+0xe081000f 23 CFlag
+
+# Logical shift left by immediate, non-zero shift
+# Instruction: ADD R0, R1, R6, LSL #30
+0xe0810f06 0x80000000 1
+
+# Logical shift left by immediate, zero shift
+# Instruction: ADD R0, R1, R2, LSL #0
+0xe0810002 2 CFlag
+
+# Logical shift left by register, zero shift
+# Instruction: ADD R0, R1, R2, LSL R7
+0xe0810712 2 CFlag
+
+# Logical shift left by register, <32 bit shift
+# Instruction: ADD R0, R1, R2, LSL R8
+0xe0810812 0x800 0
+
+# Logical shift left by register, 32 bit shift
+# Instruction: ADD R0, R1, R3, LSL R9
+0xe0810913 0 1
+
+# Logical shift left by register, >32 bit shift
+# Instruction: ADD R0, R1, R2, LSL R10
+0xe0810a12 0 0
+
+# Logical shift right by immediate, non-zero shift
+# Instruction: ADD R0, R1, R2, LSR #1
+0xe08100a2 1 0
+
+# Logical shift right by immediate, zero shift
+# Instruction: ADD R0, R1, R2, LSR #0
+0xe0810022 0 0
+
+# Logical shift right by register, zero shift
+# Instruction: ADD R0, R1, R2, LSR R0
+0xe0810032 2 CFlag
+
+# Logical shift right by register, <32 bit shift
+# Instruction: ADD R0, R1, R2, LSR R8
+0xe0810832 0 0
+
+# Logical shift right by register, 32 bit shift
+# Instruction: ADD R0, R1, R3, LSR R9
+0xe0810933 0 0
+
+# Logical shift right by register, >32 bit shift
+# Instruction: ADD R0, R1, R2, LSR R10
+0xe0810a32 0 0
+
+# Arithmetic shift right by immediate, zero shift with positive Rm. Note that a zero shift here is used to encode a 32 bit shift.
+# Instruction: ADD R0, R1, R2, ASR #0
+0xe0810042 0 0
+
+# Arithmetic shift right by immediate, zero shift with negative Rm
+# Instruction: ADD R0, R1, R10, ASR #0
+0xe081004A 0xffffffff 1
+
+# Arithmetic shift right by immediate, non-zero shift
+# Instruction: ADD R0, R1, R3, ASR #1
+0xe08100c3 1 1
+
+# Arithmetic shift right by register, zero shift
+# Instruction: ADD R0, R1, R2, ASR R7
+0xe0810752 2 CFlag
+
+# Arithmetic shift right by register, <32 bit shift
+# Instruction: ADD R0, R1, R3, ASR R1
+0xe0810153 1 1
+
+# Arithmetic shift right by register, >=32 bit shift with positive Rm
+# Instruction: ADD R0, R1, R3, ASR R9
+0xe0810953 0 0
+
+# Arithmetic shift right by register, >=32 bit shift with negative Rm
+# Instruction: ADD R0, R1, R10, ASR R10
+0xe0810a5a 0xffffffff 1
+
+# Rotate right by immediate, zero shift. This is encoded same as a rotate right with extend
+# Instruction: ADD R0, R1, R2, ROR #0
+0xe0810062 0x80000001 0
+
+# Rotate right by immediate, non-zero shift
+# Instruction: ADD R0, R1, R5, ROR #2
+0xe0810165 0x40000001 0
+
+# Rotate right by register, 0 bit shift
+# Instruction: ADD R0, R1, R2, ROR R7
+0xe0810772 2 CFlag
+
+# Rotate right by register, 0 shift, bottom 5 bits are 0
+# Instruction: ADD R0, R1, R3, ROR R9
+0xe0810973 3 0
+
+# Rotate right by register, non-zero shift
+# Instruction: ADD R0, R1, R2, ROR R5
+0xe0810572 0x10000000 0
+
+# Rotate right with extend
+# Instruction: ADD R0, R1, R2, RRX
+0xe0810062 0x80000001 0
