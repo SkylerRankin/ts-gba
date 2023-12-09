@@ -1,0 +1,17 @@
+# A program using only ARMv4 data processing instructions.
+# Each line consists of the following components:
+#     <big-endian instruction> <text assembly for instruction> Updates=[<register/flag updates>]
+#
+# Data processing instructions often update CPSR based on SPSR when the PC register is used. These
+# situations are tested in a different file (data_processing_spsr_arm.txt).
+
+# To begin, all registers and flags are 0
+
+# --- ADC ---
+SET R0=0x55555555, R1=0xAAAAAAAC, R2=0xAAAAAAAB, R3=0x2AAAAAAA, R4=16, R5=0xFFFFFFEF
+0xe0a0a001 ADC R10, R0, R1 Updates=[R10=1]                              # Carry but no flag set
+0xe0b0a001 ADCS R10, R0, R1 Updates=[R10=1, C=1]                        # Set carry flag
+0xe0b0a002 ADCS R10, R0, R2 Updates=[R10=1, C=1]                        # Use previous carry and set carry flag
+0xe0b0a003 ADCS R10, R0, R3 Updates=[R10=0x80000000, C=0, V=1, N=1]     # No carry, signed overflow, negative result
+0xe0b0a001 ADCS R10, R0, R1 Updates=[R10=1, C=1, N=0, V=0]              # Just to set the carry bit again
+0xe0b4a005 ADCS R10, R4, R5 Updates=[R10=0, C=1, Z=1]                   # Zero result

@@ -1,5 +1,5 @@
 import { CPU, Reg } from './cpu';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32 } from './math';
 
 type ProcessedInstructionOptions = {
     incrementPC: boolean
@@ -599,16 +599,17 @@ const processAdc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
     cpu.history.setInstructionName('ADC');
-    cpu.setGeneralRegister(rd, (value1 + value2 + cFlag) & 0xFFFFFFFF);
-    const result = cpu.getGeneralRegister(rd);
+    const result = value1 + value2 + cFlag;
+    const result32 = result & 0xFFFFFFFF;
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
-        if (result === 0) cpu.setConditionCodeFlags('z');
-        if (result < 0) cpu.setConditionCodeFlags('n');
+        if (result32 === 0) cpu.setConditionCodeFlags('z');
+        if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
         // Unsigned overflow
         if (result > 2**32 - 1) cpu.setConditionCodeFlags('c');
         // Signed overflow
-        const resultMSB = (result >>> 31) & 0x1;
+        const resultMSB = (result32 >>> 31) & 0x1;
         const value1MSB = (value1 >>> 31) & 0x1;
         const value2MSB = (value2 >>> 31) & 0x1;
         if ((resultMSB && !value1MSB && !value2MSB) || (!resultMSB && value1MSB && value2MSB)) {

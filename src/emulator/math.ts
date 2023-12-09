@@ -139,7 +139,11 @@ const toBigEndianInt16 = (n: number): number => {
     ) >>> 0;
 }
 
+const isNegative32 = (n: number): boolean => {
+    return ((n >>> 31) & 0x1) === 1;
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
-    asHex, toBigEndianInt32, toBigEndianInt16 }
+    asHex, toBigEndianInt32, toBigEndianInt16, isNegative32 }

@@ -160,8 +160,17 @@ class CPU implements CPUType {
         return true;
     }
 
-    clearConditionCodeFlags() : void {
-        this.statusRegisters[0][0] &= ~0xF0000000;
+    clearConditionCodeFlags(...flags: ('n' | 'z' | 'c' | 'v')[]) : void {
+        if (flags.length === 0) {
+            this.statusRegisters[0][0] &= ~0xF0000000;
+        } else {
+            const clearMasks : number[] = [~0x80000000, ~0x40000000, ~0x20000000, ~0x10000000];
+            let cpsr = this.getStatusRegister('CPSR');
+            ['n', 'z', 'c', 'v'].forEach((key: any, i: number) => {
+                if (flags.includes(key)) cpsr &= clearMasks[i];
+            });
+            this.statusRegisters[0][0] = cpsr;
+        }
     }
 
     setConditionCodeFlags(...flags: ('n' | 'z' | 'c' | 'v')[]) : void {
@@ -328,4 +337,4 @@ class CPU implements CPUType {
 }
 
 export { CPU, OperatingModeCodes, Reg }
-export type { CPUType, StatusRegisterUpdate, OperatingMode, OperatingState }
+export type { CPUType, StatusRegisterUpdate, OperatingMode, OperatingState, StatusRegisterKey }
