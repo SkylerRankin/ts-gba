@@ -3,8 +3,6 @@ import { CPU, StatusRegisterKey } from "../../emulator/cpu";
 import { readFileSync } from "fs";
 import { toBigEndianInt32 } from "../../emulator/math";
 
-const jestPrefix = { showPrefix: false };
-
 test("Identify ARM op-codes", () => {
     const cpu = new CPU();
 
@@ -68,7 +66,7 @@ test("Determine data processing shift operand values/carries", () => {
     });
 });
 
-test.only("Execute data processing ARM instructions", () => {
+test("Execute data processing ARM instructions", () => {
     const cpu = new CPU();
     cpu.reset();
 
@@ -78,8 +76,6 @@ test.only("Execute data processing ARM instructions", () => {
         .filter(i => !i.line.startsWith("#") && i.line.length > 0)
         .map(i => {
             let line = i.line;
-            const inlineCommentIndex = line.lastIndexOf("#");
-            if (inlineCommentIndex !== -1) line = line.substring(0, inlineCommentIndex).trim();
 
             // Special lines for manually setting register/flag values.
             if (line.startsWith("SET")) {
@@ -99,10 +95,7 @@ test.only("Execute data processing ARM instructions", () => {
 
             const updatesIndex = line.indexOf("Updates=");
             if (updatesIndex !== -1) {
-                let updatesText = line.substring(line.indexOf("[", updatesIndex) + 1);
-                if (updatesText.endsWith("]")) {
-                    updatesText = updatesText.substring(0, updatesText.length - 1);
-                }
+                let updatesText = line.substring(line.indexOf("[", updatesIndex) + 1, line.indexOf("]"));
 
                 const updateObjects = parseUpdateString(updatesText);
                 registerUpdates = updateObjects.registerUpdates;

@@ -143,7 +143,25 @@ const isNegative32 = (n: number): boolean => {
     return ((n >>> 31) & 0x1) === 1;
 }
 
+/**
+ * Returns 1 if a "borrow" occurs when subtracting a from b. A borrow means that a 1
+ * is required to be borrowed into the MSB during the subtraction. This translates to
+ * subtracting a larger number from a smaller number, when interpreting the inputs both
+ * as unsigned. 
+ */
+const borrowFrom = (a: number, b: number): number => {
+    return ((a & 0xFFFFFFFF) >>> 0) < ((b & 0xFFFFFFFF) >>> 0) ? 1 : 0;
+}
+
+const signedOverflowFromSubtraction = (operand1: number, operand2: number, result: number): number => {
+    const msb1 = (operand1 >> 31) & 0x1;
+    const msb2 = (operand2 >> 31) & 0x1;
+    const msbResult = (result >> 31) & 0x1;
+    return (msb1 !== msb2 && msb1 !== msbResult) ? 1 : 0;
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
-    asHex, toBigEndianInt32, toBigEndianInt16, isNegative32 }
+    asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
+    signedOverflowFromSubtraction }

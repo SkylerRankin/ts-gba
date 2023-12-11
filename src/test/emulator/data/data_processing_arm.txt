@@ -6,6 +6,7 @@
 # situations are tested in a different file (data_processing_spsr_arm.txt).
 
 # To begin, all registers and flags are 0
+SET N=0, C=0, Z=0, V=0
 
 # --- ADC ---
 SET R0=0x55555555, R1=0xAAAAAAAC, R2=0xAAAAAAAB, R3=0x2AAAAAAA, R4=16, R5=0xFFFFFFEF
@@ -15,3 +16,40 @@ SET R0=0x55555555, R1=0xAAAAAAAC, R2=0xAAAAAAAB, R3=0x2AAAAAAA, R4=16, R5=0xFFFF
 0xe0b0a003 ADCS R10, R0, R3 Updates=[R10=0x80000000, C=0, V=1, N=1]     # No carry, signed overflow, negative result
 0xe0b0a001 ADCS R10, R0, R1 Updates=[R10=1, C=1, N=0, V=0]              # Just to set the carry bit again
 0xe0b4a005 ADCS R10, R4, R5 Updates=[R10=0, C=1, Z=1]                   # Zero result
+
+# --- ADD ---
+SET R0=0x55555555, R1=0xAAAAAAAC, R2=0xAAAAAAAB, R3=0x2AAAAAAD, R4=16, R5=0xFFFFFFF0, Z=0, C=0, V=0, N=0
+0xe080a001 ADD R10, R0, R1 Updates=[R10=1]                              # Carry but no flag set
+0xe090a001 ADDS R10, R0, R1 Updates=[R10=1, C=1]                        # Set carry flag
+0xe090a002 ADDS R10, R0, R2 Updates=[R10=0, C=1, Z=1]                   # Set carry flag, zero result
+0xe090a003 ADDS R10, R0, R3 Updates=[R10=0x80000002, C=0, V=1, N=1, Z=0] # No carry, signed overflow, negative result
+0xe090a001 ADDS R10, R0, R1 Updates=[R10=1, C=1, N=0, V=0]              # Just to set the carry bit again
+0xe094a005 ADDS R10, R4, R5 Updates=[R10=0, C=1, Z=1]                   # Zero result
+
+# --- AND ---
+SET R0=0x36, R1=0x90000000, R2=0xD2000000, R3=0x1C000000, R4=0x25, Z=0, C=0, V=0, N=0
+0xe200a012 AND R10, R0, #0x12 Updates=[R10=0x12]                         # Normal AND, no flag change
+0xe011a002 ANDS R10, R1, R2 Updates=[R10=0x90000000, N=1]                # Negative result
+0xe013ad84 ANDS R10, R3, R4, LSL #27 Updates=[R10=0x08000000, N=0, C=1]  # Carry from shift operand
+
+# --- BIC ---
+SET R0=0xFF, R1=0xAF, R2=0x25, R3=0xF0000000, R4=0x7F000000, Z=0, C=0, V=0, N=0
+0xe3c0a089 BIC R10, R0, #0x89 Updates=[R10=0x76]                         # Normal bit clear
+0xe1d1a000 BICS R10, R1, R0 Updates=[R10=0, Z=1]                         # Clear to zero
+0xe1d0ad82 BICS R10, R0, R2, LSL #27 Updates=[R10=0xFF, C=1, Z=0]        # Empty clear with carry flag set
+0xe1d3a004 BICS R10, R3, R4 Updates=[R10=0x80000000, C=1, Z=0, N=1]      # Negative clear, carry is left over from existing c flag
+
+# --- CMN ---
+SET R0=0xA0, R1=0xB0, R2=0x10000000, R3=0x70000000, R4=0xFFFFFF60, R5=0xF0000000, Z=0, C=0, V=0, N=0
+0xe1700001 CMN R0, R1 Updates=[]                                         # No flag update
+0xe1720003 CMN R2, R3 Updates=[N=1, V=1]                                 # Negative result with signed overflow
+0xe1700004 CMN R0, R4 Updates=[N=0, V=0, Z=1, C=1]                       # Zero result with carry bit
+0xe1720005 CMN R2, R5 Updates=[N=0, C=1, Z=1, V=0]                       # Zero result with carry bit
+
+# --- CMP ---
+SET R0=0xA0, R1=0xB0, R2=0x1, R3=0xFFFFFFF1, R4=0x800000A0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe1510000 CMP R1, R0 Updates=[C=1]                                      # Positive result, no borrow
+0xe1500000 CMP R0, R0 Updates=[Z=1, C=1]                                 # Zero result
+0xe1500001 CMP R0, R1 Updates=[Z=0, N=1, C=0]                            # Negative result with borrow
+0xe1530002 CMP R3, R2 Updates=[C=1, N=1]                                 # Negative result without borrow
+0xe1500004 CMP R0, R4 Updates=[V=1, N=1, C=0]                            # Negative result with signed overflow and borrow

@@ -1,6 +1,6 @@
 import {
     encodeWithRotation, rotateRight, rotateLeft, signExtend,
-    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft } from '../../emulator/math';
+    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom } from '../../emulator/math';
 
 test('logicalShiftLeft', () => {
     expect(logicalShiftLeft(2, 0)).toStrictEqual([2, 0]);
@@ -60,4 +60,21 @@ test('toBigEndianInt32', () => {
 test('toBigEndianInt16', () => {
     expect(toBigEndianInt16(0x1234)).toBe(0x3412);
     expect(toBigEndianInt16(0x9100)).toBe(0x0091);
+});
+
+test.only('borrowFrom', () => {
+    // Both positive
+    expect(borrowFrom(0xC, 0xA)).toBe(0);
+    expect(borrowFrom(0xA, 0xC)).toBe(1);
+    // Both negative
+    expect(borrowFrom(0xFFFFFFFB, 0xFFFFFFFC)).toBe(1);
+    expect(borrowFrom(0xFFFFFFFC, 0xFFFFFFFB)).toBe(0);
+    // One smaller negative
+    expect(borrowFrom(0xFFFFFFF6, 0xB)).toBe(0);
+    expect(borrowFrom(0xB, 0xFFFFFFF6)).toBe(1);
+    // One larger negative
+    expect(borrowFrom(0xFFFFFFF7, 0xA)).toBe(0);
+    expect(borrowFrom(0xA, 0xFFFFFFF7)).toBe(1);
+    // Zero
+    expect(borrowFrom(0, 0)).toBe(0);
 });
