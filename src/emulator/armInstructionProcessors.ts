@@ -529,48 +529,35 @@ const processEor = (data: DataProcessingParameter) : number => {
 }
 
 const processSub = (data: DataProcessingParameter) : number => {
-    const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
+    const {cpu, value1, value2, rd, sFlag} = data;
     cpu.history.setInstructionName('SUB');
-    cpu.setGeneralRegister(rd, value1 - value2);
-    const result = cpu.getGeneralRegister(rd);
+    const result = value1 - value2;
+    const result32 = result & 0xFFFFFFFF;
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
-        if (result === 0) cpu.setConditionCodeFlags('z');
-        if (result < 0) cpu.setConditionCodeFlags('n');
-
-        // TODO handle underflows, not overflows ------------------------------------------------------------- !!!
-
-        // Unsigned overflow
-        if (result < 2**32 - 1) cpu.setConditionCodeFlags('c');
-        // Signed overflow
-        const resultMSB = (result >>> 31) & 0x1;
-        const value1MSB = (value1 >>> 31) & 0x1;
-        const value2MSB = (value2 >>> 31) & 0x1;
-        if (value1MSB !== value2MSB && value1MSB !== resultMSB) {
-            cpu.setConditionCodeFlags('v');
-        }
+        if (result32 === 0) cpu.setConditionCodeFlags('z');
+        if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
+        if (borrowFrom(value1, value2) === 0) cpu.setConditionCodeFlags('c');
+        if (signedOverflowFromSubtraction(value1, value2, result32) === 1) cpu.setConditionCodeFlags('v');
     }
     return result;
 }
 
 const processRsb = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
+    const result = value2 - value1;
+    const result32 = result & 0xFFFFFFFF;
     cpu.history.setInstructionName('RSB');
-    cpu.setGeneralRegister(rd, value2 - value1);
-    const result = cpu.getGeneralRegister(rd);
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
-        if (result === 0) cpu.setConditionCodeFlags('z');
-        if (result < 0) cpu.setConditionCodeFlags('n');
+        if (result32 === 0) cpu.setConditionCodeFlags('z');
+        if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
         // Unsigned overflow
-        if (result < 2**32 - 1) cpu.setConditionCodeFlags('c');
+        if (borrowFrom(value2, value1) === 0) cpu.setConditionCodeFlags('c');
         // Signed overflow
-        const resultMSB = (result >>> 31) & 0x1;
-        const value1MSB = (value1 >>> 31) & 0x1;
-        const value2MSB = (value2 >>> 31) & 0x1;
-        if (value1MSB !== value2MSB && value2MSB !== resultMSB) {
-            cpu.setConditionCodeFlags('v');
-        }
+        if (signedOverflowFromSubtraction(value2, value1, result32)) cpu.setConditionCodeFlags('v');
     }
     return result;
 }
@@ -625,22 +612,19 @@ const processAdc = (data: DataProcessingParameter) : number => {
 const processSbc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
+    const notCarry = cFlag === 1 ? 0 : 1;
+    const result = value1 - value2 - notCarry;
+    const result32 = result & 0xFFFFFFFF;
     cpu.history.setInstructionName('SBC');
-    cpu.setGeneralRegister(rd, (value1 - value2 - cFlag) & 0xFFFFFFFF);
-    const result = cpu.getGeneralRegister(rd);
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
-        if (result === 0) cpu.setConditionCodeFlags('z');
-        if (result < 0) cpu.setConditionCodeFlags('n');
+        if (result32 === 0) cpu.setConditionCodeFlags('z');
+        if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
         // Unsigned overflow
-        if (result > 2**32 - 1) cpu.setConditionCodeFlags('c');
+        if (borrowFrom(value1, value2 + notCarry) === 0) cpu.setConditionCodeFlags('c');
         // Signed overflow
-        const resultMSB = (result >>> 31) & 0x1;
-        const value1MSB = (value1 >>> 31) & 0x1;
-        const value2MSB = (value2 >>> 31) & 0x1;
-        if ((resultMSB && !value1MSB && !value2MSB) || (!resultMSB && value1MSB && value2MSB)) {
-            cpu.setConditionCodeFlags('v');
-        }
+        if (signedOverflowFromSubtraction(value1, value2 + notCarry, result32)) cpu.setConditionCodeFlags('v');
     }
     return result;
 }
@@ -648,22 +632,20 @@ const processSbc = (data: DataProcessingParameter) : number => {
 const processRsc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getConditionCodeFlag('c');
+    const notCarry = cFlag === 1 ? 0 : 1;
+    const result = value2 - value1 - notCarry;
+    const result32 = result & 0xFFFFFFFF;
     cpu.history.setInstructionName('RSC');
-    cpu.setGeneralRegister(rd, (value2 - value1 - cFlag) & 0xFFFFFFFF);
-    const result = cpu.getGeneralRegister(rd);
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
-        if (result === 0) cpu.setConditionCodeFlags('z');
-        if (result < 0) cpu.setConditionCodeFlags('n');
+        if (result32 === 0) cpu.setConditionCodeFlags('z');
+        if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
         // Unsigned overflow
-        if (result > 2**32 - 1) cpu.setConditionCodeFlags('c');
+        // TODO: what if the `value1 + 1` overflows, does this check still work?
+        if (borrowFrom(value2, value1 + notCarry) === 0) cpu.setConditionCodeFlags('c');
         // Signed overflow
-        const resultMSB = (result >>> 31) & 0x1;
-        const value1MSB = (value1 >>> 31) & 0x1;
-        const value2MSB = (value2 >>> 31) & 0x1;
-        if ((resultMSB && !value1MSB && !value2MSB) || (!resultMSB && value1MSB && value2MSB)) {
-            cpu.setConditionCodeFlags('v');
-        }
+        if (signedOverflowFromSubtraction(value2, value1 + notCarry, result32) === 1) cpu.setConditionCodeFlags('v');
     }
     return result;
 }
@@ -671,10 +653,10 @@ const processRsc = (data: DataProcessingParameter) : number => {
 const processTst = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag, shiftCarry} = data;
     cpu.history.setInstructionName('TST');
-    const aluOut = value1 & value2;
+    const aluOut = (value1 & value2) & 0xFFFFFFFF;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
-        if (aluOut < 0) cpu.setConditionCodeFlags('n');
+        if (isNegative32(aluOut)) cpu.setConditionCodeFlags('n');
         if (aluOut === 0) cpu.setConditionCodeFlags('z');
         if (shiftCarry) cpu.setConditionCodeFlags('c');
     }
@@ -684,10 +666,10 @@ const processTst = (data: DataProcessingParameter) : number => {
 const processTeq = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag, shiftCarry} = data;
     cpu.history.setInstructionName('TEQ');
-    const aluOut = value1 ^ value2;
+    const aluOut = (value1 ^ value2) & 0xFFFFFFFF;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
-        if (aluOut < 0) cpu.setConditionCodeFlags('n');
+        if (isNegative32(aluOut)) cpu.setConditionCodeFlags('n');
         if (aluOut === 0) cpu.setConditionCodeFlags('z');
         if (shiftCarry) cpu.setConditionCodeFlags('c');
     }
@@ -735,38 +717,38 @@ const processCmn = (data: DataProcessingParameter) : number => {
 
 const processOrr = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
+    const result32 = (value1 | value2) & 0xFFFFFFFF;
     cpu.history.setInstructionName('ORR');
-    cpu.setGeneralRegister(rd, value1 | value2);
-    const result = cpu.getGeneralRegister(rd);
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
             cpu.cpsrToSPSR();
         } else {
             cpu.clearConditionCodeFlags();
-            if (result === 0) cpu.setConditionCodeFlags('z');
-            if (result < 0) cpu.setConditionCodeFlags('n');
+            if (result32 === 0) cpu.setConditionCodeFlags('z');
+            if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
             if (shiftCarry === 1) cpu.setConditionCodeFlags('c');
         }
     }
-    return result;
+    return result32;
 }
 
 const processMov = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
+    const result32 = value2 & 0xFFFFFFFF;
     cpu.history.setInstructionName('MOV');
-    cpu.setGeneralRegister(rd, value2);
-    const result = cpu.getGeneralRegister(rd);
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
             cpu.cpsrToSPSR();
         } else {
             cpu.clearConditionCodeFlags();
-            if (result === 0) cpu.setConditionCodeFlags('z');
-            if (result < 0) cpu.setConditionCodeFlags('n');
+            if (result32 === 0) cpu.setConditionCodeFlags('z');
+            if (result32 < 0) cpu.setConditionCodeFlags('n');
             if (shiftCarry === 1) cpu.setConditionCodeFlags('c');
         }
     }
-    return result;
+    return result32;
 }
 
 const processBic = (data: DataProcessingParameter) : number => {
@@ -789,20 +771,20 @@ const processBic = (data: DataProcessingParameter) : number => {
 
 const processMvn = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
+    const result32 = ~value2 & 0xFFFFFFFF;
     cpu.history.setInstructionName('MVN');
-    cpu.setGeneralRegister(rd, ~value2);
-    const result = cpu.getGeneralRegister(rd);
+    cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
             cpu.cpsrToSPSR();
         } else {
             cpu.clearConditionCodeFlags();
-            if (result === 0) cpu.setConditionCodeFlags('z');
-            if (result < 0) cpu.setConditionCodeFlags('n');
+            if (result32 === 0) cpu.setConditionCodeFlags('z');
+            if (result32 < 0) cpu.setConditionCodeFlags('n');
             if (shiftCarry === 1) cpu.setConditionCodeFlags('c');
         }
     }
-    return result;
+    return result32;
 }
 
 // Branch Instructions

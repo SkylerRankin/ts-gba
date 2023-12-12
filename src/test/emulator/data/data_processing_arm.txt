@@ -53,3 +53,77 @@ SET R0=0xA0, R1=0xB0, R2=0x1, R3=0xFFFFFFF1, R4=0x800000A0, R5=0x0, Z=0, C=0, V=
 0xe1500001 CMP R0, R1 Updates=[Z=0, N=1, C=0]                            # Negative result with borrow
 0xe1530002 CMP R3, R2 Updates=[C=1, N=1]                                 # Negative result without borrow
 0xe1500004 CMP R0, R4 Updates=[V=1, N=1, C=0]                            # Negative result with signed overflow and borrow
+
+# --- EOR ---
+SET R0=0x2D, R1=0x34, R2=0x70000000, R3=0x80000000, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe030a001 EORS R10, R0, R1 Updates=[R10=0x19]                                # Normal positive result
+0xe032a003 EORS R10, R2, R3 Updates=[R10=0xF0000000, N=1]                     # Negative result
+0xe030a000 EORS R10, R0, R0 Updates=[R10=0x0, Z=1, N=0]                       # Zero result
+0xe030ad81 EORS R10, R0, R1 LSL, #27 Updates=[R10=0xA000002D, C=1, Z=0, N=1]  # Shifter carry out and negative
+
+# --- MOV ---
+SET R0=0x80000000, R1=0x34, R2=0x0, R3=0x0, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe3a0a00a MOV R10, #0xA Updates=[R10=0xA]                                    # Normal move
+0xe1b0a000 MOVS R10, R0 Updates=[R10=0x80000000, N=1]                         # Negative move
+0xe3b0a000 MOVS R10, #0 Updates=[R10=0x0, N=0, Z=1]                           # Zero move
+0xe1b0ad81 MOVS R10, R1, LSL #27 Updates=[R10=0xA0000000, Z=0, C=1, N=1]      # Shifter carry out and negative
+
+# --- MVN ---
+SET R0=0xFFFFFFF5, R1=0xFFFFFFFF, R2=0x34, R3=0x0, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe1e0a000 MVN R10, R0 Updates=[R10=0xA]                                      # Normal negated move
+0xe3f0a00a MVNS R10, #0xA Updates=[R10=0xFFFFFFF5, N=1]                       # Negative negated move
+0xe1f0a001 MVNS R10, R1 Updates=[R10=0x0, N=0, Z=1]                           # Zero negated move
+0xe1f0ad82 MVNS R10, R2, LSL #27 Updates=[R10=0x5FFFFFFF, Z=0, C=1, N=0]      # Shifter carry out and negative
+
+# --- ORR ---
+SET R0=0x2D, R1=0x34, R2=0x70000000, R3=0x80000000, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe380a00b ORR R10, R0, #0xB Updates=[R10=0x2F]                                  # Positive result
+0xe190a003 ORRS R10, R0, R3 Updates=[R10=0x8000002D, N=1]                        # Negative result
+0xe394a000 ORRS R10, R4, #0 Updates=[R10=0x0, Z=1, N=0]                          # Zero result
+0xe190ad81 ORRS R10, R0, R1, LSL #27 Updates=[R10=0xA000002D, C=1, N=1, Z=0]     # Shift carry out and negative
+
+# --- RSB ---
+SET R0=0x0, R1=0x13, R2=0x80000001, R3=0x2, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe270a012 RSBS R10, R0, #0x12 Updates=[R10=0x12, C=1]                            # Positive result
+0xe271a012 RSBS R10, R1, #0x12 Updates=[R10=0xFFFFFFFF, N=1, C=0]                 # Negative result
+0xe071a001 RSBS R10, R1, R1 Updates=[R10=0x0, Z=1, N=0, C=1]                      # Zero result
+0xe073a002 RSBS R10, R3, R2 Updates=[R10=0x7FFFFFFF, V=1, Z=0, N=0, C=1]          # Signed overflow
+
+# --- RSC ---
+SET R0=0x0, R1=0x13, R2=0x80000001, R3=0x2, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe2f0a012 RSCS R10, R0, #0x12 Updates=[R10=0x11, C=1]                            # Positive result, carry used
+0xe2f0a012 RSCS R10, R0, #0x12 Updates=[R10=0x12, C=1]                            # Positive result, no carry used
+0xe2f1a012 RSCS R10, R1, #0x12 Updates=[R10=0xFFFFFFFF, N=1, C=0]                 # Negative result
+0xe2f1a014 RSCS R10, R1, #0x14 Updates=[R10=0x0, Z=1, N=0, C=1]                   # Zero result, carry used
+0xe0f1a001 RSCS R10, R1, R1 Updates=[R10=0x0, Z=1, N=0, C=1]                      # Zero result, no carry used
+0xe0f3a002 RSCS R10, R3, R2 Updates=[R10=0x7FFFFFFF, V=1, Z=0, N=0, C=1]          # Signed overflow
+
+# -- SBC ---
+SET R0=0x0, R1=0x12, R2=0x80000001, R3=0x2, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe2d1a000 SBCS R10, R1, #0x0 Updates=[R10=0x11, C=1]                            # Positive result, carry used
+0xe2d1a000 SBCS R10, R1, #0x0 Updates=[R10=0x12, C=1]                            # Positive result, no carry used
+0xe2d1a013 SBCS R10, R1, #0x13 Updates=[R10=0xFFFFFFFF, C=0, N=1]                # Negative without carry
+0xe2d1a013 SBCS R10, R1, #0x13 Updates=[R10=0xFFFFFFFE, C=0, N=1]                # Negative with carry
+0xe2d1a011 SBCS R10, R1, #0x11 Updates=[R10=0x0, C=1, Z=1, N=0]                  # Zero with carry used
+0xe2d1a012 SBCS R10, R1, #0x12 Updates=[R10=0x0, C=1, Z=1]                       # Zero without carry used
+0xe2d2a002 SBCS R10, R2, #0x2 Updates=[R10=0x7FFFFFFF, V=1, Z=0, N=0, C=1]       # Signed overflow without carry used
+
+# --- SUB ---
+SET R0=0x0, R1=0x12, R2=0x80000001, R3=0x7FFFFFFF, R4=0xFFFFFFFF, R5=0x0, Z=0, C=0, V=0, N=0
+0xe251a008 SUBS R10, R1, #0x8 Updates=[R10=0xA, C=1]                             # Positive result
+0xe251a013 SUBS R10, R1, #0x13 Updates=[R10=0xFFFFFFFF, N=1, C=0]                # Negative result, not borrow sets carry flag
+0xe051a001 SUBS R10, R1, R1 Updates=[R10=0x0, Z=1, N=0, C=1]                     # Zero result
+0xe053a004 SUBS R10, R3, R4 Updates=[R10=0x80000000, V=1, Z=0, C=0, N=1]         # Signed overflow
+
+# --- TEQ ---
+SET R0=0x0, R1=0x12, R2=0x80000000, R3=0x1234, R4=0x0, R5=0x0, Z=0, C=0, V=0, N=0
+0xe3310012 TEQ R1, #0x12 Updates=[Z=1]                                           # Equal
+0xe3310011 TEQ R1, #0x11 Updates=[Z=0]                                           # Not equal
+0xe1310002 TEQ R1, R2 Updates=[N=1]                                              # Not equal and negative
+0xe1300a03 TEQ R0, R3, LSL #20 Updates=[N=0, C=1]                                # Not equal, shifter carry out
+
+# --- TST ---
+SET R0=0x0, R1=0x12, R2=0x80000000, R3=0xFFFFFFFF, R4=0x1234, R5=0x0, Z=0, C=0, V=0, N=0
+0xe1120003 TST R2, R3 Updates=[N=1]                                             # Negative result
+0xe1110000 TST R1, R0 Updates=[N=0, Z=1]                                        # Zero result
+0xe1110a04 TST R1, R4, LSL #20 Updates=[Z=1, N=0, C=1]                          # Zero result with shifter carry out
