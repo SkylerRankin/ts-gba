@@ -1,0 +1,67 @@
+# A program using only ARMv4 THUMB data processing instructions.
+# Each line consists of the following components:
+#     <big-endian instruction> <text assembly for instruction> Updates=[<register/flag updates>]
+
+# To begin, all registers and flags are 0
+SET N=0, C=0, Z=0, V=0
+
+# --- ADC ---
+SET R0=0x1, R1=0x2, R2=0x0, R3=0xFFFFFFFB, R4=0x0, R5=0x0, R6=0x0
+0x4148 ADC R0, R1 Updates=[R0=0x3]                                      # Positive result without using carry
+SET C=1, R0=0x1
+0x4148 ADC R0, R1 Updates=[R0=0x4, C=0]                                 # Positive result using carry
+0x4159 ADC R1, R3 Updates=[R1=0xFFFFFFFD, N=1]                          # Negative result
+SET R0=0x2, R1=0xFFFFFFFE
+0x4148 ADC R0, R1 Updates=[R0=0x0, Z=1, N=0, C=1]                       # Zero result with carry
+SET R0=0xFFFFFFFB, R1=0xA
+0x4148 ADC R0, R1 Updates=[R0=0x6, C=1, Z=0]                            # Input and output a carry
+SET R0=0x7FFFFFFB, R1=0xA, C=0
+0x4148 ADC R0, R1 Updates=[R0=0x80000005, V=1, N=1]                     # Signed overflow
+
+# --- ADD (1) ---
+SET R0=0x0, R1=0xFFFFFFFB, R2=0x7FFFFFFF, R3=0xFFFFFFFF, C=0, N=0, Z=0, V=0
+0x1dc7 ADD R7, R0, #7 Updates=[R7=0x7]                                  # Positive
+0x1c4f ADD R7, R1, #1 Updates=[R7=0xFFFFFFFC, N=1]                      # Negative
+0x1d4f ADD R7, R1, #5 Updates=[R7=0x0, Z=1, N=0, C=1]                   # zero
+0x1c5f ADD R7, R3, #1 Updates=[R7=0x0, Z=1, C=1]                        # Carry
+0x1c57 ADD R7, R2, #1 Updates=[R7=0x80000000, N=1, V=1, Z=0, C=0]       # Overflow
+
+# --- ADD (2) ---
+SET R0=0x0, R1=0xFFFFFFFB,  R2=0xFFFFFFFB, R3=0x7FFFFFFF, C=0, N=0, Z=0, V=0
+0x30FF ADD R0, #0xFF Updates=[R0=0xFF]                                  # Positive
+0x3104 ADD R1, #0x4 Updates=[R1=0xFFFFFFFF, N=1]                        # Negative
+0x3205 ADD R2, #0x5 Updates=[R2=0x0, Z=1, N=0, C=1]                     # Zero and carry
+0x3301 ADD R3, #1 Updates=[R3=0x80000000, N=1, V=1, Z=0, C=0]           # Overflow
+
+# --- ADD (3) ---
+SET R0=0x0, R1=0xFFFFFFFB, R2=0x7FFFFFFF, R3=0xFFFFFFFF, R4=0x1, R5=0x5, R6=0x7, C=0, N=0, Z=0, V=0
+0x1987 ADD R7, R0, R6 Updates=[R7=0x7]                                  # Positive
+0x190F ADD R7, R1, R4 Updates=[R7=0xFFFFFFFC, N=1]                      # Negative
+0x194f ADD R7, R1, R5 Updates=[R7=0x0, Z=1, N=0, C=1]                   # zero
+0x191f ADD R7, R3, R4 Updates=[R7=0x0, Z=1, C=1]                        # Carry
+0x1917 ADD R7, R2, R4 Updates=[R7=0x80000000, N=1, V=1, Z=0, C=0]       # Overflow
+
+# --- ADD (4) ---
+SET R0=0x1, R1=0x2, R8=0x8, R9=0x9, R10=0xA, R11=0xB, C=0, N=0, Z=0, V=0
+0x4440 ADD R0, R8 Updates=[R0=0x9]          # Rm uses hight bit
+0x4489 ADD R9, R1 Updates=[R9=0xB]             # Rd uses high bit
+0x44da ADD R10, R11 Updates=[R10=0x15]           # Both use high bit
+
+# --- ADD (5) ---
+SET R0=0x0, R15=0xAB41, C=0, N=0, Z=0, V=0
+0xA093 ADD R0, PC, #0x93 * 4 Updates=[R0=0xAD8C]
+
+# --- ADD (6) ---
+SET R0=0x0, R13=0xAB41, C=0, N=0, Z=0, V=0
+0xA893 ADD R0, SP, #0x93 * 4 Updates=[R0=0xAD8D]
+
+# --- ADD (7) ---
+SET R13=0x1, C=0, N=0, Z=0, V=0
+0xB064 ADD SP, #0x63 * 4 Updates=[R13=0x191]
+
+# --- AND ---
+SET R0=0, R1=0xB, R2=0x6, R3=0x80000014, R4=0xFFA00004, C=0, Z=0, N=0, V=0
+0x4011 AND R1, R2 Updates=[R1=0x2]
+0x4002 AND R2, R0 Updates=[R2=0x0, Z=1]
+0x4023 AND R3, R4 Updates=[R3=0x80000004, Z=0, N=1]
+

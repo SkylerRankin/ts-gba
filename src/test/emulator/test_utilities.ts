@@ -65,10 +65,6 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
 
     const statusRegisterKeys = ['n', 'z', 'c', 'v'] as StatusRegisterKey[];
 
-    it("does something", () => {
-        expect(1).toBe(1);
-    });
-
     test_cases.forEach(t => {
         if (!t.instruction) {
             Object.entries(t.registerUpdates).forEach(([register, value]) => {

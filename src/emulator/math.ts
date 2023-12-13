@@ -160,8 +160,15 @@ const signedOverflowFromSubtraction = (operand1: number, operand2: number, resul
     return (msb1 !== msb2 && msb1 !== msbResult) ? 1 : 0;
 }
 
+const signedOverflowFromAddition = (operand1: number, operand2: number, result: number): boolean => {
+    const value1MSB = (operand1 >>> 31) & 0x1;
+    const value2MSB = (operand2 >>> 31) & 0x1;
+    const resultMSB = (result >>> 31) & 0x1;
+    return (value1MSB === value2MSB && value1MSB !== resultMSB);
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
     asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
-    signedOverflowFromSubtraction }
+    signedOverflowFromSubtraction, signedOverflowFromAddition }

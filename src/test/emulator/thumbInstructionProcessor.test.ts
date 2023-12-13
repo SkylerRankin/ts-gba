@@ -2,6 +2,7 @@ import { processTHUMB } from "../../emulator/thumbInstructionProcessors";
 import { CPU } from "../../emulator/cpu";
 import { readFileSync } from "fs";
 import { toBigEndianInt16 } from "../../emulator/math";
+import { executeInstructionTestFile } from "./test_utilities";
 
 
 test("Identify THUMB op-codes", () => {
@@ -21,4 +22,8 @@ test("Identify THUMB op-codes", () => {
         processTHUMB(cpu, bigEndianEncoding);
         expect(cpu.history.currentLog.instructionName).toBe(e.name);
     });
+});
+
+test("Execute data processing THUMB instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/data_processing_thumb.txt", processTHUMB)
 });

@@ -4,7 +4,9 @@ import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
     signExtend, byteArrayToInt32, int32ToByteArray, int16ToByteArray,
     int8ToByteArray, 
     numberOfSetBits,
-    asHex} from './math';
+    asHex,
+    isNegative32,
+    signedOverflowFromAddition} from './math';
 
 const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
@@ -171,13 +173,20 @@ const processADC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('ADC');
     const rm = (i >>> 3) & 0x7;
     const rd = i & 0x7;
-    const result = cpu.getGeneralRegister(rd) + cpu.getGeneralRegister(rm) + cpu.getStatusRegisterFlag('c');
-    cpu.setGeneralRegister(rd, result);
-    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
-    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
-    // CarryFrom and OverflowFrom unimplemented
-    cpu.setStatusRegisterFlag('c', 0);
-    cpu.setStatusRegisterFlag('v', 0);
+    const operand1 = cpu.getGeneralRegister(rd);
+    const operand2 = cpu.getGeneralRegister(rm);
+    const cFlag = cpu.getStatusRegisterFlag('c');
+
+    const result = operand1 + operand2 + cFlag;
+    const result32 = result & 0xFFFFFFFF;
+
+    cpu.setGeneralRegister(rd, result32);
+    cpu.clearConditionCodeFlags();
+    if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
+    if (result32 === 0) cpu.setConditionCodeFlags('z');
+    if (result > 2**32 - 1) cpu.setConditionCodeFlags('c');
+    if (signedOverflowFromAddition(operand1, operand2 + cFlag, result32)) cpu.setConditionCodeFlags('v');
+
     return { incrementPC: true };
 }
 
@@ -206,8 +215,8 @@ const processADD = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rm = (i >>> 6) & 0x7;
             const rn = (i >>> 3) & 0x7;
             rd = i & 0x7;
-            op1 = rn;
-            op2 = rm;
+            op1 = cpu.getGeneralRegister(rn);;
+            op2 = cpu.getGeneralRegister(rm);
             break;
         }
         case 4: {
@@ -241,19 +250,23 @@ const processADD = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             op2 = (i & 0x7F) << 2;
             break;
         }
-    }
-    
-    if (rd && op1 && op2) {
-        const result = op1 + op2;
-        cpu.setGeneralRegister(rd, result);
-        if (type <= 3) {
-            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
-            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
-            // CarryFrom and OverflowFrom unimplemented
-            cpu.setStatusRegisterFlag('c', 0);
-            cpu.setStatusRegisterFlag('v', 0);
+        default: {
+            // TODO improve the error handling here
+            throw Error("decoding add instruction failed");
         }
     }
+    
+    const result = op1 + op2;
+    const result32 = result & 0xFFFFFFFF;
+    cpu.setGeneralRegister(rd, result);
+    if (type <= 3) {
+        cpu.clearConditionCodeFlags();
+        if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
+        if (result32 === 0) cpu.setConditionCodeFlags('z');
+        if (result > 2**32 - 1) cpu.setConditionCodeFlags('c');
+        if (signedOverflowFromAddition(op1, op2, result32)) cpu.setConditionCodeFlags('v');
+    }
+
     return { incrementPC: true };
 }
 
@@ -262,9 +275,19 @@ const processAND = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rm = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const result = cpu.getGeneralRegister(rm) & cpu.getGeneralRegister(rd);
-    cpu.setGeneralRegister(rd, result);
-    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
-    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+    const result32 = result & 0xFFFFFFFF;
+
+    cpu.setGeneralRegister(rd, result32);
+
+    const prevCFlag = cpu.getConditionCodeFlag('c');
+    const prevVFlag = cpu.getConditionCodeFlag('v');
+    cpu.clearConditionCodeFlags();
+
+    if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
+    if (result32 === 0) cpu.setConditionCodeFlags('z');
+    if (prevCFlag === 1) cpu.setConditionCodeFlags('c');
+    if (prevVFlag === 1) cpu.setConditionCodeFlags('v');
+
     return { incrementPC: true };
 }
 
