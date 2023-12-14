@@ -65,3 +65,30 @@ SET R0=0, R1=0xB, R2=0x6, R3=0x80000014, R4=0xFFA00004, C=0, Z=0, N=0, V=0
 0x4002 AND R2, R0 Updates=[R2=0x0, Z=1]
 0x4023 AND R3, R4 Updates=[R3=0x80000004, Z=0, N=1]
 
+# --- ASR (1) ---
+SET R0=0xA, R1=0x81001111, R2=0x8, R3=0xFFFFFFFF, R4=0x6, C=0, Z=0, N=0, V=0
+0x1007 ASR R7, R0, #0x0 Updates=[R7=0x0, Z=1]            # Zero immediate, positive shift
+0x100f ASR R7, R1, #0x0 Updates=[R7=0xFFFFFFFF, C=1, N=1, Z=0]     # Zero immediate, negative shift
+0x1097 ASR R7, R2, #0x2 Updates=[R7=0x2, C=0, N=0]         # Non zero shift on positive
+0x179f ASR R7, R3, #0x1E Updates=[R7=0xFFFFFFFF, N=1, C=1]      # Non zero shift on negative
+0x1127 ASR R7, R4, #0x4 Updates=[R7=0x0, Z=1, N=0, C=0]         # Shift to zero
+
+# --- ASR (2) ---
+SET R0=0x1, R1=0x100, R2=0x8, R3=0x20, R4=0x21, R5=0x80110000, C=0, Z=0, N=0, V=0
+0x4108 ASR R0, R1 Updates=[R0=0x1]             # Rs[7:0] == 0
+0x4111 ASR R1, R2 Updates=[R1=0x1]             # Rs[7:0] < 32
+0x4119 ASR R1, R3 Updates=[R1=0x0, Z=1]             # Rs[7:0] >= 32, positive rm
+0x4125 ASR R5, R4 Updates=[R5=0xFFFFFFFF, N=1, Z=0, C=1]             # Rs[7:0] >= 32, negative rm
+
+# --- BIC ---
+SET R0=0xB, R1=0x1, R2=0xB000FFFF, R3=0x6000FFFF, R4=0xFFFFFFFF, C=0, Z=0, N=0, V=0
+0x4388 BIC R0, R1 Updates=[R0=0xA]                      # Positive
+0x439a BIC R2, R3 Updates=[R2=0x90000000, N=1]         # Negative
+0x43a3 BIC R3, R4 Updates=[R3=0x0, N=0, Z=1]         # Zero
+
+# --- CMN ---
+SET R0=0x1, R1=0xA, R2=0xFFFFFFF0, R3=0x10, R4=0x7FFFFFFF, C=0, Z=0, N=0, V=0
+0x42c8 CMN R0, R1 Updates=[C=0]             # Positive
+0x42d1 CMN R1, R2 Updates=[N=1, C=0]             # Negative
+0x42da CMN R2, R3 Updates=[Z=1, N=0, C=1]            # Zero
+0x42e0 CMN R0, R4 Updates=[V=1, N=1, Z=0, C=0]           # Signed overflow
