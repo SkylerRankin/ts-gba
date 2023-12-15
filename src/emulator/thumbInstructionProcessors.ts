@@ -7,7 +7,8 @@ import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
     asHex,
     isNegative32,
     signedOverflowFromAddition,
-    borrowFrom} from './math';
+    borrowFrom,
+    signedOverflowFromSubtraction} from './math';
 
 const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
@@ -380,18 +381,24 @@ const processCMN = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processCMP = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`CMP (${type})`);
-    let aluOut;
+    cpu.clearConditionCodeFlags();
+    let operand1;
+    let operand2;
+
     switch (type) {
         case 1: {
             const rn = (i >>> 8) & 0x7;
             const imm = i & 0xFF;
-            aluOut = cpu.getGeneralRegister(rn) - imm;
+            const rnValue = cpu.getGeneralRegister(rn);
+            operand1 = rnValue;
+            operand2 = imm;
             break;
         }
         case 2: {
             const rm = (i >>> 3) & 0x7;
             const rn = i & 0x3;
-            aluOut = cpu.getGeneralRegister(rn) - cpu.getGeneralRegister(rm);
+            operand1 = cpu.getGeneralRegister(rn);
+            operand2 = cpu.getGeneralRegister(rm);
             break;
         }
         case 3: {
@@ -399,37 +406,49 @@ const processCMP = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const h2 = (i >>> 6) & 0x1;
             const rmLow = (i >>> 3) & 0x7;
             const rnLow = i && 0x7;
-            const rm = (1 << h1) | rmLow;
-            const rn = (1 << h2) | rnLow;
-            aluOut = cpu.getGeneralRegister(rn) - cpu.getGeneralRegister(rm);
+            const rn = (h1 << 3) | rnLow;
+            const rm = (h2 << 3) | rmLow;
+            operand1 = cpu.getGeneralRegister(rn);
+            operand2 = cpu.getGeneralRegister(rm);
             break;
+        }
+        default: {
+            throw Error("Invalid CMP case");
         }
     }
 
-    if (aluOut) {
-        cpu.setStatusRegisterFlag('n', (aluOut >>> 31) & 0x1);
-        cpu.setStatusRegisterFlag('z', aluOut === 0 ? 1 : 0);
-        // TODO
-        // cpu.setStatusRegisterFlag('c', (aluOut >>> 31) & 0x1);
-        // cpu.setStatusRegisterFlag('v', (aluOut >>> 31) & 0x1);
-    }
+    const aluOut = operand1 - operand2;
+    const aluOut32 = aluOut & 0xFFFFFFFF;
+    if (isNegative32(aluOut32)) cpu.setConditionCodeFlags('n');
+    if (aluOut32 === 0) cpu.setConditionCodeFlags('z');
+    if (borrowFrom(operand1, operand2) === 0) cpu.setConditionCodeFlags('c');
+    if (signedOverflowFromSubtraction(operand1, operand2, aluOut32)) cpu.setConditionCodeFlags('v');
 
     return { incrementPC: true };
 }
 
 const processEOR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('EOR');
+    const prevCFlag = cpu.getConditionCodeFlag('c');
+    const prevVFlag = cpu.getConditionCodeFlag('v');
+    cpu.clearConditionCodeFlags();
     const rm = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const result = cpu.getGeneralRegister(rd) ^ cpu.getGeneralRegister(rm);
-    cpu.setGeneralRegister(rd, result);
-    cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
-    cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+    const result32 = result & 0xFFFFFFFF;
+    cpu.setGeneralRegister(rd, result32);
+    if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
+    if (result32 === 0) cpu.setConditionCodeFlags('z');
+    if (prevCFlag) cpu.setConditionCodeFlags('c');
+    if (prevVFlag) cpu.setConditionCodeFlags('v');
     return { incrementPC: true };
 }
 
 const processLSL = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`LSL (${type})`);
+    const prevCFlag = cpu.getConditionCodeFlag('c');
+    const prevVFlag = cpu.getConditionCodeFlag('v');
+    cpu.clearConditionCodeFlags();
 
     switch (type) {
         case 1: {
@@ -439,15 +458,18 @@ const processLSL = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rd = i & 0x7;
             let result;
             if (imm === 0) {
+                if (prevCFlag === 1) cpu.setConditionCodeFlags('c');
                 result = rmValue;
             } else {
-                cpu.setStatusRegisterFlag('c', (rmValue >>> (32 - imm)) & 0x1);
+                if ((rmValue >>> (32 - imm)) & 0x1) cpu.setConditionCodeFlags('c');
                 const [shift, carry] = logicalShiftLeft(rmValue, imm);
                 result = shift;
             }
-            cpu.setGeneralRegister(rd, result);
-            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
-            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            const result32 = result & 0xFFFFFFFF;
+            cpu.setGeneralRegister(rd, result32);
+            if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
+            if (result32 === 0) cpu.setConditionCodeFlags('z');
+            if (prevVFlag) cpu.setConditionCodeFlags('v');
             break;
         }
         case 2: {
@@ -457,21 +479,23 @@ const processLSL = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rdValue = cpu.getGeneralRegister(rd);
             let result;
             if ((rsValue & 0xFF) === 0) {
+                if (prevCFlag) cpu.setConditionCodeFlags('c');
                 result = rdValue;
             } else if ((rsValue & 0xFF) < 32) {
-                cpu.setStatusRegisterFlag('c', (rdValue >>> (32 - (rsValue & 0xFF))) & 0x1);
+                if ((rdValue >>> (32 - (rsValue & 0xFF))) & 0x1) cpu.setConditionCodeFlags('c');
                 const [shift, carry] = logicalShiftLeft(rdValue, (rsValue & 0xFF));
                 result = shift;
             } else if ((rsValue & 0xFF) === 32) {
-                cpu.setStatusRegisterFlag('c', rdValue & 0x1);
+                if (rdValue & 0x1) cpu.setConditionCodeFlags('c');
                 result = 0;
             } else {
-                cpu.setStatusRegisterFlag('c', 0);
                 result = 0;
             }
-            cpu.setGeneralRegister(rd, result);
-            cpu.setStatusRegisterFlag('n', (result >>> 31) & 0x1);
-            cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+            const result32 = result & 0xFFFFFFFF;
+            cpu.setGeneralRegister(rd, result32);
+            if (isNegative32(result32)) cpu.setConditionCodeFlags('n');
+            if (result32 === 0) cpu.setConditionCodeFlags('z');
+            if (prevVFlag) cpu.setConditionCodeFlags('v');
             break;
         }
     }

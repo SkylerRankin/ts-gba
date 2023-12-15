@@ -92,3 +92,45 @@ SET R0=0x1, R1=0xA, R2=0xFFFFFFF0, R3=0x10, R4=0x7FFFFFFF, C=0, Z=0, N=0, V=0
 0x42d1 CMN R1, R2 Updates=[N=1, C=0]             # Negative
 0x42da CMN R2, R3 Updates=[Z=1, N=0, C=1]            # Zero
 0x42e0 CMN R0, R4 Updates=[V=1, N=1, Z=0, C=0]           # Signed overflow
+
+# --- CMP (1) ---
+SET R0=0xA, R1=0x1, R2=0x80000001, R3=0x0, R4=0x0, C=0, Z=0, N=0, V=0
+0x2802 CMP R0, #2 Updates=[C=1]           # Positive
+0x2901 CMP R1, #1 Updates=[Z=1, C=1]            # Zero
+0x290a CMP R1, #0xA Updates=[N=1, Z=0, C=0]          # Negative
+0x2a02 CMP R2, #0x2 Updates=[N=0, V=1, C=1]     # Signed overflow
+
+# --- CMP (2) ---
+SET R0=0xA, R1=0x1, R2=0x80000001, R3=0x2, R4=0xA, C=0, Z=0, N=0, V=0
+0x4298 CMP R0, R3 Updates=[C=1]           # Positive
+0x4289 CMP R1, R1 Updates=[Z=1, C=1]            # Zero
+0x42a1 CMP R1, R4 Updates=[N=1, Z=0, C=0]          # Negative
+0x429a CMP R2, R3 Updates=[N=0, V=1, C=1]     # Signed overflow
+
+# --- CMP (3) ---
+SET R0=0x1, R13=0x5, R14=0x5, C=0, Z=0, N=0, V=0
+0x4586 CMP R14, R0 Updates=[C=1]          # Rm uses high bit
+0x4570 CMP R0, R14 Updates=[N=1, C=0]          # Rn uses high bit
+0x45f5 CMP R13, R14 Updates=[Z=0, N=0, C=1]         # Both use high bit
+
+# --- EOR ---
+SET R0=0x5, R1=0x3, R2=0x80000000, R3=0x7, R4=0x1A, C=0, Z=0, N=0, V=0
+0x4048 EOR R0, R1 Updates=[R0=0x6]                  # Positive result
+0x405a EOR R2, R3 Updates=[R2=0x80000007, N=1]        # Negative result
+0x4064 EOR R4, R4 Updates=[R4=0x0, Z=1, N=0]            # zero result
+
+# --- LSL (1) ---
+SET R0=0xA, R1=0x1, R2=0xA000, R3=0x0, R4=0x0, C=0, Z=0, N=0, V=0
+0x0007 LSL R7, R0, #0 Updates=[R7=0xA]         # zero immediate
+0x02c7 LSL R7, R0, #0xB Updates=[R7=0x5000]       # non zero immediate
+0x07cf LSL R7, R1, #0x1F Updates=[R7=0x80000000, N=1]  # Negative result
+0x0797 LSL R7, R2, #0x1E Updates=[R7=0x0, Z=1, N=0]        # zero result
+
+# --- LSL (2) ---
+SET R0=0x1, R1=0xA00, R2=0x10B, R3=0x20, R4=0xFF, R5=0x14, R6=0x0, C=0, Z=0, N=0, V=0
+0x4088 LSL R0, R1 Updates=[R0=0x1]             # Rs[7:0] = 0
+0x4090 LSL R0, R2 Updates=[R0=0x800]             # Rs[7:0] < 32
+0x4098 LSL R0, R3 Updates=[R0=0x0, Z=1]             # Rs[7:0] = 32
+0x40a3 LSL R3, R4 Updates=[R3=0x0, Z=1]             # Rs[7:0] > 32
+0x40a9 LSL R1, R5 Updates=[R1=0xA0000000, N=1, Z=0]             # Negative result
+0x4091 LSL R1, R2 Updates=[R1=0x0, Z=1, N=0]
