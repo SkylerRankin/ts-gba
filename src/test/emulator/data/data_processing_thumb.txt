@@ -134,3 +134,110 @@ SET R0=0x1, R1=0xA00, R2=0x10B, R3=0x20, R4=0xFF, R5=0x14, R6=0x0, C=0, Z=0, N=0
 0x40a3 LSL R3, R4 Updates=[R3=0x0, Z=1]             # Rs[7:0] > 32
 0x40a9 LSL R1, R5 Updates=[R1=0xA0000000, N=1, Z=0]             # Negative result
 0x4091 LSL R1, R2 Updates=[R1=0x0, Z=1, N=0]
+
+# --- LSR (1) ---
+SET R0=0x100, R1=0x80000000, C=0, Z=0, N=0, V=0
+0x0807 LSR R7, R0, #0 Updates=[R7=0x0, Z=1]             # Zero immediate
+0x0947 LSR R7, R0, #5 Updates=[R7=0x8, Z=0]             # Positive result
+0x0a87 LSR R7, R0, #10 Updates=[R7=0x0, Z=1]       # Zero result
+0x084f LSR R7, R1, #1 Updates=[R7=0x40000000, Z=0] # Shifting zero into negative
+
+# --- LSR (2) ---
+SET R0=0xFF00, R1=0x2, R2=0x120, R3=0xFF, R7=0x8, C=0, Z=0, N=0, V=0
+0x40c7 LSR R7, R0 Updates=[]           # Rs[7:0] = 0
+0x40cf LSR R7, R1 Updates=[R7=0x2, Z=0]           # Rs[7:0] < 32
+0x40d7 LSR R7, R2 Updates=[R7=0x0, Z=1]         # Rs[7:0] = 32
+Set C=1
+0x40df LSR R7, R3 Updates=[Z=1, C=0]           # Rs[7:0] > 32
+
+# --- MOV (1) ---
+SET R0=0x0, R1=0x0, R6=0x0, C=0, Z=0, N=0, V=0
+0x2001 MOV R0, #1 Updates=[R0=0x1]             # Positive
+0x2000 MOV R0, #0 Updates=[R0=0x0, Z=1]            # Negative
+
+# --- MOV (2) ---
+# Encoded the same as ADD Rd, Rn, #0
+SET R0=0x0, R1=0x22, R2=0x80110000, C=0, Z=0, N=0, V=0
+0x1C07 MOV R7, R0 Updates=[R7=0x0, Z=1]             # Zero
+0x1C0F MOV R7, R1 Updates=[R7=0x22, Z=0]            # Positive
+0x1C17 MOV R7, R2 Updates=[R7=0x80110000, N=1]            # Positive
+
+# --- MOV (3) ---
+SET R0=0x80001111, R15=0xAA, C=0, Z=0, N=0, V=0
+0x4686 MOV R14, R0 Updates=[R14=0x80001111]         # Rd uses high bit
+0x4671 MOV R1, R14 Updates=[R1=0x80001111]         # Rm uses high bit
+0x46fe MOV R14, R15 Updates=[R14=0xAA]             # Both use high bit
+
+# --- MUL ---
+SET R0=0x2, R1=0x3, R2=0xFFFFFFFF, R3=0x0, R4=0x0FFFFFFF, R5=0xA0, C=0, Z=0, N=0, V=0
+0x4348 MUL R0, R1 Updates=[R0=0x6]             # Positive result
+0x4350 MUL R0, R2 Updates=[R0=0xFFFFFFFA, N=1]             # Negative result
+0x4359 MUL R1, R3 Updates=[R1=0x0, Z=1, N=0]           # Zero result
+0x436c MUL R4, R5 Updates=[R4=0xFFFFFF60, Z=0, N=1]             # Trimmed result
+
+# --- MVN ---
+SET R0=0xFFFFFFFF, R1=0x0, R2=0xFFFFFFE0, C=0, Z=0, N=0, V=0
+0x43c7 MVN R7, R0 Updates=[R7=0x0, Z=1]             # Zero
+0x43cf MVN R7, R1 Updates=[R7=0xFFFFFFFF, N=1, Z=0]            # Negative
+0x43d7 MVN R7, R2 Updates=[R7=0x1F, N=0]            # Positive
+
+# --- NEG ---
+SET R0=0x0, R1=0x2, R2=0xFFFFFFFF, R3=0x80000000, R4=0x0, C=0, Z=0, N=0, V=0
+0x4247 NEG R7, R0 Updates=[R7=0x0, Z=1, C=1]         # Zero
+0x424f NEG R7, R1 Updates=[R7=0xFFFFFFFE, Z=0, N=1, C=0]         # Negative
+0x4257 NEG R7, R2 Updates=[R7=0x1, N=0]         # Positive
+0x425f NEG R7, R3 Updates=[R7=0x80000000, N=1, V=1]       # Signed overflow
+
+# --- ORR ---
+SET R0=0x1, R1=0x6, R2=0x80000000, R3=0x0, C=0, Z=0, N=0, V=0
+0x4308 ORR R0, R1 Updates=[R0=0x7]             # Positive
+0x4310 ORR R0, R2 Updates=[R0=0x80000007, N=1]      # Negative
+0x431b ORR R3, R3 Updates=[R3=0x0, Z=1, N=0]       # zero
+
+# --- ROR ---
+SET R0=0xF00, R1=0xE0, R2=0x4, R3=0x6, R4=0x2, R5=0x0, R6=0xF, C=0, Z=0, N=0, V=0
+0x41c0 ROR R0, R0 Updates=[]           # Rs[7:0] = 0
+0x41c8 ROR R0, R1 Updates=[]           # Rs[4:0] = 0
+0x41d2 ROR R2, R2 Updates=[R2=0x40000000]           # Rs[4:0] > 0
+0x41e3 ROR R3, R4 Updates=[R3=0x80000001, N=1, C=1]     # Negative result
+0x41c5 ROR R5, R0 Updates=[Z=1, N=0, C=1]            # Zero, c flag unaffected
+
+# --- SBC ---
+SET R0=0x8, R1=0x3, R2=0x5, R3=0x2, R4=0x7FFFFFFF, R5=0xFFFFFFFE, R6=0x0, C=0, Z=0, N=0, V=0
+0x4188 SBC R0, R1 Updates=[R0=0x4, C=1]           # Positive without borrow
+0x4190 SBC R0, R2 Updates=[R0=0xFFFFFFFF, N=1, C=0] # Negative, with borrow
+0x4199 SBC R1, R3 Updates=[R1=0x0, Z=1, N=0, C=1]      # Zero, no borrow, used c flag
+SET C=0, Z=0, C=0, N=0
+0x41ac SBC R4, R5 Updates=[R4=0x80000000, N=1, V=1]  # Signed overflow
+
+# --- SUB (1) ---
+SET R0=0x7, R1=0x80000000, R2=0x2, R3=0x0, R4=0x0, R5=0x0, R6=0x0, C=0, Z=0, N=0, V=0
+0x1ec7 SUB R7, R0, #3 Updates=[R7=0x4, C=1]                 # Positive
+0x1f7f SUB R7, R7, #5 Updates=[R7=0xFFFFFFFF, N=1, C=0]         # Negative
+0x1e4f SUB R7, R1, #1 Updates=[R7=0x7FFFFFFF, N=0, V=1, C=1]           # Signed overflow
+0x1e97 SUB R7, R2, #2 Updates=[R7=0x0, Z=1, C=1, V=0]               # Zero
+
+# --- SUB (2) ---
+SET R0=0x7, R1=0x4, R2=0x80000000, R3=0xFF, R4=0x0, R5=0x0, R6=0x0, C=0, Z=0, N=0, V=0
+0x3803 SUB R0, #3 Updates=[R0=0x4, C=1]               # Positive
+0x3905 SUB R1, #5 Updates=[R1=0xFFFFFFFF, N=1, C=0]       # Negative
+0x3a01 SUB R2, #1 Updates=[R2=0x7FFFFFFF, N=0, V=1, C=1]       # Signed overflow
+0x3bff SUB R3, #255 Updates=[R3=0x0, Z=1, V=0, C=1]        # Zero result
+
+# --- SUB (3) ---
+SET R0=0x7, R1=0x4, R2=0x80000000, R3=0x3, R4=0x5, R5=0x1, R6=0x0, C=0, Z=0, N=0, V=0
+0x1ac7 SUB R7, R0, R3 Updates=[R7=0x4, C=1]               # Positive
+0x1b0f SUB R7, R1, R4 Updates=[R7=0xFFFFFFFF, N=1, C=0]       # Negative
+0x1b57 SUB R7, R2, R5 Updates=[R7=0x7FFFFFFF, N=0, V=1, C=1]       # Signed overflow
+SET R0=0xA000, R1=0xA000
+0x1a47 SUB R7, R0, R1 Updates=[R7=0x0, Z=1, V=0, C=1]      # Zero result
+
+# --- SUB (4) ---
+SET R13=0xAB, C=0, Z=0, N=0, V=0
+0xb090 SUB SP, #0x10 * 4 Updates=[R13=0x6B]
+
+# --- TST ---
+SET R0=0x7, R1=0x1, R2=0x80000000, R3=0x0, C=0, Z=0, N=0, V=0
+0x4208 TST R0, R1 Updates=[]           # Positive result
+0x4212 TST R2, R2 Updates=[N=1]        # Negative result
+0x4218 TST R0, R3 Updates=[Z=1, N=0]       # Zero result

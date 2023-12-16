@@ -167,8 +167,12 @@ const signedOverflowFromAddition = (operand1: number, operand2: number, result: 
     return (value1MSB === value2MSB && value1MSB !== resultMSB);
 }
 
+const twosComplementNegation = (n: number) : number => {
+    return ((~n + 1) & 0xFFFFFFFF) >>> 0;
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
     asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
-    signedOverflowFromSubtraction, signedOverflowFromAddition }
+    signedOverflowFromSubtraction, signedOverflowFromAddition, twosComplementNegation }

@@ -1,6 +1,6 @@
 import {
     encodeWithRotation, rotateRight, rotateLeft, signExtend,
-    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom } from '../../emulator/math';
+    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom, twosComplementNegation } from '../../emulator/math';
 
 test('logicalShiftLeft', () => {
     expect(logicalShiftLeft(2, 0)).toStrictEqual([2, 0]);
@@ -13,6 +13,7 @@ test('rotateRight', () => {
     expect(rotateRight(9, 0, 8)).toBe(9);
     expect(rotateRight(9, 1, 8)).toBe(132);
     expect(rotateRight(73, 5, 7)).toBe(38);
+    expect(rotateRight(4, 4, 32)).toBe(0x40000000);
 });
 
 test('rotateLeft', () => {
@@ -62,7 +63,7 @@ test('toBigEndianInt16', () => {
     expect(toBigEndianInt16(0x9100)).toBe(0x0091);
 });
 
-test.only('borrowFrom', () => {
+test('borrowFrom', () => {
     // Both positive
     expect(borrowFrom(0xC, 0xA)).toBe(0);
     expect(borrowFrom(0xA, 0xC)).toBe(1);
@@ -77,4 +78,12 @@ test.only('borrowFrom', () => {
     expect(borrowFrom(0xA, 0xFFFFFFF7)).toBe(1);
     // Zero
     expect(borrowFrom(0, 0)).toBe(0);
+});
+
+test.only('twosComplementNegation', () => {
+    expect(twosComplementNegation(0)).toBe(0);
+    expect(twosComplementNegation(1)).toBe(0xFFFFFFFF);
+    expect(twosComplementNegation(0xFFFFFFFF)).toBe(1);
+    expect(twosComplementNegation(0xA03)).toBe(0xFFFFF5FD);
+    expect(twosComplementNegation(0xFFFFF5FD)).toBe(0xA03);
 });
