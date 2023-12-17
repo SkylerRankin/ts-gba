@@ -70,3 +70,7 @@ test("Determine data processing shift operand values/carries", () => {
 test("Execute data processing ARM instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/data_processing_arm.txt", processARM)
 });
+
+test("Execute branch ARM instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/branch_arm.txt", processARM);
+});

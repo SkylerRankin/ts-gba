@@ -9,7 +9,7 @@ import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
     signedOverflowFromAddition,
     borrowFrom,
     signedOverflowFromSubtraction,
-    twosComplementNegation} from './math';
+    isNegative} from './math';
 
 const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
@@ -98,12 +98,17 @@ const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptio
 
     switch (type) {
         case 1: {
-            const cond = (i >>> 8) & 0x7;
+            const condition = (i >>> 8) & 0xF;
             const imm = i & 0xFF;
             const pc = cpu.getGeneralRegister(Reg.PC);
-            const newPC = pc + (signExtend(imm, 32) << 1);
-            // TODO check condition correctly
-            if (cond > 0) {
+            let offset;
+            if (isNegative(imm, 8)) {
+                offset = -1 * (((~imm) + 1) & 0xFF);
+            } else {
+                offset = imm;
+            }
+            const newPC = pc + (offset << 1);
+            if (cpu.conditionIsMet(condition)) {
                 cpu.setGeneralRegister(Reg.PC, newPC);
             }
             break;
@@ -111,7 +116,13 @@ const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptio
         case 2: {
             const imm = i & 0x7FF;
             const pc = cpu.getGeneralRegister(Reg.PC);
-            const newPC = pc + (signExtend(pc, 32) << 1);
+            let offset;
+            if (isNegative(imm, 11)) {
+                offset = -1 * (((~imm) + 1) & 0x7FF);
+            } else {
+                offset = imm;
+            }
+            const newPC = pc + (offset << 1);
             cpu.setGeneralRegister(Reg.PC, newPC);
         }
     }
@@ -127,13 +138,17 @@ const processBL_BLX1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const pc = cpu.getGeneralRegister(Reg.PC);
 
     if (h === 0b10) {
-        cpu.setGeneralRegister(Reg.LR, pc + (signExtend(offset, 32) << 12));
+        const signExtendedOffset = isNegative(offset, 11) ?
+            -1 * ((~offset + 1) & 0x7FF) :
+            offset;
+        cpu.setGeneralRegister(Reg.LR, pc + ((signExtendedOffset) << 12));
         return { incrementPC: true };
     } else if (h === 0b11) {
         const newPC = cpu.getGeneralRegister(Reg.LR) + (offset << 1);
         cpu.setGeneralRegister(Reg.LR, (pc + 2) | 1);
         cpu.setGeneralRegister(Reg.PC, newPC);
     } else if (h === 0b01) {
+        cpu.history.addError(`BLX (1) instruction (0x${i.toString(16)}) is not a supported version 4 THUMB instruction.`);
         const newPC = (cpu.getGeneralRegister(Reg.LR) + (offset << 1)) & 0xFFFFFFFC;
         cpu.setGeneralRegister(Reg.LR, (pc + 2) | 1);
         cpu.setGeneralRegister(Reg.PC, newPC);
@@ -147,7 +162,7 @@ const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BX');
 
     const h2 = (i >>> 6) & 0x1;
-    const rm = (i >>> 3) & 0x7;
+    const rm = ((i >>> 3) & 0x7) + (h2 << 3);
     const rmValue = cpu.getGeneralRegister(rm);
     cpu.setStatusRegisterFlag('t', rmValue & 0x1);
     cpu.setGeneralRegister(Reg.PC, rmValue & (~0x1));

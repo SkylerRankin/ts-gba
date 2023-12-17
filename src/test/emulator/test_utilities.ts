@@ -15,7 +15,7 @@ const parseInstructionFileUpdateString = (text: string) => {
                 const value = Number.parseInt(i.substring(equalsIndex + 1)) >>> 0;
                 registerUpdates[register] = value;
             } else {
-                const validFlags = ["n", "z", "c", "v"];
+                const validFlags = ["n", "z", "c", "v", "t"];
                 const flag = i.substring(0, equalsIndex);
                 expect(validFlags.includes(flag)).toBeTruthy();
                 const value = Number.parseInt(i.substring(equalsIndex + 1));
@@ -63,7 +63,7 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
             return { instruction, registerUpdates, flagUpdates, lineNumber: i.lineNumber };
         });
 
-    const statusRegisterKeys = ['n', 'z', 'c', 'v'] as StatusRegisterKey[];
+    const statusRegisterKeys = ['n', 'z', 'c', 'v', 't'] as StatusRegisterKey[];
 
     test_cases.forEach(t => {
         if (!t.instruction) {
@@ -71,10 +71,9 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
                 cpu.setGeneralRegister(Number.parseInt(register), value);
             });
             Object.entries(t.flagUpdates).forEach(([flag, value]) => {
-                expect(['n', 'z', 'c', 'v'].includes(flag)).toBeTruthy();
-                const conditionFlag = flag as "n" | "z" | "c" | "v";
-                if (value === 0) cpu.clearConditionCodeFlags(conditionFlag);
-                else if (value === 1) cpu.setConditionCodeFlags(conditionFlag);
+                expect(['n', 'z', 'c', 'v', 't'].includes(flag)).toBeTruthy();
+                const conditionFlag = flag as "n" | "z" | "c" | "v" | "t";
+                cpu.setStatusRegisterFlag(conditionFlag, value);
             });
             return;
         }

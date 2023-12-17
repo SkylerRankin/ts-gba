@@ -143,6 +143,10 @@ const isNegative32 = (n: number): boolean => {
     return ((n >>> 31) & 0x1) === 1;
 }
 
+const isNegative = (n: number, bits: number): boolean => {
+    return ((n >>> (bits - 1)) & 0x1) === 1;   
+}
+
 /**
  * Returns 1 if a "borrow" occurs when subtracting a from b. A borrow means that a 1
  * is required to be borrowed into the MSB during the subtraction. This translates to
@@ -175,4 +179,6 @@ export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
     asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
-    signedOverflowFromSubtraction, signedOverflowFromAddition, twosComplementNegation }
+    signedOverflowFromSubtraction, signedOverflowFromAddition, twosComplementNegation,
+    isNegative
+}

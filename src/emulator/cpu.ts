@@ -56,6 +56,17 @@ const Reg = {
     PC: 15  // R15, Program Counter
 }
 
+const cpsrBitOffsetMapping: {[key in StatusRegisterKey]: number} = {
+    'n': 31,
+    'z': 30,
+    'c': 29,
+    'v': 28,
+    'q': 27,
+    'i': 7,
+    'f': 6,
+    't': 5
+};
+
 /** 
  * Lists of the banked registers for each mode for each state. Banked registers
  * have their own register value in each state. Non-banked registers share the
@@ -157,7 +168,30 @@ class CPU implements CPUType {
     }
 
     conditionIsMet(condition: number) : boolean {
-        return true;
+        const nFlag = this.getConditionCodeFlag('n');
+        const zFlag = this.getConditionCodeFlag('z');
+        const cFlag = this.getConditionCodeFlag('c');
+        const vFlag = this.getConditionCodeFlag('v');
+
+        switch (condition) {
+            case 0b0000: { return zFlag === 1; }
+            case 0b0001: { return zFlag === 0; }
+            case 0b0010: { return cFlag === 1; }
+            case 0b0011: { return cFlag === 0; }
+            case 0b0100: { return nFlag === 1; }
+            case 0b0101: { return nFlag === 0; }
+            case 0b0110: { return vFlag === 1; }
+            case 0b0111: { return vFlag === 0; }
+            case 0b1000: { return cFlag === 1 && zFlag === 0; }
+            case 0b1001: { return cFlag === 0 && zFlag === 1; }
+            case 0b1010: { return nFlag === vFlag; }
+            case 0b1011: { return nFlag !== vFlag; }
+            case 0b1100: { return zFlag === 0 && nFlag === vFlag; }
+            case 0b1101: { return zFlag === 1 || nFlag !== vFlag; }
+            case 0b1110: { return true; }
+            case 0b1111: { return true; }
+            default: { throw Error(`Invalid condition opcode 0b${condition.toString(2)}.`); } 
+        }
     }
 
     clearConditionCodeFlags(...flags: ('n' | 'z' | 'c' | 'v')[]) : void {
@@ -184,43 +218,29 @@ class CPU implements CPUType {
 
     getConditionCodeFlag(flag: 'n' | 'z' | 'c' | 'v') : number {
         let cpsr = this.getStatusRegister('CPSR');
-        switch (flag) {
-            case 'n': return (cpsr >>> 31) & 0x1;
-            case 'z': return (cpsr >>> 30) & 0x1;
-            case 'c': return (cpsr >>> 29) & 0x1;
-            case 'v': return (cpsr >>> 28) & 0x1;
-        }
+        return (cpsr >>> cpsrBitOffsetMapping[flag]) & 0x1;
     }
 
     getStatusRegisterFlag(flag: StatusRegisterKey) : number {
         let cpsr = this.getStatusRegister('CPSR');
-        switch (flag) {
-            case 'n': return (cpsr >>> 31) & 0x1;
-            case 'z': return (cpsr >>> 30) & 0x1;
-            case 'c': return (cpsr >>> 29) & 0x1;
-            case 'v': return (cpsr >>> 28) & 0x1;
-            case 'q': return (cpsr >>> 27) & 0x1;
-            case 'i': return (cpsr >>> 7) & 0x1;
-            case 'f': return (cpsr >>> 6) & 0x1;
-            case 't': return (cpsr >>> 5) & 0x1;
-        }
+        const bitOffset = cpsrBitOffsetMapping[flag];
+        return (cpsr >>> bitOffset) & 0x1;
     }
 
     setStatusRegisterFlag(flag: StatusRegisterKey, value: number) : void {
         let cpsr = this.getStatusRegister('CPSR');
-        switch (flag) {
-            case 'n': cpsr &= (value << 31); break;
-            case 'z': cpsr &= (value << 30); break;
-            case 'c': cpsr &= (value << 29); break;
-            case 'v': cpsr &= (value << 28); break;
-            case 'q': cpsr &= (value << 27); break;
-            case 'i': cpsr &= (value << 7); break;
-            case 'f': cpsr &= (value << 6); break;
-            case 't':
-                cpsr &= (value << 5);
-                this.operatingState = value === 0 ? 'ARM' : 'THUMB';
-                break;
+        const mask = 1 << cpsrBitOffsetMapping[flag];
+
+        if (value === 0) {
+            cpsr &= ~mask;
+        } else {
+            cpsr |= mask;
         }
+
+        if (flag === 't') {
+            this.operatingState = value === 0 ? 'ARM' : 'THUMB';
+        }
+
         this.statusRegisters[0][0] = cpsr;
     }
 

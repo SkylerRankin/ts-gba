@@ -1,0 +1,22 @@
+# A program using only ARMv4 branching instructions.
+# Each line consists of the following components:
+#     <big-endian instruction> <text assembly for instruction> Updates=[<register/flag updates>]
+
+SET R14=0, R15=0, N=0, C=0, Z=0, V=0
+
+# --- B ---
+SET R15=0x10B08
+0xeaffbd7e B #0x100 Updates=[R15=0x100]                     # Backwards branch
+SET R15=0x108
+0xea004280 B #0x10B08 Updates=[R15=0x10B08]                 # Forward branch
+
+# --- BL ---
+SET R14=0, R15=0x10B08
+0xebffbd7e BL #0x100 Updates=[R15=0x100, R14=0x10B0c]       # Backwards branch
+SET R14=0, R15=0x108
+0xeb004280 BL #0x10B08 Updates=[R15=0x10B08, R14=0x10c]     # Forward branch
+
+# --- BX ---
+SET R0=0x124, R1=0x123, R15=0, T=0
+0xe12fff10 BX R0 Updates=[R15=0x124]                        # Without THUMB transfer
+0xe12fff11 BX R1 Updates=[R15=0x122, T=1]                   # With THUMB transfer

@@ -58,6 +58,7 @@ class StateHistory implements StateHistoryType {
         this.currentLog.pc = pc;
     }
     setInstructionName(name: string) { this.currentLog.instructionName = name; }
+    addError(message: string) { this.currentLog.errors.push(message); }
 
 }
 

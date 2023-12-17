@@ -24,6 +24,10 @@ test("Identify THUMB op-codes", () => {
     });
 });
 
-test.only("Execute data processing THUMB instructions", () => {
+test("Execute data processing THUMB instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/data_processing_thumb.txt", processTHUMB)
+});
+
+test.only("Execute branch THUMB instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/branch_thumb.txt", processTHUMB);
 });

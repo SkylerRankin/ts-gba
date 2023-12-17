@@ -790,17 +790,14 @@ const processMvn = (data: DataProcessingParameter) : number => {
 // Branch Instructions
 
 const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
-    const pcOffset = 8;
     const lFlag = (i >>> 24) & 0x1;
     cpu.history.setInstructionName(lFlag ? "BL" : "B");
 
-    let imm = i & 0xFFFFFF;
-    if (((imm >>> 23) & 0x1) === 1) imm += 0xFF000000;
-    imm = imm << 2;
+    const imm = signExtend(i & 0xFFFFFF, 24);
     const pc = cpu.getGeneralRegister(Reg.PC);
-    // console.log(`pc=${pc.toString(16)} imm=${imm.toString(16)} pc=${(pc + imm).toString(16)}`);
-    cpu.setGeneralRegister(Reg.PC, pc + imm + pcOffset);
-    if (lFlag) {
+    const newPC = pc + (imm << 2);
+    cpu.setGeneralRegister(Reg.PC, newPC);
+    if (lFlag === 1) {
         const instructionSize = cpu.operatingState === 'ARM' ? 4 : 2;
         cpu.setGeneralRegister(Reg.LR, pc + instructionSize);
     }
@@ -809,7 +806,8 @@ const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processBLX = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`BLX (${type})`);
-    return { incrementPC: true };
+    cpu.history.addError(`Unsupported BLX instruction: 0x${(i >>> 0).toString(16)}. This instruction is only available on ARMv5 and above.`);
+    return { incrementPC: false };
 
 }
 
