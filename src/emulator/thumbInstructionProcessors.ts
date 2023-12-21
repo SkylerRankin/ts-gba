@@ -624,6 +624,11 @@ const processMOV = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    /**
+     * This instruction only uses the lower 32 bits of the multiplication, which are the same in
+     * signed and unsigned multiplications. Therefore this instruction works for any combination
+     * of signed and unsigned inputs.
+     */
     cpu.history.setInstructionName('MUL');
     const prevCFlag = cpu.getConditionCodeFlag('c');
     const prevVFlag = cpu.getConditionCodeFlag('v');

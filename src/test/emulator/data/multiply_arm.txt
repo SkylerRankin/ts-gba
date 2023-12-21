@@ -1,0 +1,61 @@
+# A program using only ARMv4 multiplication instructions.
+# Each line consists of the following components:
+#     <big-endian instruction> <text assembly for instruction> Updates=[<register/flag updates>]
+
+SET R14=0, R15=0, N=0, C=0, Z=0, V=0
+
+# --- MLA ---
+SET R0=0x0, R1=0x2, R2=0x9, R3=0xFFFFFFFB, R4=0x1, R10=0x0, N=0, Z=0, C=0, V=0
+0xe03a4291 MLAS R10, R1, R2, R4 Updates=[R10=0x13]                                          # Positive result
+0xe03a0092 MLAS R10, R2, R0, R0 Updates=[R10=0x0, Z=1]                                      # Zero result
+0xe03a1392 MLAS R10, R2, R3, R1 Updates=[R10=0xFFFFFFD5, Z=0, N=1]                          # Negative result
+
+# --- MUL ---
+SET R0=0x0, R1=0x2, R2=0x9, R3=0xFFFFFFFB, R4=0x1, R10=0x0, N=0, Z=0, C=0, V=0
+0xe01a0291 MULS R10, R1, R2 Updates=[R10=0x12]                                              # Positive result
+0xe01a0092 MULS R10, R2, R0 Updates=[R10=0x0, Z=1]                                          # Zero result
+0xe01a0392 MULS R10, R2, R3 Updates=[R10=0xFFFFFFD3, Z=0, N=1]                              # Negative result
+
+# --- SMLAL ---
+SET R0=0x3, R1=0x4, R2=0x0, R3=0x0, R10=0x1, R11=0x2, N=0, Z=0, C=0, V=0
+0xe0fba190 SMLALS R10, R11, R0, R1 Updates=[R10=0xD, R11=0x2]                               # Positive result with no carry
+SET R0=0x86A5B7, R1=0x5B7F9, R10=0x11, R11=0x3
+0xe0fba190 SMLALS R10, R11, R0, R1 Updates=[R10=0x10, R11=0x305]                            # Positive result with carry
+SET R0=0xFFFFFFFF, R1=0xFFFFFFFE, R10=0xFFFFFFFE, R11=0xFFFFFFFF
+0xe0fba190 SMLALS R10, R11, R0, R1 Updates=[R10=0x0, R11=0x0, Z=1]                          # Zero
+SET R0=0xFFFEFFBD, R1=0x8773f, R10=0x1, R11=0x0, Z=0
+0xe0fba190 SMLALS R10, R11, R0, R1 Updates=[R10=0x8689CA84, R11=0xFFFFFFF7, N=1]            # Negative
+
+# --- SMULL ---
+SET R0=0x20004BD, R1=0x1345, R2=0x0, R3=0x0, R4=0x0, R10=0x0, R11=0x0, N=0, Z=0, C=0, V=0
+0xe0dba190 SMULLS R10, R11, R0, R1 Updates=[R10=0x8A5B4DF1, R11=0x26]                       # Positive result
+SET R0=0x0
+0xe0dba190 SMULLS R10, R11, R0, R1 Updates=[R10=0x0, R11=0x0, Z=1]                          # Zero result
+SET R0=0xFDFFFB43
+0xe0dba190 SMULLS R10, R11, R0, R1 Updates=[R10=0x75A4B20F, R11=0xFFFFFFD9, Z=0, N=1]       # Large negative result
+SET R0=0x1, R1=0xFFFFFFFF
+0xe0dba190 SMULLS R10, R11, R0, R1 Updates=[R10=0xFFFFFFFF, R11=0xFFFFFFFF]                 # Small negative result
+
+# --- UMLAL ---
+SET R0=0x20004BD, R1=0x1345, R2=0x0, R3=0x0, R4=0x0, R10=0x1, R11=0x2, N=0, Z=0, C=0, V=0
+0xe0bba190 UMLALS R10, R11, R0, R1 Updates=[R10=0x8A5B4DF2, R11=0x28]                       # Positive result
+SET R0=0x0, R10=0x0, R11=0x0
+0xe0bba190 UMLALS R10, R11, R0, R1 Updates=[R10=0x0, R11=0x0, Z=1]                          # Zero result
+SET R0=0xFDFFFB43, R1=0x1345, R10=0x2, R11=0x3, Z=0
+0xe0bba190 UMLALS R10, R11, R0, R1 Updates=[R10=0x75A4B211, R11=0x1321]                     # Large positive result with operand that would be negative
+SET R0=0x1, R1=0xFFFFFFFF, R10=0x0, R11=0x7F
+0xe0bba190 UMULLS R10, R11, R0, R1 Updates=[R10=0xFFFFFFFF, R11=0x7F]                       # Small positive result with operand that would be negative
+SET R0=0xDFA32214, R1=0xFF23FF32, R10=0xFF, R11=0x1
+0xe0bba190 UMULLS R10, R11, R0, R1 Updates=[R10=0xC18A90FF, R11=0xDEE2F12F, N=1]            # Negative result
+
+# --- UMULL ---
+SET R0=0x20004BD, R1=0x1345, R2=0x0, R3=0x0, R4=0x0, R10=0x0, R11=0x0, N=0, Z=0, C=0, V=0
+0xe09ba190 UMULLS R10, R11, R0, R1 Updates=[R10=0x8A5B4DF1, R11=0x26]                       # Positive result
+SET R0=0x0
+0xe09ba190 UMULLS R10, R11, R0, R1 Updates=[R10=0x0, R11=0x0, Z=1]                          # Zero result
+SET R0=0xFDFFFB43, Z=0
+0xe09ba190 UMULLS R10, R11, R0, R1 Updates=[R10=0x75A4B20F, R11=0x131E]                     # Large positive result with operand that would be negative
+SET R0=0x1, R1=0xFFFFFFFF
+0xe09ba190 UMULLS R10, R11, R0, R1 Updates=[R10=0xFFFFFFFF, R11=0x0]                        # Small positive result with operand that would be negative
+SET R0=0xDFA32214, R1=0xFF23FF32
+0xe09ba190 UMULLS R10, R11, R0, R1 Updates=[R10=0xC18A9000, R11=0xDEE2F12E, N=1]            # Negative result

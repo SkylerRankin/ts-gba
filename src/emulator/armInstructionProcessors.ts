@@ -1,5 +1,5 @@
 import { CPU, Reg } from './cpu';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative } from './math';
 
 type ProcessedInstructionOptions = {
     incrementPC: boolean
@@ -1044,9 +1044,13 @@ const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const result = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs)) & 0xFFFFFFFF;
     cpu.setGeneralRegister(rd, result);
     if (sFlag) {
+        const prevCFlag = cpu.getConditionCodeFlag('c');
+        const prevVFlag = cpu.getConditionCodeFlag('v');
         cpu.clearConditionCodeFlags();
         if (result === 0) cpu.setConditionCodeFlags('z');
         if (result < 0) cpu.setConditionCodeFlags('n');
+        if (prevCFlag) cpu.setConditionCodeFlags('c');
+        if (prevVFlag) cpu.setConditionCodeFlags('v');
     }
     return { incrementPC: true };
 }
@@ -1058,13 +1062,16 @@ const processMLA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rs = (i >>> 8) & 0xF;
     const rm = i & 0xF;
     const sFlag = (i >>> 20) & 0x1;
-    const result = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs) + cpu.getGeneralRegister(rn))
-        & 0xFFFFFFFF;
+    const result = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs) + cpu.getGeneralRegister(rn)) & 0xFFFFFFFF;
     cpu.setGeneralRegister(rd, result);
     if (sFlag) {
+        const prevCFlag = cpu.getConditionCodeFlag('c');
+        const prevVFlag = cpu.getConditionCodeFlag('v');
         cpu.clearConditionCodeFlags();
         if (result === 0) cpu.setConditionCodeFlags('z');
         if (result < 0) cpu.setConditionCodeFlags('n');
+        if (prevCFlag) cpu.setConditionCodeFlags('c');
+        if (prevVFlag) cpu.setConditionCodeFlags('v');
     }
     return { incrementPC: true };
 }
@@ -1076,34 +1083,118 @@ const processSMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rs = (i >>> 8) & 0xF;
     const rm = i & 0xF;
     const sFlag = (i >>> 20) & 0x1;
-    // TODO Supposed to be signed multiplication; how to ensure this>
-    const rdHiValue = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs));
-    const rdLoValue = (cpu.getGeneralRegister(rm) * cpu.getGeneralRegister(rs));
-    // TODO rdHiValue should only be bits [63:32], rdLoValue should be bits [31:0]
-    // How to get high bits, bit operations make the numbers 32 bits
+
+    let rmValue = cpu.getGeneralRegister(rm);
+    let rsValue = cpu.getGeneralRegister(rs);
+    const rmNegative = isNegative32(rmValue);
+    const rsNegative = isNegative32(rsValue);
+
+    if (rmNegative) rmValue = value32ToNative(rmValue);
+    if (rsNegative) rsValue = value32ToNative(rsValue);
+
+    const result = rmValue * rsValue;
+    const rdHiValue = Math.floor(result / 0x100000000) & 0xFFFFFFFF;
+    const rdLoValue = result & 0xFFFFFFFF;
+
     cpu.setGeneralRegister(rdHi, rdHiValue);
     cpu.setGeneralRegister(rdLo, rdLoValue);
 
     if (sFlag) {
-        cpu.clearConditionCodeFlags();
-        if (rdHiValue === 0 && rdLoValue === 0) cpu.setConditionCodeFlags('z');
-        if (rdHiValue < 0) cpu.setConditionCodeFlags('n');
+        cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+        cpu.setStatusRegisterFlag('n', isNegative32(rdHiValue) ? 1 : 0);
     }
     return { incrementPC: true };
 }
 
 const processUMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('UMULL');
+    const rdHi = (i >>> 16) & 0xF;
+    const rdLo = (i >>> 12) & 0xF;
+    const rs = (i >>> 8) & 0xF;
+    const rm = i & 0xF;
+    const sFlag = (i >>> 20) & 0x1;
+
+    const rmValue = cpu.getGeneralRegister(rm);
+    const rsValue = cpu.getGeneralRegister(rs);
+    const result = rmValue * rsValue;
+
+    const rdHiValue = Math.floor(result / 0x100000000) & 0xFFFFFFFF;
+    const rdLoValue = result & 0xFFFFFFFF;
+    
+    cpu.setGeneralRegister(rdHi, rdHiValue);
+    cpu.setGeneralRegister(rdLo, rdLoValue);
+
+    if (sFlag) {
+        cpu.setStatusRegisterFlag('z', result === 0 ? 1 : 0);
+        cpu.setStatusRegisterFlag('n', isNegative32(rdHiValue) ? 1 : 0);
+    }
     return { incrementPC: true };
 }
 
 const processSMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SMLAL');
+    const rdHi = (i >>> 16) & 0xF;
+    const rdLo = (i >>> 12) & 0xF;
+    const rs = (i >>> 8) & 0xF;
+    const rm = i & 0xF;
+    const sFlag = (i >>> 20) & 0x1;
+
+    let rmValue = cpu.getGeneralRegister(rm);
+    let rsValue = cpu.getGeneralRegister(rs);
+    let rdLoValue = cpu.getGeneralRegister(rdLo);
+    let rdHiValue = cpu.getGeneralRegister(rdHi);
+    const rmNegative = isNegative32(rmValue);
+    const rsNegative = isNegative32(rsValue);
+
+    if (rmNegative) rmValue = value32ToNative(rmValue);
+    if (rsNegative) rsValue = value32ToNative(rsValue);
+
+    const result = rmValue * rsValue;
+    rdLoValue = ((result & 0xFFFFFFFF) >>> 0) + rdLoValue
+    const rdLoCarry = (rdLoValue > 2**32 - 1) ? 1 : 0;
+    rdHiValue = (Math.floor(result / 0x100000000) & 0xFFFFFFFF) + rdHiValue + rdLoCarry;
+
+    rdLoValue = rdLoValue & 0xFFFFFFFF;
+    rdHiValue = rdHiValue & 0xFFFFFFFF;
+
+    cpu.setGeneralRegister(rdHi, rdHiValue);
+    cpu.setGeneralRegister(rdLo, rdLoValue);
+
+    if (sFlag) {
+        cpu.setStatusRegisterFlag('z', (rdLoValue === 0 && rdHiValue === 0) ? 1 : 0);
+        cpu.setStatusRegisterFlag('n', isNegative32(rdHiValue) ? 1 : 0);
+    }
     return { incrementPC: true };
 }
 
 const processUMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('UMLAL');
+    const rdHi = (i >>> 16) & 0xF;
+    const rdLo = (i >>> 12) & 0xF;
+    const rs = (i >>> 8) & 0xF;
+    const rm = i & 0xF;
+    const sFlag = (i >>> 20) & 0x1;
+
+    const rmValue = cpu.getGeneralRegister(rm);
+    const rsValue = cpu.getGeneralRegister(rs);
+    let rdLoValue = cpu.getGeneralRegister(rdLo);
+    let rdHiValue = cpu.getGeneralRegister(rdHi);
+
+    const result = rmValue * rsValue;
+    rdLoValue = ((result & 0xFFFFFFFF) >>> 0) + rdLoValue
+    const rdLoCarry = (rdLoValue > 2**32 - 1) ? 1 : 0;
+    rdHiValue = (Math.floor(result / 0x100000000) & 0xFFFFFFFF) + rdHiValue + rdLoCarry;
+
+    rdLoValue = rdLoValue & 0xFFFFFFFF;
+    rdHiValue = rdHiValue & 0xFFFFFFFF;
+
+    cpu.setGeneralRegister(rdHi, rdHiValue);
+    cpu.setGeneralRegister(rdLo, rdLoValue);
+
+    if (sFlag) {
+        cpu.setStatusRegisterFlag('z', (rdLoValue === 0 && rdHiValue === 0) ? 1 : 0);
+        cpu.setStatusRegisterFlag('n', isNegative32(rdHiValue) ? 1 : 0);
+    }
     return { incrementPC: true };
 }
 

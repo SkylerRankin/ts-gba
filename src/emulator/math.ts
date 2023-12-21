@@ -175,10 +175,25 @@ const twosComplementNegation = (n: number) : number => {
     return ((~n + 1) & 0xFFFFFFFF) >>> 0;
 }
 
+/**
+ * Register values are 32 bit, but for the purposes of JavaScript runtimes,
+ * a 32 bit value with bit 31 set won't be considered negative. This may
+ * messes up signed multiplication on 32 bit values, for instance. This function
+ * converts a 32 bit signed value to the native JS number form, retaining
+ * the sign.
+ */
+const value32ToNative = (n: number) : number => {
+    if (isNegative32(n)) {
+        return twosComplementNegation(n) * -1;
+    } else {
+        return n;
+    }
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
     asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
     signedOverflowFromSubtraction, signedOverflowFromAddition, twosComplementNegation,
-    isNegative
+    isNegative, value32ToNative
 }

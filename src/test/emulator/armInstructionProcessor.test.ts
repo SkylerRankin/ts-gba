@@ -74,3 +74,7 @@ test("Execute data processing ARM instructions", () => {
 test("Execute branch ARM instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/branch_arm.txt", processARM);
 });
+
+test("Execute multiply ARM instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/multiply_arm.txt", processARM);
+})
