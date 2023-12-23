@@ -1,0 +1,10 @@
+# A program using only ARMv4 status register access instructions.
+# Each line consists of the following components:
+#     <big-endian instruction> <text assembly for instruction> Updates=[<register/flag updates>]
+
+SET R14=0, R15=0, N=0, C=0, Z=0, V=0
+
+# --- MRS ---
+SET R0=0x0, R1=0x2, R2=0x9, R3=0xFFFFFFFB, R4=0x1, R10=0x0, N=0, Z=0, C=0, V=0
+0x0 MRS R0, CPSR
+0x0 MRS R0, SPSR

@@ -1202,6 +1202,7 @@ const processUMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
  const processCLZ = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('CLZ');
+    cpu.history.addError(`CLZ instruction (0x${i.toString(16)}) is only supported in architecture version 5 and above.`);
     return { incrementPC: true };
  }
 
@@ -1209,12 +1210,87 @@ const processUMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processMRS = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('MRS');
+
+    const rFlag = (i >>> 22) & 0x1;
+    const rd = (i >> 12) & 0xF;
+
+    if (rFlag === 1) {
+        const spsr = cpu.getStatusRegister('SPSR');
+        cpu.setGeneralRegister(rd, spsr);
+    } else {
+        const cpsr = cpu.getStatusRegister('CPSR');
+        cpu.setGeneralRegister(rd, cpsr);
+    } 
+
     return { incrementPC: true };
 }
 
-// type = 1 => immediate operand, 2 => register operand
 const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`MSR`);
+
+    // type = 1 => immediate operand, 2 => register operand
+    let operand;
+    if (type === 1) {
+        const rotation = (i >>> 8) & 0xF;
+        const imm = i & 0xFF;
+        operand = rotateRight(imm, rotation, 32);
+    } else {
+        const rm = i & 0xF;
+        operand = cpu.getGeneralRegister(rm);
+    }
+
+    const rFlag = (i >>> 22) & 0x1;
+    const fieldMask = (i >>> 16) & 0xF;
+
+    if (rFlag === 0) {
+        let cpsr = cpu.getStatusRegister('CPSR');
+        if ((fieldMask & 0x1) > 0 && cpu.inAPrivilegedMode()) {
+            // cpsr 7:0 = operand 7:0
+            cpsr &= 0xFFFFFF00;
+            cpsr |= (operand & 0xFF);
+        }
+        if ((fieldMask & 0b10) > 0 && cpu.inAPrivilegedMode()) {
+            // cpsr 15:8 = operand 15:8
+            cpsr &= 0xFFFF00FF;
+            cpsr |= (operand & 0xFF00);
+        }
+        if ((fieldMask & 0b100) > 0 && cpu.inAPrivilegedMode()) {
+            // cpsr 23:16 = operand 23:16
+            cpsr &= 0xFF00FFFF;
+            cpsr |= (operand & 0xFF0000);
+        }
+        if ((fieldMask & 0b100) > 0) {
+            // cpsr 31:24 = operand 31:24
+            cpsr &= 0x00FFFFFF;
+            cpsr |= (operand & 0xFF000000);
+        }
+        cpu.setStatusRegister('CPSR', cpsr);
+    } else if (cpu.currentModeHasSPSR()) {
+        let spsr = cpu.getStatusRegister('SPSR');
+        if ((fieldMask & 0x1) > 0) {
+            // spsr 7:0 = operand 7:0
+            spsr &= 0xFFFFFF00;
+            spsr |= (operand & 0xFF);
+        }
+        if ((fieldMask & 0b10) > 0) {
+            // spsr 15:8 = operand 15:8
+            spsr &= 0xFFFF00FF;
+            spsr |= (operand & 0xFF00);
+        }
+        if ((fieldMask & 0b100) > 0) {
+            // spsr 23:16 = operand 23:16
+            spsr &= 0xFF00FFFF;
+            spsr |= (operand & 0xFF0000);
+        }
+        if ((fieldMask & 0b100) > 0) {
+            // spsr 31:24 = operand 31:24
+            spsr &= 0x00FFFFFF;
+            spsr |= (operand & 0xFF000000);
+        }
+        cpu.setStatusRegister('SPSR', spsr);
+    }
+
+
     return { incrementPC: true };
 }
 

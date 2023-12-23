@@ -310,6 +310,17 @@ class CPU implements CPUType {
         }
     }
 
+    setStatusRegister(reg: StatusRegister, value: number): void {
+        if (this.currentModeHasSPSR()) {
+            switch (reg) {
+                case 'CPSR': this.statusRegisters[0][0] = value; break;
+                case 'SPSR': this.statusRegisters[this.operatingMode][1] = value; break;
+            }
+        } else {
+            throw Error(`Cannot set ${reg} in mode ${OperatingModeNames[this.operatingMode]}.`);
+        }
+    }
+
     setGeneralRegisterByMode(reg: number, value: number, mode: OperatingMode) : void {
         this.generalRegisters[OperatingModeNames.indexOf(mode)][reg] = value;
     }
@@ -352,6 +363,17 @@ class CPU implements CPUType {
 
     setBytesInMemory(address: number, bytes: Uint8Array) : void {
         this.memory.setBytes(address, bytes);
+    }
+
+    inAPrivilegedMode() : boolean {
+        return this.operatingMode != OperatingModeNames.indexOf('usr');
+    }
+
+    currentModeHasSPSR() : boolean {
+        return (
+            this.operatingMode != OperatingModeNames.indexOf('usr') &&
+            this.operatingMode != OperatingModeNames.indexOf('sys')
+        );
     }
 
 }
