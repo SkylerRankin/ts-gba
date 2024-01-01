@@ -80,7 +80,7 @@ test('borrowFrom', () => {
     expect(borrowFrom(0, 0)).toBe(0);
 });
 
-test.only('twosComplementNegation', () => {
+test('twosComplementNegation', () => {
     expect(twosComplementNegation(0)).toBe(0);
     expect(twosComplementNegation(1)).toBe(0xFFFFFFFF);
     expect(twosComplementNegation(0xFFFFFFFF)).toBe(1);

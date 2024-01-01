@@ -21,7 +21,6 @@ type CPUType = {
     step: () => void,
     atBreakpoint: () => boolean,
     
-    updateStatusRegister: (update: StatusRegisterUpdate) => void,
     getStatusRegisterFlag(register: StatusRegister, flag: StatusRegisterKey) : number,
     setStatusRegisterFlag(flag: StatusRegisterKey, value: number) : void,
     getStatusRegister: (reg: StatusRegister) => number,
@@ -35,7 +34,6 @@ type CPUType = {
     setBytesInMemory(address: number, bytes: Uint8Array) : void,
 }
 
-// TODO: check if both of these map directions are needed
 const OperatingModeCodes = {
     'usr': 0b10000,
     'fiq': 0b10001,
@@ -45,15 +43,6 @@ const OperatingModeCodes = {
     'und': 0b11011,
     'sys': 0b11111
 };
-const OperatingModeEncodingToName: {[key: number]: OperatingMode} = {
-    0b10000: 'usr',
-    0b10001: 'fiq',
-    0b10010: 'irq',
-    0b10011: 'svc',
-    0b10111: 'abt',
-    0b11011: 'und',
-    0b11111: 'sys'
-}
 const OperatingModeNames = ['usr', 'fiq', 'irq', 'svc', 'abt', 'und', 'sys'];
 type OperatingMode = 'usr' | 'fiq' | 'irq' | 'svc' | 'abt' | 'und' | 'sys';
 // CPSR[5] = 1 for Thumb, 0 for ARM
@@ -176,15 +165,15 @@ class CPU implements CPUType {
         this.operatingState = 'ARM';
         this.bigEndian = false;
         this.setModeBits(OperatingModeCodes.usr);
-        this.setStateBit(0);
+        this.setStatusRegisterFlag('t', 0);
         this.setGeneralRegister(Reg.PC, 0x08000008);
     }
 
     conditionIsMet(condition: number) : boolean {
-        const nFlag = this.getConditionCodeFlag('n');
-        const zFlag = this.getConditionCodeFlag('z');
-        const cFlag = this.getConditionCodeFlag('c');
-        const vFlag = this.getConditionCodeFlag('v');
+        const nFlag = this.getStatusRegisterFlag('CPSR', 'n');
+        const zFlag = this.getStatusRegisterFlag('CPSR', 'z');
+        const cFlag = this.getStatusRegisterFlag('CPSR', 'c');
+        const vFlag = this.getStatusRegisterFlag('CPSR', 'v');
 
         switch (condition) {
             case 0b0000: { return zFlag === 1; }
@@ -207,41 +196,11 @@ class CPU implements CPUType {
         }
     }
 
-    clearConditionCodeFlags(...flags: ('n' | 'z' | 'c' | 'v')[]) : void {
-        if (flags.length === 0) {
-            this.statusRegisters[0][0] &= ~0xF0000000;
-        } else {
-            const clearMasks : number[] = [~0x80000000, ~0x40000000, ~0x20000000, ~0x10000000];
-            let cpsr = this.getStatusRegister('CPSR');
-            ['n', 'z', 'c', 'v'].forEach((key: any, i: number) => {
-                if (flags.includes(key)) cpsr &= clearMasks[i];
-            });
-            this.statusRegisters[0][0] = cpsr;
-        }
-    }
-
-    // TODO: check if this can be removed since setStatusRegisterFlag exists
-    setConditionCodeFlags(...flags: ('n' | 'z' | 'c' | 'v')[]) : void {
-        let cpsr = this.getStatusRegister('CPSR');
-        const setMasks : number[] = [0x80000000, 0x40000000, 0x20000000, 0x10000000];
-        ['n', 'z', 'c', 'v'].forEach((key: any, i: number) => {
-            if (flags.includes(key)) cpsr |= setMasks[i];
+    clearConditionCodeFlags() : void {
+        ['n', 'z', 'c', 'v'].forEach(flag => {
+            this.setStatusRegisterFlag(flag as StatusRegisterKey, 0);
         });
-        this.statusRegisters[0][0] = cpsr;
     }
-
-    // TODO: this is a duplicate of getStatusRegisterFlag
-    getConditionCodeFlag(flag: 'n' | 'z' | 'c' | 'v') : number {
-        let cpsr = this.getStatusRegister('CPSR');
-        return (cpsr >>> cpsrBitOffsetMapping[flag]) & 0x1;
-    }
-
-    // getStatusRegisterFlag(flag: StatusRegisterKey) : number {
-    //     return this.getStatusRegisterFlag('CPSR', flag);
-    //     // let cpsr = this.getStatusRegister('CPSR');
-    //     // const bitOffset = cpsrBitOffsetMapping[flag];
-    //     // return (cpsr >>> bitOffset) & 0x1;
-    // }
 
     getStatusRegisterFlag(register: StatusRegister, flag: StatusRegisterKey) : number {
         let cpsr = this.getStatusRegister(register);
@@ -267,10 +226,11 @@ class CPU implements CPUType {
     }
 
     setModeBits(value: number) : void {
-        if (Object.values(OperatingModeCodes).includes(value)) {
+        const modeEncoding = Object.entries(OperatingModeCodes).find(([k, v]) => v == value);
+        if (modeEncoding) {
             this.statusRegisters[0][0] &= ~0x1F;
             this.statusRegisters[0][0] |= value;
-            this.operatingMode = OperatingModeEncodingToName[value];
+            this.operatingMode = modeEncoding[0] as OperatingMode;
         } else {
             throw Error(`Invalid mode bits ${value.toString(2)}`);
         }
@@ -283,29 +243,6 @@ class CPU implements CPUType {
             const operatingModeIndex = OperatingModeNames.indexOf(this.operatingMode);
             this.statusRegisters[0][0] = this.statusRegisters[operatingModeIndex][1];
         }
-    }
-
-    /**
-     * The T bit of the CPSR is 0 for ARM state, 1 for THUMB state.
-     */
-    // TODO: check if this can be removed since setStatusRegisterFlag exists
-    setStateBit(value: number) : void {
-        if (value) this.statusRegisters[0][0] |= 0x20;
-        else this.statusRegisters[0][0] &= ~0x20;
-        this.operatingState = value ? 'THUMB' : 'ARM';
-    }
-
-    updateStatusRegister(update: StatusRegisterUpdate) : void {
-        const setMasks : number[] = [0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x8000000, 0x80, 0x40, 0x20];
-        const clearMasks : number[] = setMasks.map((mask: number) => ~mask);
-        let newStatus = this.statusRegisters[0][0];
-
-        statusRegisterFlags.forEach((key: StatusRegisterKey, i: number) => {
-            if (update.includes(key)) newStatus |= setMasks[i];
-            else newStatus &= clearMasks[i];
-        });
-
-        this.statusRegisters[0][0] = newStatus;
     }
 
     /**
