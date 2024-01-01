@@ -190,10 +190,20 @@ const value32ToNative = (n: number) : number => {
     }
 }
 
+const parseNumericLiteral = (s: string) : number => {
+    if (s.startsWith("0b")) {
+        return Number.parseInt(s.substring(2), 2);
+    } else if (s.startsWith("0x")) {
+        return Number.parseInt(s.substring(2), 16);
+    } else {
+        return Number.parseInt(s, 10);
+    }
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
     asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
     signedOverflowFromSubtraction, signedOverflowFromAddition, twosComplementNegation,
-    isNegative, value32ToNative
+    isNegative, value32ToNative, parseNumericLiteral
 }

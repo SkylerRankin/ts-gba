@@ -193,7 +193,7 @@ const processADC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rd = i & 0x7;
     const operand1 = cpu.getGeneralRegister(rd);
     const operand2 = cpu.getGeneralRegister(rm);
-    const cFlag = cpu.getStatusRegisterFlag('c');
+    const cFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
 
     const result = operand1 + operand2 + cFlag;
     const result32 = result & 0xFFFFFFFF;

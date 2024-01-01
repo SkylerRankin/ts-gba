@@ -28,6 +28,6 @@ test("Execute data processing THUMB instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/data_processing_thumb.txt", processTHUMB)
 });
 
-test.only("Execute branch THUMB instructions", () => {
+test("Execute branch THUMB instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/branch_thumb.txt", processTHUMB);
 });

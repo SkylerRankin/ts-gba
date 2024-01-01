@@ -2,9 +2,24 @@
 # Each line consists of the following components:
 #     <big-endian instruction> <text assembly for instruction> Updates=[<register/flag updates>]
 
-SET R14=0, R15=0, N=0, C=0, Z=0, V=0
 
 # --- MRS ---
-SET R0=0x0, R1=0x2, R2=0x9, R3=0xFFFFFFFB, R4=0x1, R10=0x0, N=0, Z=0, C=0, V=0
-0x0 MRS R0, CPSR
-0x0 MRS R0, SPSR
+SET R0=0x0, N=1, Z=0, C=1, V=1, I=0, F=1, T=0, OPERATING_MODE=0b10011                                                       # Set CPSR values with svc mode
+0xe10f0000 MRS R0, CPSR Updates=[R0=0xB0000053]                                                                             # Read CPSR into R0
+SET R1=0x0, N_SPSR=0, Z_SPSR=1, C_SPSR=0, V_SPSR=0, I_SPSR=1, F_SPSR=0, T_SPSR=1, OPERATING_MODE_SPSR=0b10001               # Set SPSR values with FIQ mode
+0xe14f1000 MRS R1, SPSR Updates=[R1=0x400000B1]                                                                             # Read system mode's SPSR into R1
+
+# --- MSR ---
+SET R0=0x0, N=1, Z=0, C=1, V=1, I=1, F=1, T=0, OPERATING_MODE=0b10000                                                       # Set CPSR values with user mode
+0xe321f01f MSR CPSR_c, #0x1F Updates=[]                                                                                     # Attempt to switch into system mode, but cannot since current mode (user) is not privileged
+SET OPERATING_MODE=0x1F                                                                                                     # Use system operating mode
+0xe321f147 MSR CPSR_c, #0xC0000011 Updates=[I=0, F=0, T=0, OPERATING_MODE=0b10001]                                          # Switch into FIQ mode, immediate uses the 8 bit immediate (0x47) and the rotation (0x1).
+SET R0=0xD0000000, N=0, Z=0, C=0, V=0, I=0, F=0, T=0, OPERATING_MODE=0b10000                                                # Clear CPSR values with user mode and set R0 for future CPSR flags
+0xe128f000 MSR CPSR_f, R0 Updates=[N=1, Z=1, C=0, V=1]
+
+SET R0=0x0, N=0, Z=0, C=0, V=0, I=0, F=0, T=0, OPERATING_MODE=0b10001                                                        # Set CPSR values with fiq mode
+SET R0=0x0, N_SPSR=0, Z_SPSR=0, C_SPSR=0, V_SPSR=0, I_SPSR=0, F_SPSR=0, T_SPSR=0, OPERATING_MODE_SPSR=0b10001                # Set SPSR values with fiq mode
+0xe361f0f2 MSR SPSR_c, #0xF2 Updates=[I_SPSR=1, F_SPSR=1, T_SPSR=1, OPERATING_MODE_SPSR=0b10010]                             # Update SPSR bits 7:0
+SET R0=0x0, N=0, Z=0, C=0, V=0, I=0, F=0, T=0, OPERATING_MODE=0b10001                                                        # Set CPSR values with fiq mode
+SET R0=0xF0000000, N_SPSR=0, Z_SPSR=0, C_SPSR=0, V_SPSR=0, I_SPSR=0, F_SPSR=0, T_SPSR=0, OPERATING_MODE_SPSR=0b10001         # Set SPSR values with fiq mode
+0xe168f000 MSR SPSR_f, R0 Updates=[N_SPSR=1, Z_SPSR=1, C_SPSR=1, V_SPSR=1]                                                   # Update SPSR bits 31:24

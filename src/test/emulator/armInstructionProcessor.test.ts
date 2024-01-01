@@ -18,6 +18,8 @@ test("Identify ARM op-codes", () => {
 
     test_cases.forEach(e => {
         const bigEndianEncoding = toBigEndianInt32(e.encoding);
+        // Test each instruction in supervisor mode
+        cpu.setModeBits(0x13);
         processARM(cpu, bigEndianEncoding);
         expect(cpu.history.currentLog.instructionName).toBe(e.name);
     });
@@ -78,3 +80,7 @@ test("Execute branch ARM instructions", () => {
 test("Execute multiply ARM instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/multiply_arm.txt", processARM);
 })
+
+test("Execute status register access ARM instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/status_register_access_arm.txt", processARM);
+});

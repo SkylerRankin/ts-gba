@@ -167,7 +167,7 @@ const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
     let carry = 0;
     let valueOffset = 0;
     const iFlag = (i >> 25) & 0x1;
-    const cFlag = cpu.getStatusRegisterFlag('c');
+    const cFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
 
     if (iFlag) {
         const rotate = (i >>> 8) & 0xF;
@@ -499,7 +499,7 @@ const processAnd = (data: DataProcessingParameter) : number => {
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
-            cpu.cpsrToSPSR();
+            cpu.spsrToCPSR();
         } else {
             cpu.clearConditionCodeFlags();
             if (result32 === 0) cpu.setConditionCodeFlags('z');
@@ -517,7 +517,7 @@ const processEor = (data: DataProcessingParameter) : number => {
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
         if (rd === 15) {
-            cpu.cpsrToSPSR();
+            cpu.spsrToCPSR();
         } else {
             cpu.clearConditionCodeFlags();
             if (result === 0) cpu.setConditionCodeFlags('z');
@@ -722,7 +722,7 @@ const processOrr = (data: DataProcessingParameter) : number => {
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
-            cpu.cpsrToSPSR();
+            cpu.spsrToCPSR();
         } else {
             cpu.clearConditionCodeFlags();
             if (result32 === 0) cpu.setConditionCodeFlags('z');
@@ -740,7 +740,7 @@ const processMov = (data: DataProcessingParameter) : number => {
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
-            cpu.cpsrToSPSR();
+            cpu.spsrToCPSR();
         } else {
             cpu.clearConditionCodeFlags();
             if (result32 === 0) cpu.setConditionCodeFlags('z');
@@ -758,7 +758,7 @@ const processBic = (data: DataProcessingParameter) : number => {
     cpu.setGeneralRegister(rd, result);
     if (sFlag) {
         if (rd === 15) {
-            cpu.cpsrToSPSR();
+            cpu.spsrToCPSR();
         } else {
             cpu.clearConditionCodeFlags();
             if (result === 0) cpu.setConditionCodeFlags('z');
@@ -776,7 +776,7 @@ const processMvn = (data: DataProcessingParameter) : number => {
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
-            cpu.cpsrToSPSR();
+            cpu.spsrToCPSR();
         } else {
             cpu.clearConditionCodeFlags();
             if (result32 === 0) cpu.setConditionCodeFlags('z');
@@ -994,9 +994,9 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
                     address += 4;
                 }
             }
-            cpu.cpsrToSPSR();
+            cpu.spsrToCPSR();
             const value = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
-            const t = cpu.getStatusRegisterFlag('t');
+            const t = cpu.getStatusRegisterFlag('CPSR', 't');
             const newPC = t === 1 ?
                 value & 0xFFFFFFFE :
                 value & 0xFFFFFFFC;
@@ -1231,7 +1231,7 @@ const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     // type = 1 => immediate operand, 2 => register operand
     let operand;
     if (type === 1) {
-        const rotation = (i >>> 8) & 0xF;
+        const rotation = ((i >>> 8) & 0xF) * 2;
         const imm = i & 0xFF;
         operand = rotateRight(imm, rotation, 32);
     } else {
@@ -1243,23 +1243,29 @@ const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     const fieldMask = (i >>> 16) & 0xF;
 
     if (rFlag === 0) {
+        const privilegedMode = cpu.inAPrivilegedMode();
         let cpsr = cpu.getStatusRegister('CPSR');
-        if ((fieldMask & 0x1) > 0 && cpu.inAPrivilegedMode()) {
+        if ((fieldMask & 0x1) > 0 && privilegedMode) {
             // cpsr 7:0 = operand 7:0
             cpsr &= 0xFFFFFF00;
             cpsr |= (operand & 0xFF);
         }
-        if ((fieldMask & 0b10) > 0 && cpu.inAPrivilegedMode()) {
+
+        // The status and field extensions (bits 8:23) are unused in version 4.
+        /*
+        if ((fieldMask & 0b10) > 0 && privilegedMode) {
             // cpsr 15:8 = operand 15:8
             cpsr &= 0xFFFF00FF;
             cpsr |= (operand & 0xFF00);
         }
-        if ((fieldMask & 0b100) > 0 && cpu.inAPrivilegedMode()) {
+        if ((fieldMask & 0b100) > 0 && privilegedMode) {
             // cpsr 23:16 = operand 23:16
             cpsr &= 0xFF00FFFF;
             cpsr |= (operand & 0xFF0000);
         }
-        if ((fieldMask & 0b100) > 0) {
+        */
+
+        if ((fieldMask & 0b1000) > 0) {
             // cpsr 31:24 = operand 31:24
             cpsr &= 0x00FFFFFF;
             cpsr |= (operand & 0xFF000000);
@@ -1272,6 +1278,9 @@ const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             spsr &= 0xFFFFFF00;
             spsr |= (operand & 0xFF);
         }
+
+        // The status and field extensions (bits 8:23) are unused in version 4.
+        /*
         if ((fieldMask & 0b10) > 0) {
             // spsr 15:8 = operand 15:8
             spsr &= 0xFFFF00FF;
@@ -1282,14 +1291,15 @@ const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             spsr &= 0xFF00FFFF;
             spsr |= (operand & 0xFF0000);
         }
-        if ((fieldMask & 0b100) > 0) {
+        */
+
+        if ((fieldMask & 0b1000) > 0) {
             // spsr 31:24 = operand 31:24
             spsr &= 0x00FFFFFF;
             spsr |= (operand & 0xFF000000);
         }
         cpu.setStatusRegister('SPSR', spsr);
     }
-
 
     return { incrementPC: true };
 }
