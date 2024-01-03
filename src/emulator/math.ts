@@ -102,8 +102,8 @@ const int8ToByteArray = (n: number, bigEndian: boolean) : Uint8Array => {
 }
 
 const intToByteArray = (n: number, bigEndian: boolean, bytes: number) : Uint8Array => {
-    const a = new Uint8Array(4);
-    for (let i = 0; i < 4; i++) {
+    const a = new Uint8Array(bytes);
+    for (let i = 0; i < bytes; i++) {
         a[i] = (n >>> (i * 8)) & 0xFF;
     }
     if (bigEndian) a.reverse();
@@ -200,10 +200,18 @@ const parseNumericLiteral = (s: string) : number => {
     }
 }
 
+const wordAlignAddress = (address: number) : number => {
+    return address & 0xFFFFFFFC;
+}
+
+const halfWordAlignAddress = (address: number) : number => {
+    return address & 0xFFFFFFFE;
+}
+
 export { encodeWithRotation, rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
     asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
     signedOverflowFromSubtraction, signedOverflowFromAddition, twosComplementNegation,
-    isNegative, value32ToNative, parseNumericLiteral
+    isNegative, value32ToNative, parseNumericLiteral, wordAlignAddress, halfWordAlignAddress
 }

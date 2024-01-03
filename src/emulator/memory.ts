@@ -1,6 +1,6 @@
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'BG_OBJ' | 'VRAM' | 'OAM' | 'ROM' | 'UNUSED';
 const segments: {[key in MemorySegment]: {[key in 'start' | 'end']: number}} = {
-    'BIOS':     { start: 0x00000000, end: 0x00003FFFF },
+    'BIOS':     { start: 0x00000000, end: 0x00003FFF },
     'WRAM_O':   { start: 0x02000000, end: 0x0203FFFF },
     'WRAM_I':   { start: 0x03000000, end: 0x03007FFF },
     'IO':       { start: 0x04000000, end: 0x040003FE },
@@ -23,27 +23,31 @@ interface MemoryType {
 class Memory implements MemoryType {
 
     memoryBlocks = {
-        'BIOS': new Uint8Array(segments.BIOS.end - segments.BIOS.start),
-        'WRAM_O': new Uint8Array(0),
-        'WRAM_I': new Uint8Array(0),
-        'IO': new Uint8Array(0),
-        'BG_OBJ': new Uint8Array(0),
-        'VRAM': new Uint8Array(0),
-        'OAM': new Uint8Array(0),
-        'ROM': new Uint8Array(segments.ROM.end - segments.ROM.start),
-        'UNUSED': new Uint8Array(0)
+        'BIOS': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'WRAM_O': new Uint8Array(segments.WRAM_O.end - segments.WRAM_O.start + 1),
+        'WRAM_I': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'IO': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'BG_OBJ': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'VRAM': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'OAM': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'ROM': new Uint8Array(segments.ROM.end - segments.ROM.start + 1),
+        'UNUSED': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
     };
 
-    reset = (): void => {
+    constructor() {
+        this.reset();
+    }
 
+    reset = (): void => {
+        this.memoryBlocks.BIOS.fill(0);
     }
 
     getSegment = (address: number): MemorySegment => {
         let segment: MemorySegment = 'UNUSED';
-        Object.keys(segments).forEach((s: string) => {
-            if (segments[s as MemorySegment].start <= address &&
-                segments[s as MemorySegment].end > address) {
-                segment = s as MemorySegment;
+        (Object.keys(segments) as MemorySegment[]).forEach((s: MemorySegment) => {
+            if (segments[s].start <= address &&
+                segments[s].end > address) {
+                segment = s;
             }
         });
         return segment;

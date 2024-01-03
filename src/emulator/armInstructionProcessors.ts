@@ -1,5 +1,5 @@
 import { CPU, Reg } from './cpu';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray } from './math';
 
 type ProcessedInstructionOptions = {
     incrementPC: boolean
@@ -1308,11 +1308,51 @@ const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 
 const processSWP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SWP');
+
+    const rn = (i >>> 16) & 0xF;
+    const rnValue = cpu.getGeneralRegister(rn);
+    const rd = (i >>> 12) & 0xF;
+    const rm = i & 0xF;
+    const rmValue = cpu.getGeneralRegister(rm);
+
+    const address = wordAlignAddress(rnValue);
+
+    let temp = 0;
+    if ((rnValue & 0x3) === 0x0) {
+        temp = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+    } else if ((rnValue & 0x3) === 0x1) {
+        temp = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+        temp = rotateRight(temp, 8, 32);
+    } else if ((rnValue & 0x3) === 0x2) {
+        temp = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+        temp = rotateRight(temp, 16, 32);
+    } else if ((rnValue & 0x3) === 0x3) {
+        temp = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
+        temp = rotateRight(temp, 24, 32);
+    }
+
+    cpu.setBytesInMemory(address, int32ToByteArray(rmValue, cpu.bigEndian));
+    cpu.setGeneralRegister(rd, temp);
+
     return { incrementPC: true };
 }
 
 const processSWPB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SWPB');
+
+    const rn = (i >>> 16) & 0xF;
+    const rnValue = cpu.getGeneralRegister(rn);
+    const rd = (i >>> 12) & 0xF;
+    const rm = i & 0xF;
+    const rmValue = cpu.getGeneralRegister(rm);
+
+    // Address is not word aligned when accessing a single byte.
+    const address = rnValue;
+
+    const temp = byteArrayToInt32(cpu.getBytesFromMemory(address, 1), cpu.bigEndian);
+    cpu.setBytesInMemory(address, int8ToByteArray(rmValue & 0xF, cpu.bigEndian));
+    cpu.setGeneralRegister(rd, temp);
+
     return { incrementPC: true };
 }
 

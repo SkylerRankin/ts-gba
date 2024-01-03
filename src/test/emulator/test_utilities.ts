@@ -39,6 +39,39 @@ const parseInstructionFileUpdateString = (text: string) => {
     return { registerUpdates, cpsrUpdates, spsrUpdates };
 }
 
+const parseMemoryUpdateString = (text: string) => {
+    const originalText = text;
+    const memoryUpdates: {[key: number]: Uint8Array} = {};
+
+    while (text.length > 0) {
+        const bracketIndex = text.indexOf("]");
+        let section = text.substring(0, bracketIndex);
+        text = text.substring(bracketIndex + 1).trim();
+        if (text.startsWith(",")) text = text.substring(1).trim();
+
+        const address = parseNumericLiteral(section.substring(0, section.indexOf("=")));
+        section = section.substring(section.indexOf("[") + 1);
+
+        if (address in memoryUpdates) {
+            throw Error(`Duplicate address (0x${address.toString(16)}) in memory update string: ${originalText}.`);
+        }
+
+        const bytes = section.split(",").map(i => {
+            return parseNumericLiteral(i.trim());
+        });
+
+        bytes.forEach(b => {
+            if (b > 255) {
+                throw Error(`Byte (${b}) is too large in memory update string: ${originalText}.`);
+            }
+        });
+
+        memoryUpdates[address] = new Uint8Array(bytes);
+    }
+
+    return memoryUpdates;
+}
+
 const getTestCases = (filePath: string) => {
     return readFileSync(filePath).toString()
         .split(/\r?\n/)
@@ -46,6 +79,21 @@ const getTestCases = (filePath: string) => {
         .filter(i => !i.line.startsWith("#") && i.line.length > 0)
         .map(i => {
             let line = i.line;
+
+            // Special lines for manually setting memory
+            if (line.startsWith("SET_MEMORY") || line.startsWith("CHECK_MEMORY")) {
+                const memoryUpdates = parseMemoryUpdateString(line.substring(line.indexOf("MEMORY") + 6).trim());
+                return {
+                    instruction: undefined,
+                    memoryUpdates,
+                    setMemory: line.startsWith("SET_MEMORY"),
+                    checkMemory: line.startsWith("CHECK_MEMORY"),
+                    registerUpdates: {},
+                    cpsrUpdates: {},
+                    spsrUpdates: {},
+                    lineNumber: i.lineNumber
+                };
+            }
 
             // Special lines for manually setting register/flag values.
             if (line.startsWith("SET")) {
@@ -67,8 +115,7 @@ const getTestCases = (filePath: string) => {
 
             const updatesIndex = line.indexOf("Updates=");
             if (updatesIndex !== -1) {
-                let updatesText = line.substring(line.indexOf("[", updatesIndex) + 1, line.indexOf("]"));
-
+                const updatesText = line.substring(line.indexOf("[", updatesIndex) + 1, line.indexOf("]", updatesIndex));
                 const updateObjects = parseInstructionFileUpdateString(updatesText);
                 registerUpdates = updateObjects.registerUpdates;
                 cpsrUpdates = updateObjects.cpsrUpdates;
@@ -79,9 +126,38 @@ const getTestCases = (filePath: string) => {
         });
 }
 
+const mockSetBytesInMemory = (address: number, bytes: Uint8Array, testMemory: Uint8Array) => {
+    if (address >= 1000) {
+        throw Error(`Address outside bounds of test memory (0-999): ${address}.`);
+    }
+
+    for (let i = 0; i < bytes.length; i++) {
+        testMemory[address + i] = bytes[i];
+    }
+}
+
+const mockGetBytesFromMemory = (address: number, bytes: number, testMemory: Uint8Array) => {
+    if (address >= 1000) {
+        throw Error(`Address outside bounds of test memory (0-999): ${address}.`);
+    }
+
+    const result = new Uint8Array(bytes);
+    for (let i = 0; i < bytes; i++) {
+        result[i] = testMemory[address + i];
+    }
+
+    return result;
+}
+
 const executeInstructionTestFile = (filePath: string, processingFunction: any) => {
     const cpu = new CPU();
+    cpu.bigEndian = false;
     cpu.reset();
+
+    const testMemory = new Uint8Array(1000);
+
+    jest.spyOn(cpu, "setBytesInMemory").mockImplementation((address, bytes) => mockSetBytesInMemory(address, bytes, testMemory));
+    jest.spyOn(cpu, "getBytesFromMemory").mockImplementation((address, bytes) => mockGetBytesFromMemory(address, bytes, testMemory));
     
     const test_cases = getTestCases(filePath);
     test_cases.forEach(t => {
@@ -112,6 +188,27 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
                     setSPSRFlag(cpu, conditionFlag, value);
                 }
             });
+
+            // Manual memory updates
+            if (t.memoryUpdates && t.setMemory) {
+                Object.entries(t.memoryUpdates).forEach(([address, bytes]) => {
+                    cpu.setBytesInMemory(Number.parseInt(address), bytes);
+                });
+            }
+
+            // Manual memory checks
+            if (t.memoryUpdates && t.checkMemory) {
+                Object.entries(t.memoryUpdates).forEach(([address, bytes]) => {
+                    for (let i = 0; i < bytes.length; i++) {
+                        const byteAddress = Number.parseInt(address) + i;
+                        expect(
+                            testMemory[byteAddress],
+                            `Line ${t.lineNumber}: Expected byte at address 0x${byteAddress.toString(16)} to be 0x${bytes[i].toString(16)}, but got 0x${testMemory[byteAddress].toString(16)}.`
+                        ).toBe(bytes[i]);
+                    }
+                });
+            }
+
             return;
         }
 

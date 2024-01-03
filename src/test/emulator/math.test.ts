@@ -1,6 +1,6 @@
 import {
     encodeWithRotation, rotateRight, rotateLeft, signExtend,
-    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom, twosComplementNegation } from '../../emulator/math';
+    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom, twosComplementNegation, int16ToByteArray, int8ToByteArray } from '../../emulator/math';
 
 test('logicalShiftLeft', () => {
     expect(logicalShiftLeft(2, 0)).toStrictEqual([2, 0]);
@@ -51,6 +51,24 @@ test('byteArrayToInt32 and int32ToByteArray', () => {
     expect(byteArrayToInt32(a, false)).toBe(0xAA00FF);
     expect(int32ToByteArray(b, true)).toStrictEqual(a);
     expect(int32ToByteArray(b, false)).toStrictEqual(Uint8Array.from([0, 0xAA, 0, 0xFF]));
+});
+
+test('byteArrayToInt32 and int16ToByteArray', () => {
+    const a = Uint8Array.from([0xFF, 0xAA]);
+    const b = 0xFFAA;
+    expect(byteArrayToInt32(a, true)).toBe(0xFFAA);
+    expect(byteArrayToInt32(a, false)).toBe(0xAAFF);
+    expect(int16ToByteArray(b, true)).toStrictEqual(a);
+    expect(int16ToByteArray(b, false)).toStrictEqual(Uint8Array.from([0xAA, 0xFF]));
+});
+
+test('byteArrayToInt32 and int8ToByteArray', () => {
+    const a = Uint8Array.from([0xFB]);
+    const b = 0xFB;
+    expect(byteArrayToInt32(a, true)).toBe(0xFB);
+    expect(byteArrayToInt32(a, false)).toBe(0xFB);
+    expect(int8ToByteArray(b, true)).toStrictEqual(a);
+    expect(int8ToByteArray(b, false)).toStrictEqual(a);
 });
 
 test('toBigEndianInt32', () => {

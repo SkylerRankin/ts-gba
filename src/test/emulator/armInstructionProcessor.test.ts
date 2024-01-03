@@ -84,3 +84,7 @@ test("Execute multiply ARM instructions", () => {
 test("Execute status register access ARM instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/status_register_access_arm.txt", processARM);
 });
+
+test("Execute semaphore ARM instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/semaphore_arm.txt", processARM);
+});
