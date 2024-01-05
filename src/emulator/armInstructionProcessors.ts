@@ -1,5 +1,5 @@
 import { CPU, Reg } from './cpu';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray, halfWordAlignAddress } from './math';
 
 type ProcessedInstructionOptions = {
     incrementPC: boolean
@@ -835,7 +835,7 @@ const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDR');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
-    const bytes = cpu.getBytesFromMemory(address, 4);
+    const bytes = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
     let value = byteArrayToInt32(bytes, cpu.bigEndian);
     switch (address & 0x3) {
         case 0b01: value = rotateRight(value, 8, 32); break;
@@ -844,8 +844,7 @@ const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     }
 
     if (rd === 15) {
-        const pc = cpu.getGeneralRegister(Reg.PC);
-        const newPC = pc & 0xFFFFFFFC;
+        const newPC = value & 0xFFFFFFFC;
         cpu.setGeneralRegister(Reg.PC, newPC);
     } else {
         cpu.setGeneralRegister(rd, value);
@@ -865,7 +864,12 @@ const processLDRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 const processLDRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDRBT');
     const rd = (i >>> 12) & 0xF;
-    const address = getLoadStoreAddress(cpu, i);
+    
+    // The instruction only uses addressing mode 2 post indexing. But instead of having
+    // the normal configuration of P == 0 and W == 0, W == 1 in this instruction. Setting
+    // the W bit back to 0 before calculating the address handles this case as if it was
+    // a normal post-indexed situation.
+    const address = getLoadStoreAddress(cpu, i & 0xFFDFFFFF);
     const value = cpu.getBytesFromMemory(address, 1)[0];
     cpu.setGeneralRegister(rd, value);
     return { incrementPC: true };
@@ -875,7 +879,7 @@ const processLDRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDRH');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
-    const bytes = cpu.getBytesFromMemory(address, 2);
+    const bytes = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
     const value = byteArrayToInt32(bytes, cpu.bigEndian);
     cpu.setGeneralRegister(rd, value);
     return { incrementPC: true };
@@ -894,7 +898,8 @@ const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDRSH');
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
-    const value = signExtend(cpu.getBytesFromMemory(address, 2)[0], 16);
+    let value = byteArrayToInt32(cpu.getBytesFromMemory(halfWordAlignAddress(address), 2), cpu.bigEndian);
+    value = signExtend(value, 16);
     cpu.setGeneralRegister(rd, value);
     return { incrementPC: true };
 }
@@ -902,8 +907,13 @@ const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 const processLDRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDRT');
     const rd = (i >>> 12) & 0xF;
-    const address = getLoadStoreAddress(cpu, i);
-    const bytes = cpu.getBytesFromMemory(address, 4);
+
+    // The instruction only uses addressing mode 2 post indexing. But instead of having
+    // the normal configuration of P == 0 and W == 0, W == 1 in this instruction. Setting
+    // the W bit back to 0 before calculating the address handles this case as if it was
+    // a normal post-indexed situation.
+    const address = getLoadStoreAddress(cpu, i & 0xFFDFFFFF);
+    const bytes = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
     let value = byteArrayToInt32(bytes, cpu.bigEndian);
     switch (address & 0x3) {
         case 0b01: value = rotateRight(value, 8, 32); break;
@@ -919,7 +929,7 @@ const processSTR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
-    cpu.setBytesInMemory(address, bytes);
+    cpu.setBytesInMemory(wordAlignAddress(address), bytes);
     return { incrementPC: true };
 }
 
@@ -935,7 +945,12 @@ const processSTRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 const processSTRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('STRBT');
     const rd = (i >>> 12) & 0xF;
-    const address = getLoadStoreAddress(cpu, i);
+
+    // The instruction only uses addressing mode 2 post indexing. But instead of having
+    // the normal configuration of P == 0 and W == 0, W == 1 in this instruction. Setting
+    // the W bit back to 0 before calculating the address handles this case as if it was
+    // a normal post-indexed situation.
+    const address = getLoadStoreAddress(cpu, i & 0xFFDFFFFF);
     const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
     cpu.setBytesInMemory(address, bytes);
     return { incrementPC: true };
@@ -955,9 +970,14 @@ const processSTRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 const processSTRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('STRT');
     const rd = (i >>> 12) & 0xF;
-    const address = getLoadStoreAddress(cpu, i);
+
+    // The instruction only uses addressing mode 2 post indexing. But instead of having
+    // the normal configuration of P == 0 and W == 0, W == 1 in this instruction. Setting
+    // the W bit back to 0 before calculating the address handles this case as if it was
+    // a normal post-indexed situation.
+    const address = getLoadStoreAddress(cpu, i & 0xFFDFFFFF);
     const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
-    cpu.setBytesInMemory(address, bytes);
+    cpu.setBytesInMemory(wordAlignAddress(address), bytes);
     return { incrementPC: true };
 }
 
@@ -1380,26 +1400,31 @@ const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processCDP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('CDP');
+    cpu.history.addError(`Coprocessor instructions not supported: 0x${i.toString(16).padStart(8, '0')} (CDP).`);
     return { incrementPC: true };
 }
 
 const processLDC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('LDC');
+    cpu.history.addError(`Coprocessor instructions not supported: 0x${i.toString(16).padStart(8, '0')} (LDC).`);
     return { incrementPC: true };
 }
 
 const processMCR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('MCR');
+    cpu.history.addError(`Coprocessor instructions not supported: 0x${i.toString(16).padStart(8, '0')} (MCR).`);
     return { incrementPC: true };
 }
 
 const processMRC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('MRC');
+    cpu.history.addError(`Coprocessor instructions not supported: 0x${i.toString(16).padStart(8, '0')} (MRC).`);
     return { incrementPC: true };
 }
 
 const processSTC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('STC');
+    cpu.history.addError(`Coprocessor instructions not supported: 0x${i.toString(16).padStart(8, '0')} (STC).`);
     return { incrementPC: true };
 }
 

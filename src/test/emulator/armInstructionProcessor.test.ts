@@ -1,7 +1,7 @@
-import { getLoadStoreAddress, getShiftOperandValue, processARM } from "../../emulator/armInstructionProcessors";
-import { CPU, StatusRegisterKey, statusRegisterFlags } from "../../emulator/cpu";
+import { getShiftOperandValue, processARM } from "../../emulator/armInstructionProcessors";
+import { CPU } from "../../emulator/cpu";
 import { readFileSync } from "fs";
-import { parseNumericLiteral, toBigEndianInt32 } from "../../emulator/math";
+import { toBigEndianInt32 } from "../../emulator/math";
 import { executeInstructionTestFile, executeLoadStoreAddressTestFile } from "./test_utilities";
 
 test("Identify ARM op-codes", () => {
@@ -73,7 +73,7 @@ test('Determine load/store addresses (addressing modes 2)', () => {
     executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_2_arm.txt");
 });
 
-test.only('Determine load/store addresses (addressing modes 3)', () => {
+test('Determine load/store addresses (addressing modes 3)', () => {
     executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_3_arm.txt");
 });
 
@@ -95,4 +95,8 @@ test("Execute status register access ARM instructions", () => {
 
 test("Execute semaphore ARM instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/semaphore_arm.txt", processARM);
+});
+
+test("Execute load/store ARM instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/load_store_arm.txt", processARM);
 });

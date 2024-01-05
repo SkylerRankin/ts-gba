@@ -334,10 +334,12 @@ class CPU implements CPUType {
     }
 
     getBytesFromMemory(address: number, bytes: number) : Uint8Array {
+        // TODO enforce which memory blocks can be read in which operating mode
         return this.memory.getBytes(address, bytes);
     }
 
     setBytesInMemory(address: number, bytes: Uint8Array) : void {
+        // TODO enforce which memory blocks can be written in which operating mode
         this.memory.setBytes(address, bytes);
     }
 
