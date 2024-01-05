@@ -9,7 +9,9 @@ import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
     signedOverflowFromAddition,
     borrowFrom,
     signedOverflowFromSubtraction,
-    isNegative} from './math';
+    isNegative,
+    wordAlignAddress,
+    halfWordAlignAddress} from './math';
 
 const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
@@ -845,12 +847,8 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + (imm * 4);
-            if ((address & 0x3) === 0) {
-                const data = cpu.getBytesFromMemory(address, 4);
-                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
-            } else {
-                cpu.history.currentLog.errors.push(`LDR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
-            }
+            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
             break;
         }
         case 2: {
@@ -858,20 +856,16 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            if ((address & 0x3) === 0) {
-                const data = cpu.getBytesFromMemory(address, 4);
-                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
-            } else {
-                cpu.history.currentLog.errors.push(`LDR (2) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
-            }
+            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
             break;
         }
         case 3: {
             const rd = (i >>> 8) & 0x7;
             const imm = i & 0xFF;
             const pc = cpu.getGeneralRegister(Reg.PC);
-            const address = ((pc & ~(0b11)) << 2) + (imm + 4);
-            const data = cpu.getBytesFromMemory(address, 4);
+            const address = (((pc >> 2)) << 2) + (imm * 4);
+            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
             cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
             break;
         }
@@ -880,12 +874,8 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const imm = i & 0xFF;
             const sp = cpu.getGeneralRegister(Reg.SP);
             const address = sp + (imm * 4);
-            if ((address & 0x3) === 0) {
-                const data = cpu.getBytesFromMemory(address, 4);
-                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
-            } else {
-                cpu.history.currentLog.errors.push(`LDR (4) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
-            }
+            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
         }
     }
 
@@ -928,12 +918,8 @@ const processLDRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + (imm * 2);
-            if ((address & 0x1) === 0) {
-                const data = cpu.getBytesFromMemory(address, 2);
-                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
-            } else {
-                cpu.history.currentLog.errors.push(`LDRH (1) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
-            }
+            const data = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
             break;
         }
         case 2: {
@@ -941,12 +927,8 @@ const processLDRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            if ((address & 0x1) === 0) {
-                const data = cpu.getBytesFromMemory(address, 2);
-                cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
-            } else {
-                cpu.history.currentLog.errors.push(`LDRH (2) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
-            }
+            const data = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
+            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
             break;
         }
     }
@@ -962,7 +944,7 @@ const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rd = i & 0x7;
     const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
     const data = cpu.getBytesFromMemory(address, 1);
-    cpu.setGeneralRegister(rd, signExtend(data[0], 1));
+    cpu.setGeneralRegister(rd, signExtend(data[0], 8));
 
     return { incrementPC: true };
 }
@@ -974,13 +956,8 @@ const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rn = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-    if ((address & 0x1) === 0) {
-        const data = cpu.getBytesFromMemory(address, 2);
-        cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
-    } else {
-        cpu.history.currentLog.errors.push(`LDRSH address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
-    }
-
+    const data = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
+    cpu.setGeneralRegister(rd, signExtend(byteArrayToInt32(data, cpu.bigEndian), 16));
     return { incrementPC: true };
 }
 
@@ -993,12 +970,8 @@ const processSTR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + (imm * 4);
-            if ((address & 0x11) === 0) {
-                const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
-                cpu.setBytesInMemory(address, data);
-            } else {
-                cpu.history.currentLog.errors.push(`STR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
-            }
+            const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+            cpu.setBytesInMemory(wordAlignAddress(address), data);
             break;
         }
         case 2: {
@@ -1006,12 +979,8 @@ const processSTR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            if ((address & 0x11) === 0) {
-                const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
-                cpu.setBytesInMemory(address, data);
-            } else {
-                cpu.history.currentLog.errors.push(`STR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
-            }
+            const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+            cpu.setBytesInMemory(wordAlignAddress(address), data);
             break;
         }
         case 3: {
@@ -1019,12 +988,8 @@ const processSTR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const imm = i & 0xFF;
             const sp = cpu.getGeneralRegister(Reg.SP);
             const address = sp + (imm * 4);
-            if ((address & 0x11) === 0) {
-                const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
-                cpu.setBytesInMemory(address, data);
-            } else {
-                cpu.history.currentLog.errors.push(`STR (1) address 0x${address.toString(16).padStart(8, '0')} is not word aligned.`);
-            }
+            const data = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
+            cpu.setBytesInMemory(wordAlignAddress(address), data);
             break;
         }
     }
@@ -1041,7 +1006,7 @@ const processSTRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + imm;
-            const data = int8ToByteArray((rd & 0xF), cpu.bigEndian);
+            const data = int8ToByteArray((cpu.getGeneralRegister(rd) & 0xFF), cpu.bigEndian);
             cpu.setBytesInMemory(address, data);
             break;
         }
@@ -1050,7 +1015,7 @@ const processSTRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            const data = int8ToByteArray((rd & 0xF), cpu.bigEndian);
+            const data = int8ToByteArray((cpu.getGeneralRegister(rd) & 0xFF), cpu.bigEndian);
             cpu.setBytesInMemory(address, data);
             break;
         }
@@ -1068,12 +1033,8 @@ const processSTRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + (imm * 2);
-            if ((address & 0x3) === 0) {
-                const data = int16ToByteArray((rd & 0xFF), cpu.bigEndian);
-                cpu.setBytesInMemory(address, data);
-            } else {
-                cpu.history.currentLog.errors.push(`STRH (1) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
-            }
+            const data = int16ToByteArray((cpu.getGeneralRegister(rd) & 0xFFFF), cpu.bigEndian);
+            cpu.setBytesInMemory(halfWordAlignAddress(address), data);
             break;
         }
         case 2: {
@@ -1081,12 +1042,8 @@ const processSTRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            if ((address & 0x3) === 0) {
-                const data = int16ToByteArray((rd & 0xFF), cpu.bigEndian);
-                cpu.setBytesInMemory(address, data);
-            } else {
-                cpu.history.currentLog.errors.push(`STRH (1) address 0x${address.toString(16).padStart(8, '0')} is not half-word aligned.`);
-            }
+            const data = int16ToByteArray((cpu.getGeneralRegister(rd) & 0xFFFF), cpu.bigEndian);
+            cpu.setBytesInMemory(halfWordAlignAddress(address), data);
             break;
         }
     }
