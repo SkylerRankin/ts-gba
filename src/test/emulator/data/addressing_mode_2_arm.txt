@@ -1,0 +1,260 @@
+# A random example of each ARMv4 addressing mode 2, used by load/store instructions.
+# All instructions that utilize a register for memory access will use R1.
+# Each line uses the following format:
+#   Instruction=<big-endian instruction>, Address=<expected address> Rn=<optional Rn register update>
+
+
+# --- 1: Immediate offset ---
+
+# Offset addition
+# Instruction: LDR R0, [R1, #+0x14]
+SET R1=0xFF00
+Instruction=0xe5910014, Address=0xFF14
+
+# Offset subtraction
+# Instruction: LDR R0, [R1, #-0x14]
+SET R1=0xFF00
+Instruction=0xe5110014, Address=0xFEEC
+
+
+# --- 2: Register offset ---
+
+# Offset addition
+# Instruction: LDR R0, [R1, +R2]
+SET R1=0xFF00, R2=0x14
+Instruction=0xe7910002, Address=0xFF14
+
+# Offset subtraction
+# Instruction: LDR R0, [R1, -R2]
+SET R1=0xFF00, R2=0x14
+Instruction=0xe7110002, Address=0xFEEC
+
+
+# --- 3: Scaled register offset ---
+
+# LSL with addition
+# Instruction: LDR R0, [R1, +R2, LSL #3]
+SET R1=0xA00, R2=0x12
+Instruction=0xe7910182, Address=0xA90
+
+# LSL with subtraction
+# Instruction: LDR R0, [R1, -R2, LSL #3]
+SET R1=0xA00, R2=0x12
+Instruction=0xe7110182, Address=0x970
+
+# LSR with zero immediate and addition
+# Instruction: LDR R0, [R1, +R2, LSR #0]
+SET R1=0xA04, R2=0x123
+Instruction=0xe7910022, Address=0xA04
+
+# LSR with non-zero immediate and addition
+# Instruction: LDR R0, [R1, +R2, LSR #3]
+SET R1=0xA04, R2=0x1F0
+Instruction=0xe79101a2, Address=0xA42
+
+# ASR with zero immediate, negative Rm, and addition
+# Instruction: LDR R0, [R1, +R2, ASR #0]
+SET R1=0xA04, R2=0x80100000
+Instruction=0xe7910042, Address=0xA03
+
+# ASR with zero immediate, positive Rm, and addition
+# Instruction: LDR R0, [R1, +R2, ASR #0]
+SET R1=0xA04, R2=0x70100000
+Instruction=0xe7910042, Address=0xA04
+
+# ASR with non-zero immediate and addition
+# Instruction: LDR R0, [R1, +R2, ASR #5]
+SET R1=0xA04, R2=0x80001000
+Instruction=0xe79102c2, Address=0xFC000a84
+
+# RRX with zero immediate and addition
+# Instruction: LDR R0, [R1, +R2, RRX]
+SET R1=0xA04, R2=0x1002, C=1
+Instruction=0xe7910062, Address=0x80001205
+
+# ROR with non-zer immediate and addition
+# Instruction: LDR R0, [R1, +R2, ROR #8]
+SET R1=0xA04, R2=0x1F0FF
+Instruction=0xe7910462, Address=0xFF000BF4
+
+
+# --- 4: Immediate pre-indexed ---
+
+# Offset addition with register update
+# Instruction: LDR R0, [R1, #0x1FD]!
+SET R1=0xBFFF0010
+Instruction=0xe5b101fd, Address=0xBFFF020D, Rn=0xBFFF020D
+
+# Offset addition without register update
+# Instruction: LDR R0, [R1, #0x1FD]!
+SET R1=0xBFFF0010, Z=0
+Instruction=0x05b101fd, Address=0xBFFF020D
+
+# Offset subtraction with register update
+# Instruction: LDR R0, [R1, #-0x1FD]!
+SET R1=0xBFFF0010
+Instruction=0xe53101fd, Address=0xBFFEFE13, Rn=0xBFFEFE13
+
+
+# --- 5: Register pre-indexed ---
+
+# Offset addition with register update
+# Instruction: LDR R0, [R1, R2]!
+SET R1=0xA033B0, R2=0x4400F
+Instruction=0xe7b10002, Address=0x0A473BF, Rn=0x0x0A473BF
+
+# Offset addition without register update
+# Instruction: LDR R0, [R1, R2]!
+SET R1=0xA033B0, R2=0x4400F, Z=0
+Instruction=0x07b10002, Address=0x0A473BF
+
+# Offset subtraction with register update
+# Instruction: LDR R0, [R1, -R2]!
+SET R1=0xA033B0, R2=0x4400F
+Instruction=0xe7310002, Address=0x9BF3A1, Rn=0x9BF3A1
+
+
+# --- 6: Scaled register pre-indexed ---
+
+# LSL with addition
+# Instruction: LDR R0, [R1, R2, LSL #2]!
+SET R1=0xB001044, R2=0x41
+Instruction=0xe7b10102, Address=0xB001148, Rn=0xB001148
+
+# LSL with subtraction
+# Instruction: LDR R0, [R1, -R2, LSL #2]!
+SET R1=0xB001044, R2=0x41
+Instruction=0xe7310102, Address=0xB000F40, Rn=0xB000F40
+
+# LSL with addition and failed condition
+# Instruction: LDR R0, [R1, R2, LSL #2]!
+SET R1=0xB001044, R2=0x41, Z=0
+Instruction=0x07b10102, Address=0xB001148
+
+# LSL with subtraction
+# Instruction: LDR R0, [R1, -R2, LSL #2]!
+SET R1=0xB001044, R2=0x41
+Instruction=0xe7310102, Address=0xB000F40, Rn=0xB000F40
+
+# LSR with zero immediate and addition
+# Instruction: LDR R0, [R1, R2, LSR #0]!
+SET R1=0xB001044, R2=0x41
+Instruction=0xe7b10022, Address=0xB001044, Rn=0xB001044
+
+# LSR with non-zero immediate and addition
+# Instruction: LDR R0, [R1, R2, LSR #0xF]!
+SET R1=0xB001044, R2=0xC20141
+Instruction=0xe7b107a2, Address=0xB0011C8, Rn=0xB0011C8
+
+# ASR with zero immediate, negative Rm, and addition
+# Instruction: LDR R0, [R1, R2, ASR #0]!
+SET R1=0xB01100, R2=0xF0F10034
+Instruction=0xe7B10042, Address=0x00B010FF, Rn=0x00B010FF
+
+# ASR with zero immediate, positive Rm, and addition
+# Instruction: LDR R0, [R1, R2, ASR #0]!
+SET R1=0xB01100, R2=0x70F10034
+Instruction=0xe7B10042, Address=0xB01100, Rn=0xB01100
+
+# ASR with non-zero immediate and addition
+# Instruction: LDR R0, [R1, R2, ASR #0x1D]!
+SET R1=0x0120033F, R2=0x700000E2
+Instruction=0xe7b10ec2, Address=0x1200342, Rn=0x1200342
+
+# RRX with addition
+# Instruction: LDR R0, [R1, R2, RRX]!
+SET R1=0x0120033F, R2=0x1001, C=1
+Instruction=0xe7b10062, Address=0x81200B3F, Rn=0x81200B3F
+
+# ROR with addition
+# Instruction: LDR R0, [R1, R2, ROR #0x10]!
+SET R1=0x0120033F, R2=0xF022
+Instruction=0xe7b10862, Address=0xF142033F, Rn=0xF142033F
+
+
+# --- 7: Immediate post-indexed ---
+
+# No register update
+# Instruction: LDR R0, [R1], #11
+SET R1=0xAB001001, Z=0
+Instruction=0x0491000b, Address=0xAB001001
+
+# Offset addition with register update
+# Instruction: LDR R0, [R1], #11
+SET R1=0xAB001001
+Instruction=0xe491000b, Address=0xAB001001, Rn=0xAB00100C
+
+# Offset subtraction with register update
+# Instruction: LDR R0, [R1], #-11
+SET R1=0xAB001001
+Instruction=0xe411000b, Address=0xAB001001, Rn=0xAB000FF6
+
+
+# --- 8: Register post-indexed ---
+
+# No register update
+# Instruction: LDR R0, [R1], R2
+SET R1=0xAB001001, R2=0xB, Z=0
+Instruction=0x06910002, Address=0xAB001001
+
+# Offset addition with register update
+# Instruction: LDR R0, [R1], R2
+SET R1=0xAB001001, R2=0xB
+Instruction=0xe6910002, Address=0xAB001001, Rn=0xAB00100C
+
+# Offset subtraction with register update
+# Instruction: LDR R0, [R1], -R2
+SET R1=0xAB001001, R2=0xB
+Instruction=0xe6110002, Address=0xAB001001, Rn=0xAB000FF6
+
+# --- 9: Scaled register post-indexed ---
+
+# LSL with addition
+# Instruction: LDR R0, [R1], R2, LSL #0x11
+SET R1=0x20033FF0, R2=0xB002004
+Instruction=0xe6910882, Address=0x20033FF0, Rn=0x600B3FF0
+
+# LSL with subtraction
+# Instruction: LDR R0, [R1], -R2, LSL #0x11
+SET R1=0x20033FF0, R2=0xB002004
+Instruction=0xe6110882, Address=0x20033FF0, Rn=0xDFFB3FF0
+
+# LSL with failed condition and addition
+# Instruction: LDR R0, [R1], R2, LSL #0x11
+SET R1=0x20033FF0, R2=0xB002004, Z=0
+Instruction=0x06910882, Address=0x20033FF0, Rn=0x20033FF0
+
+# LSR with zero immediate and addition
+# Instruction: LDR R0, [R1], R2, LSR #0
+SET R1=0x20033FF0, R2=0xB002004
+Instruction=0xe6910022, Address=0x20033FF0, Rn=0x20033FF0
+
+# LSR with non-zero immediate and addition
+# Instruction: LDR R0, [R1], R2, LSR #6
+SET R1=0x20033FF0, R2=0xB002004
+Instruction=0xe6910322, Address=0x20033FF0, Rn=0x202F4070
+
+# ASR with zero immediate, negative Rm, and addition
+# Instruction: LDR R0, [R1], R2, ASR #0
+SET R1=0x20033FF0, R2=0xFF099003
+Instruction=0xe6910042, Address=0x0x20033FF0, Rn=0x20033FEF
+
+# ASR with zero immediate, positive Rm, and addition
+# Instruction: LDR R0, [R1], R2, ASR #0
+SET R1=0x20033FF0, R2=0x0F099003
+Instruction=0xe6910042, Address=0x0x20033FF0, Rn=0x20033FF0
+
+# ASR with non-zero immediate and addition
+# Instruction: LDR R0, [R1], R2, ASR #0xB
+SET R1=0x20033FF0, R2=0xFF099003
+Instruction=0xe69105c2, Address=0x20033FF0, Rn=0x20032122
+
+# RRX with addition
+# Instruction: LDR R0, [R1], R2, RRX
+SET R1=0x20033FF0, R2=0xFF099003, C=1
+Instruction=0xe6910062, Address=0x20033FF0, Rn=0x1F8807F1
+
+# ROR with addition
+# Instruction: LDR R0, [R1], R2, ROR #2
+SET R1=0x20033FF0, R2=0xFF099003
+Instruction=0xe6910162, Address=0x20033FF0, Rn=0x1FC5A3F0

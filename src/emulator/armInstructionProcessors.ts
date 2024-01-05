@@ -324,6 +324,8 @@ const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
 const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
     const bits = (i >>> 0).toString(2).padStart(32, '0')
         .split('').map((x: string) : number => parseInt(x)).reverse();
+    const condition = (i >>> 28) & 0xF;
+    const conditionPassed = cpu.conditionIsMet(condition);
     const mode = ((i >>> 26) & 0x3) === 0x1 ? 2 : 3;
     const p = bits[24];
     const u = bits[23];
@@ -342,23 +344,23 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
             
             if (p === 1 && w === 0) {
                 // Immediate offset; does not set Rn
-                address = rnValue + sign * offset;
+                address = ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0;
             } else if (p === 1 && w === 1) {
                 // Immediate pre-indexed
-                address = rnValue + sign * offset;
-                cpu.setGeneralRegister(rn, address);
+                address = ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0;
+                if (conditionPassed) cpu.setGeneralRegister(rn, address);
             } else if (p === 0 && w === 0) {
                 // Immediate post-indexed
                 address = rnValue;
-                cpu.setGeneralRegister(rn, rnValue + sign * offset);
+                if (conditionPassed) cpu.setGeneralRegister(rn, ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0);
             }
         } else {
             const sign = u === 1 ? 1 : -1;
-            const shiftImmediate = (i >>> 7) & 0xF;
+            const shiftImmediate = (i >>> 7) & 0x1F;
             const shiftType = (i >>> 5) & 0x3;
             const rm = i & 0xF;
             const rmValue = cpu.getGeneralRegister(rm);
-            const cFlag = 0;
+            const cFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
             let index = 0;
 
             switch (shiftType) {
@@ -368,15 +370,21 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
                     break;
                 case 0b01:
                     // LSR
-                    if (shiftImmediate !== 0) {
+                    if (shiftImmediate === 0) {
+                        index = 0;
+                    } else {
                         [index] = logicalShiftRight(rmValue, shiftImmediate);
                     }
                     break;
                 case 0b10:
                     // ASR
-                    if (shiftImmediate === 0 && rmValue < 0) {
-                        index = 0xFFFFFFFF;
-                    } else if (shiftImmediate !== 0) {
+                    if (shiftImmediate === 0) {
+                        if (isNegative32(rmValue)) {
+                            index = 0xFFFFFFFF;
+                        } else {
+                            index = 0;
+                        }
+                    } else {
                         [index] = arithmeticShiftRight(rmValue, shiftImmediate);
                     }
                     break;
@@ -392,15 +400,15 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
 
             if (p === 1 && w === 0) {
                 // Register offset; does not set Rn
-                address = rnValue + sign * index;
+                address = ((rnValue + sign * index) & 0xFFFFFFFF) >>> 0;
             } else if (p === 1 && w === 1) {
                 // Register pre-indexed
-                address = rnValue + sign * index;
-                cpu.setGeneralRegister(rn, address);
+                address = ((rnValue + sign * index) & 0xFFFFFFFF) >>> 0;
+                if (conditionPassed) cpu.setGeneralRegister(rn, address);
             } else if (p === 0 && w === 0) {
                 // Register post-indexed
                 address = rnValue;
-                cpu.setGeneralRegister(rn, rnValue + sign * index);
+                if (conditionPassed) cpu.setGeneralRegister(rn, ((rnValue + sign * index) & 0xFFFFFFFF) >>> 0);
             }
         }
     } else if (mode === 3) {
@@ -418,19 +426,19 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
 
         if (p === 1 && w === 0) {
             // Offset; does not change base register
-            address = rnValue + sign * offset;
+            address = ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0;
         } else if (p === 1 && w === 1) {
             // Pre-indexed
-            address = rnValue + sign * offset;
+            address = ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0;
             cpu.setGeneralRegister(rn, address);
         } else if (p === 0 && w === 0) {
             // Post-indexed
             address = rnValue;
-            cpu.setGeneralRegister(rn, rnValue + sign * offset);
+            cpu.setGeneralRegister(rn, ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0);
         }
     }
 
-    return address;
+    return address >>> 0;
 }
 
 /**
@@ -1395,5 +1403,5 @@ const processSTC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     return { incrementPC: true };
 }
 
-export { processARM, getShiftOperandValue }
+export { processARM, getShiftOperandValue, getLoadStoreAddress }
 export type { ProcessedInstructionOptions }
