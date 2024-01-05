@@ -2,7 +2,7 @@ import { getLoadStoreAddress, getShiftOperandValue, processARM } from "../../emu
 import { CPU, StatusRegisterKey, statusRegisterFlags } from "../../emulator/cpu";
 import { readFileSync } from "fs";
 import { parseNumericLiteral, toBigEndianInt32 } from "../../emulator/math";
-import { executeInstructionTestFile } from "./test_utilities";
+import { executeInstructionTestFile, executeLoadStoreAddressTestFile } from "./test_utilities";
 
 test("Identify ARM op-codes", () => {
     const cpu = new CPU();
@@ -70,58 +70,11 @@ test("Determine data processing shift operand values/carries", () => {
 });
 
 test('Determine load/store addresses (addressing modes 2)', () => {
-    const cpu: CPU = new CPU();
-    const rn = 1;
-
-    readFileSync("src/test/emulator/data/addressing_mode_2_arm.txt").toString()
-        .split("\r\n")
-        .map((line, lineNumber) => ({ line, lineNumber: lineNumber + 1 }))
-        .filter(i => i.line.length > 0 && !i.line.startsWith("#"))
-        .forEach(i => {
-            const line = i.line;
-            if (line.startsWith("SET")) {
-                line.substring(4).split(",").map(i => i.trim()).forEach(i => {
-                    if (i.toLowerCase().startsWith("r")) {
-                        const register = Number.parseInt(i.substring(1, i.indexOf("=")));
-                        const value = parseNumericLiteral(i.substring(i.indexOf("=") + 1));
-                        expect(register >= 0 && register <= 15).toBeTruthy();
-                        cpu.setGeneralRegister(register, value);
-                    } else {
-                        const flag = i.substring(0, i.indexOf("=")).toLowerCase() as StatusRegisterKey;
-                        expect(statusRegisterFlags.includes(flag)).toBeTruthy();
-                        const value = parseNumericLiteral(i.substring(i.indexOf("=") + 1));
-                        cpu.setStatusRegisterFlag(flag, value);
-                    }
-                });
-            } else {
-                const items = line.split(",").map(i => i.trim());
-                const instruction = parseNumericLiteral(items[0].substring(12));
-                const expectedAddress = parseNumericLiteral(items[1].substring(8)) >>> 0;
-                const expectedRnUpdate = items.length === 3 ? parseNumericLiteral(items[2].substring(3)) : undefined;
-
-                const previousRnValue = cpu.getGeneralRegister(rn);
-                const address = getLoadStoreAddress(cpu, instruction);
-                expect(address, `Line ${i.lineNumber}: Expected address to be 0x${expectedAddress.toString(16)} but got 0x${address.toString(16)}.`).toBe(expectedAddress);
-                
-                const rnValue = cpu.getGeneralRegister(rn);
-                if (expectedRnUpdate !== undefined) {
-                    expect(
-                        rnValue,
-                        `Line ${i.lineNumber}: Expected R1 to be updated to 0x${expectedRnUpdate.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
-                    ).toBe(expectedRnUpdate);
-                } else {
-                    expect(
-                        rnValue,
-                        `Line ${i.lineNumber}: Expected R1 to be unchanged from 0x${previousRnValue.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
-                    ).toBe(previousRnValue);
-                }
-            }
-        });
-
+    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_2_arm.txt");
 });
 
-test('Determine load/store addresses (addressing modes 3)', () => {
-    fail(`Not implemented`);
+test.only('Determine load/store addresses (addressing modes 3)', () => {
+    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_3_arm.txt");
 });
 
 test("Execute data processing ARM instructions", () => {

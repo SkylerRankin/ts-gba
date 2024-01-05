@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { CPU, OperatingModeCodes, OperatingModeNames, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../emulator/cpu";
 import { parseNumericLiteral } from "../../emulator/math";
+import { getLoadStoreAddress } from "../../emulator/armInstructionProcessors";
 
 const parseInstructionFileUpdateString = (text: string) => {
     const registerUpdates: { [key: number]: number; } = {};
@@ -349,4 +350,55 @@ const setSPSRMode = (cpu: CPU, value: number) => {
     }
 }
 
-export { executeInstructionTestFile };
+const executeLoadStoreAddressTestFile = (filePath: string) => {
+    const cpu: CPU = new CPU();
+    const rn = 1;
+
+    readFileSync(filePath).toString()
+        .split("\r\n")
+        .map((line, lineNumber) => ({ line, lineNumber: lineNumber + 1 }))
+        .filter(i => i.line.length > 0 && !i.line.startsWith("#"))
+        .forEach(i => {
+            const line = i.line;
+            if (line.startsWith("SET")) {
+                line.substring(4).split(",").map(i => i.trim()).forEach(i => {
+                    if (i.toLowerCase().startsWith("r")) {
+                        const register = Number.parseInt(i.substring(1, i.indexOf("=")));
+                        const value = parseNumericLiteral(i.substring(i.indexOf("=") + 1));
+                        expect(register >= 0 && register <= 15).toBeTruthy();
+                        cpu.setGeneralRegister(register, value);
+                    } else {
+                        const flag = i.substring(0, i.indexOf("=")).toLowerCase() as StatusRegisterKey;
+                        expect(statusRegisterFlags.includes(flag)).toBeTruthy();
+                        const value = parseNumericLiteral(i.substring(i.indexOf("=") + 1));
+                        cpu.setStatusRegisterFlag(flag, value);
+                    }
+                });
+            } else {
+                const items = line.split(",").map(i => i.trim());
+                const instruction = parseNumericLiteral(items[0].substring(12));
+                const expectedAddress = parseNumericLiteral(items[1].substring(8)) >>> 0;
+                const expectedRnUpdate = items.length === 3 ? parseNumericLiteral(items[2].substring(3)) : undefined;
+
+                const previousRnValue = cpu.getGeneralRegister(rn);
+                const address = getLoadStoreAddress(cpu, instruction);
+                expect(address, `Line ${i.lineNumber}: Expected address to be 0x${expectedAddress.toString(16)} but got 0x${address.toString(16)}.`).toBe(expectedAddress);
+
+                const rnValue = cpu.getGeneralRegister(rn);
+                if (expectedRnUpdate !== undefined) {
+                    expect(
+                        rnValue,
+                        `Line ${i.lineNumber}: Expected R1 to be updated to 0x${expectedRnUpdate.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
+                    ).toBe(expectedRnUpdate);
+                } else {
+                    expect(
+                        rnValue,
+                        `Line ${i.lineNumber}: Expected R1 to be unchanged from 0x${previousRnValue.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
+                    ).toBe(previousRnValue);
+                }
+            }
+        });
+}
+
+
+export { executeInstructionTestFile, executeLoadStoreAddressTestFile };

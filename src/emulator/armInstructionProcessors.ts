@@ -430,11 +430,11 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
         } else if (p === 1 && w === 1) {
             // Pre-indexed
             address = ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0;
-            cpu.setGeneralRegister(rn, address);
+            if (conditionPassed) cpu.setGeneralRegister(rn, address);
         } else if (p === 0 && w === 0) {
             // Post-indexed
             address = rnValue;
-            cpu.setGeneralRegister(rn, ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0);
+            if (conditionPassed) cpu.setGeneralRegister(rn, ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0);
         }
     }
 

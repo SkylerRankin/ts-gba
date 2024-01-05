@@ -1,0 +1,101 @@
+# A random example of each ARMv4 addressing mode 3, used by load/store instructions.
+# All instructions that utilize a register for memory access will use R1.
+# Each line uses the following format:
+#   Instruction=<big-endian instruction>, Address=<expected address> Rn=<optional Rn register update>
+
+
+# --- 1: Immediate offset ---
+
+# Offset addition
+# Instruction: LDR R0, [R1, #0xEF]
+SET R1=0xFF003204
+Instruction=0xe1d10ebf, Address=0xFF0032F3
+
+# Offset subtraction
+# Instruction: LDR R0, [R1, #0xEF]
+SET R1=0xFF003204
+Instruction=0xe1510ebf, Address=0xFF003115
+
+
+# --- 2: Register offset ---
+
+# Offset addition
+# Instruction: LDRSB R0, [R1, R2]
+SET R1=0xFF003204, R2=0xEF
+Instruction=0xe19100D2, Address=0xFF0032F3
+
+# Offset subtraction
+# Instruction: LDRSB R0, [R1, -R2]
+SET R1=0xFF003204, R2=0xEF
+Instruction=0xe11100D2, Address=0xFF003115
+
+
+# --- 3: Immediate pre-indexed ---
+
+# Offset addition with register update
+# Instruction: LDRSB R0, [R1, #0xEF]!
+SET R1=0xFF003204
+Instruction=0xe1f10edf, Address=0xFF0032F3, Rn=0xFF0032F3
+
+# Offset addition without register update
+# Instruction: LDRSB R0, [R1, #0xEF]!
+SET R1=0xFF003204, Z=0
+Instruction=0x01f10edf, Address=0xFF0032F3
+
+# Offset subtraction with register update
+# Instruction: LDRSB R0, [R1, #-0xEF]!
+SET R1=0xFF003204
+Instruction=0xe1710edf, Address=0xFF003115, Rn=0xFF003115
+
+# --- 4: Register pre-indexed ---
+
+# Offset addition with register update
+# Instruction: LDRSB R0, [R1, R2]!
+SET R1=0xFF003204, R2=0xEF
+Instruction=0xe1b100d2, Address=0xFF0032F3, Rn=0xFF0032F3
+
+# Offset addition without register update
+# Instruction: LDRSB R0, [R1, R2]!
+SET R1=0xFF003204, R2=0xEF, Z=0
+Instruction=0x01b100d2, Address=0xFF0032F3
+
+# Offset subtraction with register update
+# Instruction: LDRSB R0, [R1, -R2]!
+SET R1=0xFF003204, R2=0xEF
+Instruction=0xe13100d2, Address=0xFF003115, Rn=0xFF003115
+
+
+# --- 5: Immediate post-indexed ---
+
+# No register update
+# Instruction: LDRSB R0, [R1], #0xE2
+SET R1=0xB0234330, Z=0
+Instruction=0x00d10ed2, Address=0xB0234330
+
+# Register update with addition
+# Instruction: LDRSB R0, [R1], #0xE2
+SET R1=0xB0234330
+Instruction=0xe0d10ed2, Address=0xB0234330, Rn=0xB0234412
+
+# Register update with subtraction
+# Instruction: LDRSB R0, [R1], #-0xE2
+SET R1=0xB0234330
+Instruction=0xe0510ed2, Address=0xB0234330, Rn=0xB023424E
+
+
+# --- 6: Register post-indexed ---
+
+# No register update
+# Instruction: LDRSB R0, [R1], R2
+SET R1=0xECC34330, R2=0x15, Z=0
+Instruction=0x009100d2, Address=0xECC34330
+
+# Register update with addition
+# Instruction: LDRSB R0, [R1], R2
+SET R1=0xECC34330, R2=0x100015
+Instruction=0xe09100d2, Address=0xECC34330, Rn=0xECD34345
+
+# Register update with subtraction
+# Instruction: LDRSB R0, [R1], -R2
+SET R1=0xECC34330, R2=0x100015
+Instruction=0xe01100d2, Address=0xECC34330, Rn=0xECB3431B
