@@ -989,18 +989,18 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     cpu.history.setInstructionName(`LDM (${type})`);
     const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
     const regList = (i & 0xFFFF);
-    const bitsSet = numberOfSetBits(regList);
-    let address = startAddress;
+    let address = wordAlignAddress(startAddress);
 
     switch (type) {
         case 1:
             for (let i = 0; i <= 14; i++) {
-                if (((bitsSet >>> i) & 0x1) === 1) {
+                if (((regList >>> i) & 0x1) === 1) {
                     const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
                     cpu.setGeneralRegister(i, riValue);
+                    address += 4;
                 }
             }
-            if (((bitsSet >>> 15) & 0x1) === 1) {
+            if (((regList >>> 15) & 0x1) === 1) {
                 const value = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
                 const newPC = value & 0xFFFFFFFC;
                 cpu.setGeneralRegister(Reg.PC, newPC);
@@ -1009,7 +1009,7 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             break;
         case 2:
             for (let i = 0; i <= 14; i++) {
-                if (((bitsSet >>> i) & 0x1) === 1) {
+                if (((regList >>> i) & 0x1) === 1) {
                     const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
                     cpu.setGeneralRegisterByMode(i, riValue, 'usr');
                     address += 4;
@@ -1018,7 +1018,7 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             break;
         case 3:
             for (let i = 0; i <= 14; i++) {
-                if (((bitsSet >>> i) & 0x1) === 1) {
+                if (((regList >>> i) & 0x1) === 1) {
                     const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
                     cpu.setGeneralRegisterByMode(i, riValue, 'usr');
                     address += 4;
@@ -1036,8 +1036,10 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     }
 
     if (address - 4 !== endAddress) {
-        console.error(`LDM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
+        throw Error(`LDM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
     }
+
+    // TODO: LDM can modify PC, in which case increment PC should be false
     return { incrementPC: true };
 }
 
@@ -1058,7 +1060,7 @@ const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     }
 
     if (endAddress !== address - 4) {
-        console.error(`STM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
+        throw Error(`STM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
     }
     return { incrementPC: true };
 }

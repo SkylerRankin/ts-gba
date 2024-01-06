@@ -104,3 +104,7 @@ test("Execute semaphore ARM instructions", () => {
 test("Execute load/store ARM instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/load_store_arm.txt", processARM);
 });
+
+test("Execute load/store multiple ARM instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/load_store_multiple_arm.txt", processARM);
+});
