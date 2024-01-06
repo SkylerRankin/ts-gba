@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { CPU, OperatingModeCodes, OperatingModeNames, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../emulator/cpu";
 import { parseNumericLiteral } from "../../emulator/math";
-import { getLoadStoreAddress } from "../../emulator/armInstructionProcessors";
+import { getLoadStoreAddress, getLoadStoreMultipleAddress } from "../../emulator/armInstructionProcessors";
 
 const parseInstructionFileUpdateString = (text: string) => {
     const registerUpdates: { [key: number]: number; } = {};
@@ -350,7 +350,7 @@ const setSPSRMode = (cpu: CPU, value: number) => {
     }
 }
 
-const executeLoadStoreAddressTestFile = (filePath: string) => {
+const executeLoadStoreAddressTestFile = (filePath: string, multipleAddress: boolean) => {
     const cpu: CPU = new CPU();
     const rn = 1;
 
@@ -377,12 +377,28 @@ const executeLoadStoreAddressTestFile = (filePath: string) => {
             } else {
                 const items = line.split(",").map(i => i.trim());
                 const instruction = parseNumericLiteral(items[0].substring(12));
-                const expectedAddress = parseNumericLiteral(items[1].substring(8)) >>> 0;
-                const expectedRnUpdate = items.length === 3 ? parseNumericLiteral(items[2].substring(3)) : undefined;
+                let expectedRnUpdate;
+                let previousRnValue;
 
-                const previousRnValue = cpu.getGeneralRegister(rn);
-                const address = getLoadStoreAddress(cpu, instruction);
-                expect(address, `Line ${i.lineNumber}: Expected address to be 0x${expectedAddress.toString(16)} but got 0x${address.toString(16)}.`).toBe(expectedAddress);
+                if (multipleAddress) {
+                    // Addressing mode 4
+                    const expectedStartAddress = parseNumericLiteral(items[1].substring(13)) >>> 0;
+                    const expectedEndAddress = parseNumericLiteral(items[2].substring(11)) >>> 0;
+                    expectedRnUpdate = items.length === 4 ? parseNumericLiteral(items[3].substring(3)) : undefined;
+
+                    previousRnValue = cpu.getGeneralRegister(rn);
+                    const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, instruction);
+                    expect(startAddress, `Line ${i.lineNumber}: Expected start address to be 0x${expectedStartAddress.toString(16)} but got 0x${startAddress.toString(16)}.`).toBe(expectedStartAddress);
+                    expect(endAddress, `Line ${i.lineNumber}: Expected end address to be 0x${expectedEndAddress.toString(16)} but got 0x${endAddress.toString(16)}.`).toBe(expectedEndAddress);
+                } else {
+                    // Addressing modes 2 and 3
+                    const expectedAddress = parseNumericLiteral(items[1].substring(8)) >>> 0;
+                    expectedRnUpdate = items.length === 3 ? parseNumericLiteral(items[2].substring(3)) : undefined;
+
+                    previousRnValue = cpu.getGeneralRegister(rn);
+                    const address = getLoadStoreAddress(cpu, instruction);
+                    expect(address, `Line ${i.lineNumber}: Expected address to be 0x${expectedAddress.toString(16)} but got 0x${address.toString(16)}.`).toBe(expectedAddress);
+                }
 
                 const rnValue = cpu.getGeneralRegister(rn);
                 if (expectedRnUpdate !== undefined) {
@@ -399,6 +415,5 @@ const executeLoadStoreAddressTestFile = (filePath: string) => {
             }
         });
 }
-
 
 export { executeInstructionTestFile, executeLoadStoreAddressTestFile };

@@ -25,7 +25,7 @@ test("Identify ARM op-codes", () => {
     });
 });
 
-test("Determine data processing shift operand values/carries", () => {
+test("Determine data processing shift operand values/carries (addressing mode 1)", () => {
     const cpu = new CPU();
     const mockCFlag = 123;
 
@@ -49,7 +49,7 @@ test("Determine data processing shift operand values/carries", () => {
     // R10[7:0] = 64
     cpu.setGeneralRegister(10, 0xFFFFFF40);
 
-    const test_cases = readFileSync("src/test/emulator/data/shift_operands_arm.txt").toString()
+    const test_cases = readFileSync("src/test/emulator/data/addressing_mode_1_arm.txt").toString()
         .split(/\r?\n/)
         .filter(line => !line.startsWith("#") && line.length > 0)
         .map(line => {
@@ -69,12 +69,16 @@ test("Determine data processing shift operand values/carries", () => {
     });
 });
 
-test('Determine load/store addresses (addressing modes 2)', () => {
-    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_2_arm.txt");
+test('Determine load/store addresses (addressing mode 2)', () => {
+    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_2_arm.txt", false);
 });
 
-test('Determine load/store addresses (addressing modes 3)', () => {
-    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_3_arm.txt");
+test('Determine load/store addresses (addressing mode 3)', () => {
+    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_3_arm.txt", false);
+});
+
+test('Determine load/store multiple addresses (addressing mode 4)', () => {
+    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_4_arm.txt", true);
 });
 
 test("Execute data processing ARM instructions", () => {

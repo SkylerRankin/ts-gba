@@ -447,6 +447,8 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
  * addresses to read/set a series of values in memory.
  */
 const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
+    const condition = (i >>> 28) & 0xF;
+    const conditionPassed = cpu.conditionIsMet(condition);
     const opcode = (i >>> 23) & 0x3;
     const w = (i >>> 21) & 0x1;
     const regList = i & 0xFFFF;
@@ -460,7 +462,7 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
             // Decrement After
             startAddress = rnValue - (bitsSet * 4) + 4;
             endAddress = rnValue;
-            if (w === 1) {
+            if (conditionPassed && w === 1) {
                 rnValue -= (bitsSet * 4);
                 cpu.setGeneralRegister(rn, rnValue);
             }
@@ -469,7 +471,7 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
             // Increment After
             startAddress = rnValue;
             endAddress = rnValue + (bitsSet * 4) - 4
-            if (w === 1) {
+            if (conditionPassed && w === 1) {
                 rnValue += (bitsSet * 4);
                 cpu.setGeneralRegister(rn, rnValue);
             }
@@ -477,8 +479,8 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
         case 0b10:
             // Decrement Before
             startAddress = rnValue - (bitsSet * 4);
-            endAddress - rnValue - 4;
-            if (w === 1) {
+            endAddress = rnValue - 4;
+            if (conditionPassed && w === 1) {
                 rnValue -= (bitsSet * 4);
                 cpu.setGeneralRegister(rn, rnValue);
             }
@@ -487,7 +489,7 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
             // Increment Before
             startAddress = rnValue + 4;
             endAddress = rnValue + (bitsSet * 4);
-            if (w === 1) {
+            if (conditionPassed && w === 1) {
                 rnValue += (bitsSet * 4);
                 cpu.setGeneralRegister(rn, rnValue);
             }
@@ -1428,5 +1430,5 @@ const processSTC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     return { incrementPC: true };
 }
 
-export { processARM, getShiftOperandValue, getLoadStoreAddress }
+export { processARM, getShiftOperandValue, getLoadStoreAddress, getLoadStoreMultipleAddress }
 export type { ProcessedInstructionOptions }

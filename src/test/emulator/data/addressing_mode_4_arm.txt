@@ -1,0 +1,76 @@
+# A random example of each ARMv4 addressing mode 4, used by load/store multiple instructions.
+# All instructions that utilize a register for memory access will use R1.
+# Each line uses the following format:
+#   Instruction=<big-endian instruction>, StartAddress=<expected start address>, EndAddress=<expected end address> Rn=<optional Rn register update>
+
+
+# --- 1: Increment After ---
+
+# With register update
+# Instruction: LDMIA R1!, {R0, R2 - R7, R11, PC}
+SET R1=0xD4
+Instruction=0xe8b188fd, StartAddress=0xD4, EndAddress=0xF4, Rn=0xF8
+
+# Condition failed
+# Instruction: LDMIA R1!, {R0, R2 - R7, R11, PC}
+SET R1=0xD4, Z=0
+Instruction=0x08b188fd, StartAddress=0xD4, EndAddress=0xF4
+
+# W bit not set
+# Instruction: LDMIA R1, {R0, R2 - R7, R11, PC}
+SET R1=0xD4
+Instruction=0xe89188fd, StartAddress=0xD4, EndAddress=0xF4
+
+
+# --- 2: Increment Before ---
+
+# With register update
+# Instruction: LDMIB R1!, {R0, R2, R3, R11, PC}
+SET R1=0xD4
+Instruction=0xe9b1880d, StartAddress=0xD8, EndAddress=0xE8, Rn=0xE8
+
+# Condition failed
+# Instruction: LDMIB R1!, {R0, R2, R3, R11, PC}
+SET R1=0xD4, Z=0
+Instruction=0x09b1880d, StartAddress=0xD8, EndAddress=0xE8
+
+# W bit not set
+# Instruction: LDMIB R1, {R0, R2, R3, R11, PC}
+SET R1=0xD4
+Instruction=0xe991880d, StartAddress=0xD8, EndAddress=0xE8
+
+
+# --- 3: Decrement After ---
+
+# With register update
+# Instruction: LDMDA R1!, {R2, R3-R8, R11, PC}
+SET R1=0xD4
+Instruction=0xe83189fc, StartAddress=0xB4, EndAddress=0xD4, Rn=0xB0
+
+# Condition failed
+# Instruction: LDMDA R1!, {R2, R3-R8, R11, PC}
+SET R1=0xD4, Z=0
+Instruction=0x083189fc, StartAddress=0xB4, EndAddress=0xD4
+
+# W bit not set
+# Instruction: LDMDA R1, {R2, R3-R8, R11, PC}
+SET R1=0xD4
+Instruction=0xe81189fc, StartAddress=0xB4, EndAddress=0xD4
+
+
+# --- 4: Decrement Before ---
+
+# With register update
+# Instruction: LDMDB R1!, {R4-R7, R12, R13}
+SET R1=0xD4
+Instruction=0xe93130f0, StartAddress=0xBC, EndAddress=0xD0, Rn=0xBC
+
+# Condition failed
+# Instruction: LDMDB R1!, {R4-R7, R12, R13}
+SET R1=0xD4, Z=0
+Instruction=0x093130f0, StartAddress=0xBC, EndAddress=0xD0
+
+# W bit not set
+# Instruction: LDMDB R1, {R4-R7, R12, R13}
+SET R1=0xD4
+Instruction=0xe91130f0, StartAddress=0xBC, EndAddress=0xD0

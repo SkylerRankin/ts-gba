@@ -1,0 +1,11 @@
+# A program using only ARMv4 load/store multiple instructions.
+# Each line consists of the following components:
+#     <big-endian instruction> <text assembly for instruction> Updates=[<register/flag updates>]
+
+
+# To begin, all registers and flags are 0
+SET N=0, C=0, Z=0, V=0
+
+# --- LDM (1) ---
+
+# 0x0 LDM 
