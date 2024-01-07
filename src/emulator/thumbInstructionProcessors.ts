@@ -15,9 +15,6 @@ import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
 
 const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
-    const bits = (i >>> 0).toString(2).padStart(32, '0')
-        .split('').map((x: string) : number => parseInt(x)).reverse();
-
     // Exception Generating Instructions
     if (i >>> 8 === 0b10111110) return processBKPT(cpu, i);
     if (i >>> 8 === 0b11011111) return processSWI(cpu, i);
@@ -1059,8 +1056,8 @@ const processLDMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rn = (i >>> 8) & 0x7;
     const regList = i & 0xFF;
     const startAddress = cpu.getGeneralRegister(rn);
-    const endAddress = cpu.getGeneralRegister(rn) + (numberOfSetBits(regList) * 4) - 4;
-    let address = startAddress;
+    const endAddress = (cpu.getGeneralRegister(rn) + (numberOfSetBits(regList) * 4) - 4) & 0xFFFFFFFF;
+    let address = wordAlignAddress(startAddress);
     for (let i = 0; i <= 7; i++) {
         if (((regList >>> i) & 0x1) === 1) {
             let data = cpu.getBytesFromMemory(address, 4);
@@ -1070,11 +1067,11 @@ const processLDMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     }
 
     if (address - 4 !== endAddress) {
-        cpu.history.currentLog.errors.push(`Final address of 0x${address.toString(16).padStart(8, '0')} != expected end address 0x${endAddress.toString(16).padStart(8, '0')}`);
+        throw Error(`Final address of 0x${address.toString(16).padStart(8, '0')} != expected end address 0x${endAddress.toString(16).padStart(8, '0')}`);
     }
 
     const rnValue = cpu.getGeneralRegister(rn);
-    cpu.setGeneralRegister(rn, rnValue + (numberOfSetBits(regList) * 4));
+    cpu.setGeneralRegister(rn, (rnValue + (numberOfSetBits(regList) * 4)) & 0xFFFFFFFF);
 
     return { incrementPC: true };
 }
@@ -1087,7 +1084,7 @@ const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const sp = cpu.getGeneralRegister(Reg.SP);
     const startAddress = sp;
     const endAddress = sp + 4 * (r + numberOfSetBits(regList));
-    let address = startAddress;
+    let address = wordAlignAddress(startAddress);
 
     for (let i = 0; i <= 7; i++) {
         if (((regList >>> i) & 0x1) === 1) {
@@ -1105,7 +1102,7 @@ const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     }
 
     if (endAddress !== address) {
-        cpu.history.currentLog.errors.push(`End address ${asHex(address)} != expected end address ${asHex(endAddress)}.`);
+        throw Error(`End address ${asHex(address)} != expected end address ${asHex(endAddress)}.`);
     }
 
     cpu.setGeneralRegister(Reg.SP, endAddress);
@@ -1121,7 +1118,7 @@ const processPUSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const sp = cpu.getGeneralRegister(Reg.SP);
     const startAddress = sp - 4 * (r + numberOfSetBits(regList));
     const endAddress = sp - 4;
-    let address = startAddress;
+    let address = wordAlignAddress(startAddress);
 
     for (let i = 0; i <= 7; i++) {
         if (((regList >>> i) & 0x1) === 1) {
@@ -1137,8 +1134,8 @@ const processPUSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         address += 4;
     }
 
-    if (endAddress !== address) {
-        cpu.history.currentLog.errors.push(`Ending address ${asHex(address)} != expected (end address - 4) ${asHex(endAddress - 4)}.`);
+    if (endAddress !== address - 4) {
+        throw Error(`Ending address ${asHex(address)} != expected (end address - 4) ${asHex(endAddress - 4)}.`);
     }
 
     cpu.setGeneralRegister(Reg.SP, sp - 4 * (r + numberOfSetBits(regList)));

@@ -35,3 +35,7 @@ test("Execute branch THUMB instructions", () => {
 test("Execute load/store THUMB instructions", () => {
     executeInstructionTestFile("src/test/emulator/data/load_store_thumb.txt", processTHUMB);
 });
+
+test("Execute load/store multiple THUMB instructions", () => {
+    executeInstructionTestFile("src/test/emulator/data/load_store_multiple_thumb.txt", processTHUMB);
+});
