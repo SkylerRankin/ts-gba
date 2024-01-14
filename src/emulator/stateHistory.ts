@@ -53,7 +53,7 @@ class StateHistory implements StateHistoryType {
         const instruction = byteArrayToInt32(cpu.memory.getBytes(pc - 8, instructionSize), cpu.bigEndian);
 
         this.currentLog.operatingState = cpu.operatingState;
-        this.currentLog.operatingMode = cpu.operatingMode;
+        // this.currentLog.operatingMode = cpu.operatingMode;
         this.currentLog.instruction = instruction;
         this.currentLog.pc = pc;
     }

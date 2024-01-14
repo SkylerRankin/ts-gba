@@ -1392,11 +1392,13 @@ const processSWPB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processBKPT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BKPT');
+    cpu.history.addError(`BKPT not implemented: 0x${i.toString(16).padStart(8, '0')}.`);
     return { incrementPC: true };
 }
 
 const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SWI');
+    cpu.history.addError(`SWI not implemented: 0x${i.toString(16).padStart(8, '0')}.`);
     return { incrementPC: true };
 }
 
