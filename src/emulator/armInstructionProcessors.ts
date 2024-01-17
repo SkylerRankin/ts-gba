@@ -117,8 +117,7 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // Data processing instructions
     if ((i & 0x0C000000) === 0) return processDataProcessing(cpu, i);
 
-    // In case of no instruction match.
-    return { incrementPC: true };
+    throw Error(`Failed to decode instruction: 0x${i.toString(16).padStart(8, '0')}.`);
 }
 
 const processDataProcessing = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -803,12 +802,12 @@ const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const lFlag = (i >>> 24) & 0x1;
     cpu.history.setInstructionName(lFlag ? "BL" : "B");
 
+    const instructionSize = 4;
     const imm = signExtend(i & 0xFFFFFF, 24);
     const pc = cpu.getGeneralRegister(Reg.PC);
-    const newPC = pc + (imm << 2);
+    const newPC = pc + (imm << 2) + (instructionSize * 2);
     cpu.setGeneralRegister(Reg.PC, newPC);
     if (lFlag === 1) {
-        const instructionSize = cpu.operatingState === 'ARM' ? 4 : 2;
         cpu.setGeneralRegister(Reg.LR, pc + instructionSize);
     }
     return { incrementPC: false };
@@ -825,7 +824,8 @@ const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BX');
     const rm = i & 0xF;
     const rmValue = cpu.getGeneralRegister(rm);
-    const pc = rmValue & 0xFFFFFFFE;
+    const instructionSize = 4;
+    const pc = (rmValue + instructionSize * 2) & 0xFFFFFFFE;
     cpu.setStatusRegisterFlag('t', rmValue & 0x1);
     cpu.setGeneralRegister(Reg.PC, pc);
     return { incrementPC: false };
@@ -1252,7 +1252,7 @@ const processMRS = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     } else {
         const cpsr = cpu.getStatusRegister('CPSR');
         cpu.setGeneralRegister(rd, cpsr);
-    } 
+    }
 
     return { incrementPC: true };
 }

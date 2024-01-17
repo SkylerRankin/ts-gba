@@ -80,4 +80,4 @@ class Memory implements MemoryType {
 
 }
 
-export { Memory }
+export { Memory, segments as MemorySegments }

@@ -9,6 +9,9 @@ SET R0=0x0, N=1, Z=0, C=1, V=1, I=0, F=1, T=0, OPERATING_MODE=0b10011           
 SET R1=0x0, N_SPSR=0, Z_SPSR=1, C_SPSR=0, V_SPSR=0, I_SPSR=1, F_SPSR=0, T_SPSR=1, OPERATING_MODE_SPSR=0b10001               # Set SPSR values with FIQ mode
 0xe14f1000 MRS R1, SPSR Updates=[R1=0x400000B1]                                                                             # Read system mode's SPSR into R1
 
+SET R12=0x0, N=0, Z=1, C=1, V=1, I=0, F=1, T=0, OPERATING_MODE=0b10011
+0x010FC000 MRS R12, CPSR Updates=[R12=0x70000053]
+
 # --- MSR ---
 SET R0=0x0, N=1, Z=0, C=1, V=1, I=1, F=1, T=0, OPERATING_MODE=0b10000                                                       # Set CPSR values with user mode
 0xe321f01f MSR CPSR_c, #0x1F Updates=[]                                                                                     # Attempt to switch into system mode, but cannot since current mode (user) is not privileged

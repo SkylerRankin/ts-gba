@@ -6,28 +6,28 @@ SET R14=0, R15=0, N=0, C=0, Z=0, V=0, T=0
 
 # --- B (1) ---
 SET R15=0x84004
-0xde0a B #0x84018 Updates=[R15=0x84018]                 # Branch forward
+0xde0a B #0x84018 Updates=[R15=0x8401C]                 # Branch forward
 SET R15=0x84018
-0xdef6 B #0x84004 Updates=[R15=0x84004]                 # Branch backwards
+0xdef6 B #0x84004 Updates=[R15=0x84008]                 # Branch backwards
 
 # --- B (2) ---
 SET R15=0x000000A0
-0xe280 B #0x000005A0 Updates=[R15=0x000005A0]           # Branch forward
+0xe280 B #0x000005A0 Updates=[R15=0x000005A4]           # Branch forward
 SET R15=0x000005A0
-0xe580 B #0x000000A0 Updates=[R15=0x000000A0]           # Branch backwards
+0xe580 B #0x000000A0 Updates=[R15=0x000000A4]           # Branch backwards
 
 # --- BL ---
 SET R15=0x113E8
-0xf7f0 BL #0x2042 Updates=[R14=0x13E8]                  # Negative offset, H=01 variant
+0xf7f0 BL #0x2042 Updates=[R14=0x13E8]                  # Negative offset, H=10 variant
 SET R15=0x113EA
-0xfe2d BL #0x2042 Updates=[R14=0x113ED, R15=0x2042]     # Negative offset, H=11 variant
+0xfe2d BL #0x2042 Updates=[R14=0x113ED, R15=0x2046]     # Negative offset, H=11 variant
 SET R15=0x113E8
-0xf00b BL #0x1D102 Updates=[R14=0x1c3e8]                # Positive offset, H=01 variant
+0xf00b BL #0x1D102 Updates=[R14=0x1c3e8]                # Positive offset, H=10 variant
 SET R15=0x113EA
-0xfe8d BL #0x1D102 Updates=[R14=0x113ED, R15=0x1D102]   # Positive offset, H=11 variant
+0xfe8d BL #0x1D102 Updates=[R14=0x113ED, R15=0x1D106]   # Positive offset, H=11 variant
 
 # --- BX ---
 SET R0=0xA001, R1=0xB10C, R14=0xFF002, T=0
-0x4700 BX R0 Updates=[R15=0xA000, T=1]                  # With T transfer
-0x4708 BX R1 Updates=[R15=0xB10C, T=0]                  # Without T transfer
-0x4770 BX R14 Updates=[R15=0xFF002, T=0]                # Using high bit
+0x4700 BX R0 Updates=[R15=0xA004, T=1]                  # With T transfer
+0x4708 BX R1 Updates=[R15=0xB110, T=0]                  # Without T transfer
+0x4770 BX R14 Updates=[R15=0xFF006, T=0]                # Using high bit

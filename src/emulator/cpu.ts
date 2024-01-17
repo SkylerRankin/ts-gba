@@ -5,7 +5,7 @@ import { StateHistory } from './stateHistory';
 import { byteArrayToInt32 } from './math';
 
 /**
- * A simulator for a CPU that implements the ARM ISA.
+ * A simulator for a CPU that implements the ARMv4T ISA.
  * This includes 32 bit instructions, 31 general use registers, 6 status registers.
  */
 
@@ -120,6 +120,8 @@ class CPU implements CPUType {
             this.statusRegisters.push(new Array<number>(2).fill(0));
         }
         this.statusRegisters[0][0] = (0b1011 << 28 >>> 0) || 0b11011;
+        this.setGeneralRegister(Reg.PC, 0x00000008);
+        this.setModeBits(OperatingModeCodes.sys);
     }
 
     loadProgram(program: number[]) : void {
@@ -140,16 +142,18 @@ class CPU implements CPUType {
         const instructionSize = this.operatingState === 'ARM' ? 4 : 2;
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
         const instruction = byteArrayToInt32(this.memory.getBytes(pc - 8, instructionSize), this.bigEndian);
-        const condition = instruction >> 27;
+        const condition = instruction >>> 28;
         let options: ProcessedInstructionOptions | undefined;
         if (this.conditionIsMet(condition)) {
+            this.history.currentLog.conditionMet = true;
             options = this.operatingState === 'ARM' ?
                 processARM(this, instruction) :
                 processTHUMB(this, instruction);
         }
 
-        if (!options) return;
-        if (options.incrementPC) this.setGeneralRegister(Reg.PC, pc + instructionSize);
+        if (!options || options.incrementPC) {
+            this.setGeneralRegister(Reg.PC, pc + instructionSize);
+        }
 
         this.history.endLog();
     }
@@ -164,9 +168,9 @@ class CPU implements CPUType {
         this.statusRegisters.fill(new Array<number>(2).fill(0), 0, this.generalRegisters.length);
         this.operatingState = 'ARM';
         this.bigEndian = false;
-        this.setModeBits(OperatingModeCodes.usr);
+        this.setModeBits(OperatingModeCodes.sys);
         this.setStatusRegisterFlag('t', 0);
-        this.setGeneralRegister(Reg.PC, 0x08000008);
+        this.setGeneralRegister(Reg.PC, 0x00000008);
     }
 
     conditionIsMet(condition: number) : boolean {
@@ -192,7 +196,7 @@ class CPU implements CPUType {
             case 0b1101: { return zFlag === 1 || nFlag !== vFlag; }
             case 0b1110: { return true; }
             case 0b1111: { return true; }
-            default: { throw Error(`Invalid condition opcode 0b${condition.toString(2)}.`); } 
+            default: { throw Error(`Invalid condition opcode 0b${(condition >>> 0).toString(2)}.`); }
         }
     }
 
@@ -313,24 +317,46 @@ class CPU implements CPUType {
         return this.generalRegisters[OperatingModeNames.indexOf(mode)][reg];
     }
 
-    getStateString() : string {
+    getStateSummary() : {[key: string] : string | number | number[]} {
         const modeBits = this.getStatusRegister('CPSR') & 0x1F;
         const modeName = Object.values(OperatingModeCodes).includes(modeBits) ?
             OperatingModeNames[Object.values(OperatingModeCodes).indexOf(modeBits)].toUpperCase() :
             'ERR';
+
         const state = (this.getStatusRegister('CPSR') & 0x20) === 0 ? 'ARM' : 'THB';
-        let registers = '';
+
+        let registers = [];
         if (this.operatingState === 'ARM') {
             for (let i = 0; i < 16; i++) {
-                registers += (i === 0 ? '' : ', ') + (this.getGeneralRegister(i) >>> 0).toString(16).padStart(8, '0');
+                registers.push((this.getGeneralRegister(i) >>> 0));
             }
         } else {
-            registers = [0, 1, 2, 3, 4, 5, 6, 7, 13, 14, 15].reduce(
-                (acc, value, i) => acc + (i > 0 ? ', ' : '') + (this.getGeneralRegister(value) >>> 0).toString(16).padStart(8, '0'), '');
+            [0, 1, 2, 3, 4, 5, 6, 7, 13, 14, 15].forEach(i => {
+                registers.push((this.getGeneralRegister(i) >>> 0));
+            });
         }
+
         const cpsr = this.getStatusRegister('CPSR');
-        const nzcv = (cpsr >>> 0).toString(2).padStart(32, '0').slice(0, 4);
-        return `${state} ${modeName} NZCV:[${nzcv}] Reg:[${registers}]`;
+
+        const flags =
+            (this.getStatusRegisterFlag('CPSR', 'n') === 1 ? 'N' : '-') +
+            (this.getStatusRegisterFlag('CPSR', 'z') === 1 ? 'Z' : '-') +
+            (this.getStatusRegisterFlag('CPSR', 'c') === 1 ? 'C' : '-') +
+            (this.getStatusRegisterFlag('CPSR', 'v') === 1 ? 'V' : '-') +
+            ' ' +
+            (this.getStatusRegisterFlag('CPSR', 'i') === 1 ? 'I' : '-') +
+            (this.getStatusRegisterFlag('CPSR', 'f') === 1 ? 'F' : '-') +
+            (this.getStatusRegisterFlag('CPSR', 't') === 1 ? 'Y' : '-');
+
+        let summary = {
+            mode: modeName,
+            state: state,
+            registers: registers,
+            cpsr: cpsr,
+            flags: flags
+        };
+
+        return summary;
     }
 
     getBytesFromMemory(address: number, bytes: number) : Uint8Array {
