@@ -106,7 +106,7 @@ type StatusRegisterKey = 'n' | 'z' | 'c' | 'v' | 'i' | 'f' | 't';
 type StatusRegisterUpdate = StatusRegisterKey[];
 
 class CPU implements CPUType {
-    memory = new Memory();
+    memory: Memory;
     generalRegisters = [] as number[][];
     statusRegisters = [] as number[][];
     operatingMode = 'usr' as OperatingMode;
@@ -114,7 +114,8 @@ class CPU implements CPUType {
     history = new StateHistory();
     bigEndian = false;
 
-    constructor() {
+    constructor(memory: Memory) {
+        this.memory = memory;
         for (let i = 0; i < 7; i++) {
             this.generalRegisters.push(new Array<number>(16).fill(0));
             this.statusRegisters.push(new Array<number>(2).fill(0));

@@ -3,10 +3,12 @@ import { CPU } from "../../emulator/cpu";
 import { readFileSync } from "fs";
 import { toBigEndianInt16 } from "../../emulator/math";
 import { executeInstructionTestFile } from "./test_utilities";
+import { Memory } from "../../emulator/memory";
 
 
 test("Identify THUMB op-codes", () => {
-    const cpu = new CPU();
+    const memory = new Memory();
+    const cpu = new CPU(memory);
 
     const test_cases = readFileSync("src/test/emulator/data/opcodes_thumb.txt").toString()
         .split(/\r?\n/)

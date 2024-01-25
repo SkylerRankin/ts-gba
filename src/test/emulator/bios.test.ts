@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 import { CPU } from "../../emulator/cpu";
-import { MemorySegments } from "../../emulator/memory";
+import { Memory, MemorySegments } from "../../emulator/memory";
 
 test('Load and run the GBA BIOS', () => {
     const biosPath = "src/test/emulator/data/gba_bios.bin";
@@ -30,7 +30,8 @@ test('Load and run the GBA BIOS', () => {
         0xE169F00E
     ];
 
-    const cpu = new CPU();
+    const memory = new Memory();
+    const cpu = new CPU(memory);
     cpu.memory.setBytes(MemorySegments.BIOS.start, biosBuffer);
 
     const steps = expectedInstructions.length;

@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import { CPU, OperatingModeCodes, OperatingModeNames, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../emulator/cpu";
 import { parseNumericLiteral } from "../../emulator/math";
 import { getLoadStoreAddress, getLoadStoreMultipleAddress } from "../../emulator/armInstructionProcessors";
+import { Memory } from "../../emulator/memory";
 
 const parseInstructionFileUpdateString = (text: string) => {
     const registerUpdates: { [key: number]: number; } = {};
@@ -151,7 +152,8 @@ const mockGetBytesFromMemory = (address: number, bytes: number, testMemory: Uint
 }
 
 const executeInstructionTestFile = (filePath: string, processingFunction: any) => {
-    const cpu = new CPU();
+    const memory = new Memory();
+    const cpu = new CPU(memory);
     cpu.bigEndian = false;
     cpu.reset();
 
@@ -351,7 +353,8 @@ const setSPSRMode = (cpu: CPU, value: number) => {
 }
 
 const executeLoadStoreAddressTestFile = (filePath: string, multipleAddress: boolean) => {
-    const cpu: CPU = new CPU();
+    const memory = new Memory();
+    const cpu: CPU = new CPU(memory);
     const rn = 1;
 
     readFileSync(filePath).toString()

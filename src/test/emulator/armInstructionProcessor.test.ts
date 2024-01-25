@@ -3,9 +3,11 @@ import { CPU } from "../../emulator/cpu";
 import { readFileSync } from "fs";
 import { toBigEndianInt32 } from "../../emulator/math";
 import { executeInstructionTestFile, executeLoadStoreAddressTestFile } from "./test_utilities";
+import { Memory } from "../../emulator/memory";
 
 test("Identify ARM op-codes", () => {
-    const cpu = new CPU();
+    const memory = new Memory();
+    const cpu = new CPU(memory);
 
     const test_cases = readFileSync("src/test/emulator/data/opcodes_arm.txt").toString()
         .split(/\r?\n/)
@@ -26,7 +28,8 @@ test("Identify ARM op-codes", () => {
 });
 
 test("Determine data processing shift operand values/carries (addressing mode 1)", () => {
-    const cpu = new CPU();
+    const memory = new Memory();
+    const cpu = new CPU(memory);
     const mockCFlag = 123;
 
     // Mock the C flag to be a unique value to ensure the function is
