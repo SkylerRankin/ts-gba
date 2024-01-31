@@ -132,6 +132,7 @@ class PPU implements PPUType {
                 this.displayState = 'hDraw';
                 this.currentScanline = 0;
                 this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
+                this.renderScanline(this.currentScanline);
                 break;
         }
     }
@@ -157,9 +158,9 @@ class PPU implements PPUType {
             const address = baseAddress + (x * bytesPerPixel);
             const colorData = byteArrayToInt32(this.memory.getBytes(address, 2), false);
             const rgbColor: RGBColor = {
-                red: 255 * (colorData & 0x1F) / 32,
+                red: 255 * ((colorData >> 10) & 0x1F) / 32,
                 green: 255 * ((colorData >> 5) & 0x1F) / 32,
-                blue: 255 * ((colorData >> 10) & 0x1F) / 32,
+                blue: 255 * ((colorData >> 0) & 0x1F) / 32,
             };
             this.display.setPixel(x, y, rgbColor);
         }
