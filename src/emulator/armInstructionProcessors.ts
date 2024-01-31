@@ -824,7 +824,8 @@ const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BX');
     const rm = i & 0xF;
     const rmValue = cpu.getGeneralRegister(rm);
-    const instructionSize = 4;
+    const thumbModeSwitch = (rmValue & 0x1) === 1;
+    const instructionSize = thumbModeSwitch ? 2 : 4;
     const pc = (rmValue + instructionSize * 2) & 0xFFFFFFFE;
     cpu.setStatusRegisterFlag('t', rmValue & 0x1);
     cpu.setGeneralRegister(Reg.PC, pc);

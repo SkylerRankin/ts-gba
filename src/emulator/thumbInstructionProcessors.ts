@@ -95,6 +95,7 @@ const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`B (${type})`);
 
+    let pcUpdated = false;
     const instructionSize = 2;
     switch (type) {
         case 1: {
@@ -109,6 +110,7 @@ const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptio
             }
             const newPC = pc + (offset << 1) + (instructionSize * 2);
             if (cpu.conditionIsMet(condition)) {
+                pcUpdated = true;
                 cpu.setGeneralRegister(Reg.PC, newPC);
             }
             break;
@@ -118,16 +120,17 @@ const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptio
             const pc = cpu.getGeneralRegister(Reg.PC);
             let offset;
             if (isNegative(imm, 11)) {
-                offset = -1 * (((~imm) + 1) & 0x7FF);
+                offset = -1 * (((~(imm << 1)) + 1) & 0x7FF);
             } else {
-                offset = imm;
+                offset = imm << 1;
             }
-            const newPC = pc + (offset << 1) + (instructionSize * 2);
+            const newPC = pc + offset + (instructionSize * 2);
             cpu.setGeneralRegister(Reg.PC, newPC);
+            pcUpdated = true;
         }
     }
 
-    return { incrementPC: false };
+    return { incrementPC: !pcUpdated };
 }
 
 const processBL_BLX1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -146,7 +149,7 @@ const processBL_BLX1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         return { incrementPC: true };
     } else if (h === 0b11) {
         const newPC = cpu.getGeneralRegister(Reg.LR) + (offset << 1) + (instructionSize * 2);
-        cpu.setGeneralRegister(Reg.LR, (pc + 2) | 1);
+        cpu.setGeneralRegister(Reg.LR, (pc - (instructionSize * 2) + 2) | 1);
         cpu.setGeneralRegister(Reg.PC, newPC);
     } else if (h === 0b01) {
         cpu.history.addError(`BLX (1) instruction (0x${i.toString(16)}) is not a supported version 4 THUMB instruction.`);
@@ -169,7 +172,7 @@ const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.setStatusRegisterFlag('t', rmValue & 0x1);
     cpu.setGeneralRegister(Reg.PC, (rmValue + instructionSize * 2) & (~0x1));
 
-    return { incrementPC: true };
+    return { incrementPC: false };
 }
 
 const processBLX2 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -185,7 +188,7 @@ const processBLX2 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.setStatusRegisterFlag('t', rmValue & 0x1);
     cpu.setGeneralRegister(Reg.PC, (rmValue + (instructionSize * 2)) & (~0x1));
 
-    return { incrementPC: true };
+    return { incrementPC: false };
 }
 
 // Data Processing Instructions
@@ -415,7 +418,7 @@ const processCMP = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
         }
         case 2: {
             const rm = (i >>> 3) & 0x7;
-            const rn = i & 0x3;
+            const rn = i & 0x7;
             operand1 = cpu.getGeneralRegister(rn);
             operand2 = cpu.getGeneralRegister(rm);
             break;
@@ -1062,10 +1065,10 @@ const processLDMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const startAddress = cpu.getGeneralRegister(rn);
     const endAddress = (cpu.getGeneralRegister(rn) + (numberOfSetBits(regList) * 4) - 4) & 0xFFFFFFFF;
     let address = wordAlignAddress(startAddress);
-    for (let i = 0; i <= 7; i++) {
-        if (((regList >>> i) & 0x1) === 1) {
+    for (let reg = 0; reg <= 7; reg++) {
+        if (((regList >>> reg) & 0x1) === 1) {
             let data = cpu.getBytesFromMemory(address, 4);
-            cpu.setGeneralRegister(i, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(reg, byteArrayToInt32(data, cpu.bigEndian));
             address += 4;
         }
     }

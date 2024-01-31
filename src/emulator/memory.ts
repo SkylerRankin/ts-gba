@@ -17,7 +17,7 @@ interface MemoryType {
     getSegment: (address: number) => MemorySegment
     getBytes: (address: number, bytes: number) => Uint8Array
     setBytes: (address: number, data: Uint8Array) => void
-    loadROM: (rom: number[]) => void
+    loadROM: (rom: Uint8Array) => void
 };
 
 class Memory implements MemoryType {
@@ -25,13 +25,13 @@ class Memory implements MemoryType {
     memoryBlocks = {
         'BIOS': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
         'WRAM_O': new Uint8Array(segments.WRAM_O.end - segments.WRAM_O.start + 1),
-        'WRAM_I': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
-        'IO': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
-        'BG_OBJ': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
-        'VRAM': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
-        'OAM': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'WRAM_I': new Uint8Array(segments.WRAM_I.end - segments.WRAM_I.start + 1),
+        'IO': new Uint8Array(segments.IO.end - segments.IO.start + 1),
+        'BG_OBJ': new Uint8Array(segments.BG_OBJ.end - segments.BG_OBJ.start + 1),
+        'VRAM': new Uint8Array(segments.VRAM.end - segments.VRAM.start + 1),
+        'OAM': new Uint8Array(segments.OAM.end - segments.OAM.start + 1),
         'ROM': new Uint8Array(segments.ROM.end - segments.ROM.start + 1),
-        'UNUSED': new Uint8Array(segments.BIOS.end - segments.BIOS.start + 1),
+        'UNUSED': new Uint8Array(segments.UNUSED.end - segments.UNUSED.start + 1),
     };
 
     constructor() {
@@ -71,7 +71,7 @@ class Memory implements MemoryType {
         }
     }
 
-    loadROM = (rom: number[]): void => {
+    loadROM = (rom: Uint8Array): void => {
         this.memoryBlocks.ROM.fill(0);
         for (let i = 0; i < rom.length; i++) {
             this.memoryBlocks.ROM[i] = rom[i];

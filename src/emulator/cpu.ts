@@ -3,6 +3,7 @@ import { processTHUMB } from './thumbInstructionProcessors';
 import { Memory } from './memory';
 import { StateHistory } from './stateHistory';
 import { byteArrayToInt32 } from './math';
+import { CPUProfiler } from './cpuProfiler';
 
 /**
  * A simulator for a CPU that implements the ARMv4T ISA.
@@ -16,7 +17,10 @@ type CPUType = {
     operatingMode: OperatingMode,
     operatingState: OperatingState,
     history: StateHistory,
+    profiler: CPUProfiler,
     bigEndian: boolean,
+    historyEnabled: boolean,
+    
     reset: () => void,
     step: () => void,
     atBreakpoint: () => boolean,
@@ -112,7 +116,10 @@ class CPU implements CPUType {
     operatingMode = 'usr' as OperatingMode;
     operatingState = 'ARM' as OperatingState;
     history = new StateHistory();
+    profiler = new CPUProfiler();
     bigEndian = false;
+    bootBIOS = true;
+    historyEnabled = false;
 
     constructor(memory: Memory) {
         this.memory = memory;
@@ -125,7 +132,7 @@ class CPU implements CPUType {
         this.setModeBits(OperatingModeCodes.sys);
     }
 
-    loadProgram(program: number[]) : void {
+    loadProgram(program: Uint8Array) : void {
         this.memory.loadROM(program);
     }
 
@@ -136,34 +143,43 @@ class CPU implements CPUType {
     }
 
     step() : void {
-        this.history.startLog();
-        this.history.logCPU(this);
+        if (this.historyEnabled) {
+            this.history.startLog();
+            this.history.logCPU(this);
+        }
 
         const pc = this.getGeneralRegister(Reg.PC);
         const instructionSize = this.operatingState === 'ARM' ? 4 : 2;
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
-        const instruction = byteArrayToInt32(this.memory.getBytes(pc - 8, instructionSize), this.bigEndian);
+        const instruction = byteArrayToInt32(this.memory.getBytes(pc - (instructionSize * 2), instructionSize), this.bigEndian);
         const condition = instruction >>> 28;
         let options: ProcessedInstructionOptions | undefined;
-        if (this.conditionIsMet(condition)) {
+
+        if (this.operatingState === 'ARM' && this.conditionIsMet(condition)) {
             this.history.currentLog.conditionMet = true;
-            options = this.operatingState === 'ARM' ?
-                processARM(this, instruction) :
-                processTHUMB(this, instruction);
+            this.profiler.startInstructionExecution();
+            options = processARM(this, instruction);
+            this.profiler.endInstructionExecution();
+        } else if (this.operatingState === 'THUMB') {
+            this.history.currentLog.conditionMet = true;
+            this.profiler.startInstructionExecution();
+            options = processTHUMB(this, instruction);
+            this.profiler.endInstructionExecution();
         }
 
         if (!options || options.incrementPC) {
             this.setGeneralRegister(Reg.PC, pc + instructionSize);
         }
 
-        this.history.endLog();
+        if (this.historyEnabled) {
+            this.history.endLog();
+        }
     }
 
     /**
      * Clears out all registers and memory. Sets CPU to ARM user mode.
      */
     reset() : void {
-        this.memory.reset();
         this.history.reset();
         this.generalRegisters.fill(new Array<number>(16).fill(0), 0, this.generalRegisters.length);
         this.statusRegisters.fill(new Array<number>(2).fill(0), 0, this.generalRegisters.length);
@@ -171,7 +187,12 @@ class CPU implements CPUType {
         this.bigEndian = false;
         this.setModeBits(OperatingModeCodes.sys);
         this.setStatusRegisterFlag('t', 0);
-        this.setGeneralRegister(Reg.PC, 0x00000008);
+
+        if (this.bootBIOS) {
+            this.setGeneralRegister(Reg.PC, 0x00000008);
+        } else {
+            this.setGeneralRegister(Reg.PC, 0x08000008);
+        }
     }
 
     conditionIsMet(condition: number) : boolean {

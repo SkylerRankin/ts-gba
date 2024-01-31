@@ -4,6 +4,7 @@ import { Memory, MemorySegments } from "./memory";
 
 interface PPUType {
     step(cpuCycles: number) : void;
+    reset() : void;
 }
 
 type DisplayRegister =
@@ -59,7 +60,7 @@ class PPU implements PPUType {
         this.currentScanline = -1;
         this.displayState = 'vBlank';
         this.displayStateStart = 0;
-        this.nextCycleTrigger = 0;
+        this.nextCycleTrigger = -1;
         this.vBlankAck = false;
     }
 
@@ -69,7 +70,7 @@ class PPU implements PPUType {
         
         switch (displayMode) {
             case 0x0:
-                console.log('Display mode 0 not implemented.');
+                // console.log('Display mode 0 not implemented.');
                 break;
             case 0x1:
                 console.log('Display mode 1 not implemented.');
@@ -135,7 +136,14 @@ class PPU implements PPUType {
         }
     }
 
-    
+    reset() {
+        this.currentScanline = -1;
+        this.displayState = 'vBlank';
+        this.displayStateStart = 0;
+        this.nextCycleTrigger = 0;
+        this.vBlankAck = false;
+    }
+
     renderDisplayMode3Scanline(y: number, displayControl: Uint8Array) {
         const backgroundFlags = displayControl[1] & 0xF;
         if (backgroundFlags !== 0b0100) {
@@ -145,13 +153,13 @@ class PPU implements PPUType {
         const bytesPerPixel = 2;
         const baseAddress = MemorySegments.VRAM.start + (y * DisplayConstants.hDrawPixels * bytesPerPixel);
 
-        for (let x = 0; x < DisplayConstants.hBlankPixels; x++) {
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
             const address = baseAddress + (x * bytesPerPixel);
             const colorData = byteArrayToInt32(this.memory.getBytes(address, 2), false);
             const rgbColor: RGBColor = {
-                red: (colorData & 0x1F) / 32,
-                green: ((colorData >>> 5) & 0x1F) / 32,
-                blue: ((colorData >>> 10) & 0x1F) / 32,
+                red: 255 * (colorData & 0x1F) / 32,
+                green: 255 * ((colorData >> 5) & 0x1F) / 32,
+                blue: 255 * ((colorData >> 10) & 0x1F) / 32,
             };
             this.display.setPixel(x, y, rgbColor);
         }
