@@ -211,7 +211,7 @@ class CPU implements CPUType {
             case 0b0110: { return vFlag === 1; }
             case 0b0111: { return vFlag === 0; }
             case 0b1000: { return cFlag === 1 && zFlag === 0; }
-            case 0b1001: { return cFlag === 0 && zFlag === 1; }
+            case 0b1001: { return cFlag === 0 || zFlag === 1; }
             case 0b1010: { return nFlag === vFlag; }
             case 0b1011: { return nFlag !== vFlag; }
             case 0b1100: { return zFlag === 0 && nFlag === vFlag; }

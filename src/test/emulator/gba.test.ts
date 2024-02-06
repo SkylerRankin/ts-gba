@@ -37,3 +37,11 @@ test('mode 3 lines', () => {
     const frames = 3;
     executeROM(filePath, frames);
 });
+
+
+test.only("mode 4", () => {
+    const filePath = "src/test/emulator/data/roms/mode_4_page_flip.gba";
+    // Running 4 frames will render the second page
+    const frames = 2;
+    executeROM(filePath, frames);
+});

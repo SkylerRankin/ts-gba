@@ -27,6 +27,14 @@ class Display {
         this.buffer[y * displaySize.width + x][2] = color.blue;
     }
 
+    load(display: Display) {
+        for (let i = 0; i < this.buffer.length; i++) {
+            for (let j = 0; j < this.buffer[i].length; j++) {
+                this.buffer[i][j] = display.buffer[i][j];
+            }
+        }
+    }
+
     saveToFile() {
         const bitmap = byteArrayToBitmap(this.buffer, displaySize.width, displaySize.height);
         const date = new Date();

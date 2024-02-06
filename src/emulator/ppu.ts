@@ -32,6 +32,12 @@ const DisplayConstants = {
 };
 
 
+type DisplayMode4Config = {
+    currentFrame: number,
+    display0Backup: Display,
+    display1Backup: Display
+};
+
 const displayRegisters: {[key in DisplayRegister]: number} = {
     DISPCNT: 0x04000000,
     DISPSTAT: 0x04000004,
@@ -53,6 +59,7 @@ class PPU implements PPUType {
     nextCycleTrigger: number;
     // A flag read and modified by core GBA to know when a frame has completed rendering.
     vBlankAck: boolean;
+    displayModeState: {[key: string]: DisplayMode4Config | undefined};
 
     constructor(memory: Memory, display: Display) {
         this.memory = memory;
@@ -62,6 +69,18 @@ class PPU implements PPUType {
         this.displayStateStart = 0;
         this.nextCycleTrigger = -1;
         this.vBlankAck = false;
+        this.displayModeState = {
+            "0": undefined,
+            "1": undefined,
+            "2": undefined,
+            "3": undefined,
+            "4": {
+                currentFrame: 0,
+                display0Backup: new Display(),
+                display1Backup: new Display(),
+            } as DisplayMode4Config,
+            "5": undefined
+        };
     }
 
     renderScanline(y: number) {
@@ -82,7 +101,7 @@ class PPU implements PPUType {
                 this.renderDisplayMode3Scanline(y, displayControl);
                 break;
             case 0x4:
-                console.log('Display mode 4 not implemented.');
+                this.renderDisplayMode4Scanline(y, displayControl);
                 break;
             case 0x5:
                 console.log('Display mode 5 not implemented.');
@@ -118,27 +137,38 @@ class PPU implements PPUType {
                 // H Blank completed
                 if (this.currentScanline < DisplayConstants.vDrawPixels - 1) {
                     this.currentScanline += 1;
+                    this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
                     this.displayState = 'hDraw';
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
                     this.renderScanline(this.currentScanline);
                 } else {
                     this.displayState = 'vBlank';
-                    this.nextCycleTrigger = cpuCycles + DisplayConstants.vBlankCycles;
+                    this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
+                    // this.nextCycleTrigger = cpuCycles + DisplayConstants.vBlankCycles;
                     this.vBlankAck = true;
                 }
                 break;
             case 'vBlank':
-                // V Blank completed, move back to first scanline
-                this.displayState = 'hDraw';
-                this.currentScanline = 0;
-                this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
-                this.renderScanline(this.currentScanline);
+                if (this.currentScanline < (DisplayConstants.vDrawPixels + DisplayConstants.hBlankPixels - 1)) {
+                    // Completed empty vdraw scanline
+                    this.currentScanline += 1;
+                    this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
+                    this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
+                } else {
+                    // Completed all vblank empty scanlines, returning to top scanline.
+                    this.displayState = 'hDraw';
+                    this.currentScanline = 0;
+                    this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
+                    this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
+                    this.renderScanline(this.currentScanline);
+                }
                 break;
         }
     }
 
     reset() {
         this.currentScanline = -1;
+        this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([0, 0]));
         this.displayState = 'vBlank';
         this.displayStateStart = 0;
         this.nextCycleTrigger = 0;
@@ -156,12 +186,7 @@ class PPU implements PPUType {
 
         for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
             const address = baseAddress + (x * bytesPerPixel);
-            const colorData = byteArrayToInt32(this.memory.getBytes(address, 2), false);
-            const rgbColor: RGBColor = {
-                red: 255 * ((colorData >> 10) & 0x1F) / 32,
-                green: 255 * ((colorData >> 5) & 0x1F) / 32,
-                blue: 255 * ((colorData >> 0) & 0x1F) / 32,
-            };
+            const rgbColor = this.get15BitColorFromAddress(address);
             this.display.setPixel(x, y, rgbColor);
         }
     }
@@ -172,23 +197,42 @@ class PPU implements PPUType {
             throw Error(`Display mode 4 required only background 2 enabled.`);
         }
 
-        const background3Control = this.memory.getBytes(0x0400000E, 2);
-        const backgroundPaletteAddress = 0x05000000;
-        const baseAddress = MemorySegments.VRAM.start + (y * DisplayConstants.hDrawPixels);
-
-        for (let x = 0; x < DisplayConstants.hBlankPixels; x++) {
-            const address = baseAddress + x;
-            const paletteData = byteArrayToInt32(this.memory.getBytes(address, 1), false);
-            const colorData = 0;
-            const rgbColor: RGBColor = {
-                red: (colorData & 0x1F) / 32,
-                green: ((colorData >>> 5) & 0x1F) / 32,
-                blue: ((colorData >>> 10) & 0x1F) / 32,
-            };
-            this.display.setPixel(x, y, rgbColor);
+        const state = this.displayModeState["4"] as DisplayMode4Config;
+        const frame = (displayControl[0] >> 4) & 0x1;
+        if (frame !== state.currentFrame) {
+            // Previous scanline was rendered to a different frame. Load in the new frame before
+            // writing and save previous before rendering the next scanline.
+            if (frame === 0) {
+                state.display1Backup.load(this.display);
+                this.display.load(state.display0Backup);
+            } else {
+                state.display0Backup.load(this.display);
+                this.display.load(state.display1Backup);
+            }
+            state.currentFrame = frame;
         }
 
+        const backgroundPaletteAddress = 0x05000000;
+        const frameStartAddress = MemorySegments.VRAM.start + (frame === 0 ? 0 : 0xA000);
+        const baseAddress = frameStartAddress + (y * DisplayConstants.hDrawPixels);
 
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            const paletteIndexAddress = baseAddress + x;
+            const paletteIndex = byteArrayToInt32(this.memory.getBytes(paletteIndexAddress, 1), false);
+            // Palette colors occupy 16 bits, so index is multiplied by 2 to get correct byte offset.
+            const paletteColorAddress = backgroundPaletteAddress + (paletteIndex * 0x2);
+            const rgbColor = this.get15BitColorFromAddress(paletteColorAddress);
+            this.display.setPixel(x, y, rgbColor);
+        }
+    }
+
+    get15BitColorFromAddress(address: number) {
+        const colorData = byteArrayToInt32(this.memory.getBytes(address, 2), false);
+        return {
+            red: 255 * ((colorData >>> 10) & 0x1F) / 32,
+            green: 255 * ((colorData >>> 5) & 0x1F) / 32,
+            blue: 255 * ((colorData >>> 0) & 0x1F) / 32,
+        };
     }
 
 }
