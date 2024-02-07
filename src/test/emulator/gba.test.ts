@@ -39,9 +39,16 @@ test('mode 3 lines', () => {
 });
 
 
-test.only("mode 4", () => {
+test("mode 4", () => {
     const filePath = "src/test/emulator/data/roms/mode_4_page_flip.gba";
     // Running 4 frames will render the second page
     const frames = 2;
+    executeROM(filePath, frames);
+});
+
+test("bitmap mode switch", () => {
+    const filePath = "src/test/emulator/data/roms/bitmap_mode_switch.gba";
+    // Running for 1 frame uses mode 3, 2 frames uses mode 4, and 3 frames uses mode 5
+    const frames = 3;
     executeROM(filePath, frames);
 });

@@ -29,10 +29,18 @@ const DisplayConstants = {
     vDrawPixels: 160,
     vBlankPixels: 68,
     vBlankCycles: 68 * (240 + 68) * 4,
+    displayMode5Width: 160,
+    displayMode5Height: 128,
 };
 
 
 type DisplayMode4Config = {
+    currentFrame: number,
+    display0Backup: Display,
+    display1Backup: Display
+};
+
+type DisplayMode5Config = {
     currentFrame: number,
     display0Backup: Display,
     display1Backup: Display
@@ -79,7 +87,11 @@ class PPU implements PPUType {
                 display0Backup: new Display(),
                 display1Backup: new Display(),
             } as DisplayMode4Config,
-            "5": undefined
+            "5": {
+                currentFrame: 0,
+                display0Backup: new Display(),
+                display1Backup: new Display(),
+            } as DisplayMode5Config,
         };
     }
 
@@ -104,7 +116,7 @@ class PPU implements PPUType {
                 this.renderDisplayMode4Scanline(y, displayControl);
                 break;
             case 0x5:
-                console.log('Display mode 5 not implemented.');
+                this.renderDisplayMode5Scanline(y, displayControl);
                 break;
             default:
                 throw Error(`Invalid display mode (${displayMode}) in DISPCNT.`);
@@ -144,7 +156,6 @@ class PPU implements PPUType {
                 } else {
                     this.displayState = 'vBlank';
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
-                    // this.nextCycleTrigger = cpuCycles + DisplayConstants.vBlankCycles;
                     this.vBlankAck = true;
                 }
                 break;
@@ -178,7 +189,7 @@ class PPU implements PPUType {
     renderDisplayMode3Scanline(y: number, displayControl: Uint8Array) {
         const backgroundFlags = displayControl[1] & 0xF;
         if (backgroundFlags !== 0b0100) {
-            throw Error(`Display mode 3 required only background 2 enabled.`);
+            throw Error(`Display mode 3 requires only background 2 enabled.`);
         }
 
         const bytesPerPixel = 2;
@@ -194,7 +205,7 @@ class PPU implements PPUType {
     renderDisplayMode4Scanline(y: number, displayControl: Uint8Array) {
         const backgroundFlags = displayControl[1] & 0xF;
         if (backgroundFlags !== 0b0100) {
-            throw Error(`Display mode 4 required only background 2 enabled.`);
+            throw Error(`Display mode 4 requires only background 2 enabled.`);
         }
 
         const state = this.displayModeState["4"] as DisplayMode4Config;
@@ -226,7 +237,44 @@ class PPU implements PPUType {
         }
     }
 
-    get15BitColorFromAddress(address: number) {
+    renderDisplayMode5Scanline(y: number, displayControl: Uint8Array) {
+        const backgroundFlags = displayControl[1] & 0xF;
+        if (backgroundFlags !== 0b0100) {
+            throw Error(`Display mode 5 requires only background 2 enabled.`);
+        }
+
+        const state = this.displayModeState["5"] as DisplayMode5Config;
+        const frame = (displayControl[0] >> 4) & 0x1;
+        if (frame !== state.currentFrame) {
+            // Previous scanline was rendered to a different frame. Load in the new frame before
+            // writing and save previous before rendering the next scanline.
+            if (frame === 0) {
+                state.display1Backup.load(this.display);
+                this.display.load(state.display0Backup);
+            } else {
+                state.display0Backup.load(this.display);
+                this.display.load(state.display1Backup);
+            }
+            state.currentFrame = frame;
+        }
+
+        const bytesPerPixel = 2;
+        const baseAddress = MemorySegments.VRAM.start + (y * DisplayConstants.displayMode5Width * bytesPerPixel);
+
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            let rgbColor;
+            if (x < DisplayConstants.displayMode5Width && y < DisplayConstants.displayMode5Height) {
+                const address = baseAddress + (x * bytesPerPixel);
+                rgbColor = this.get15BitColorFromAddress(address);
+            } else {
+                rgbColor = { red: 255, green: 0, blue: 255 };
+            }
+            this.display.setPixel(x, y, rgbColor);
+        }
+
+    }
+
+    get15BitColorFromAddress(address: number) : RGBColor {
         const colorData = byteArrayToInt32(this.memory.getBytes(address, 2), false);
         return {
             red: 255 * ((colorData >>> 10) & 0x1F) / 32,
