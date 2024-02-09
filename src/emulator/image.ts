@@ -1,3 +1,4 @@
+import { byteArrayToInt32 } from "./math";
 
 /**
  * Formats an RGB color array into a bitmap image formatted Uint8Array.
@@ -57,4 +58,35 @@ const byteArrayToBitmap = (colorData: number[][], width: number, height: number)
     return bmp;
 }
 
-export { byteArrayToBitmap };
+const compareBitmaps = (image1: Uint8Array, image2: Uint8Array) => {
+    const image1Width = byteArrayToInt32(image1.subarray(18, 22), false);
+    const image1Height = byteArrayToInt32(image1.subarray(22, 26), false);
+    const image2Width = byteArrayToInt32(image2.subarray(18, 22), false);
+    const image2Height = byteArrayToInt32(image2.subarray(22, 26), false);
+
+    if (image1Width !== image2Width || image1Height !== image2Height) {
+        return { equal: false, message: `Image sizes do not match: (${image1Width} x ${image1Height}) vs (${image2Width} x ${image2Height})}` };
+    }
+
+    const bitsPerPixel = 24;
+    const bytesPerPixel = 3;
+    const rowPaddingBytes = ((bitsPerPixel * image1Width) % 32) / 8;
+
+    const headerSize = 54;
+    const rowSize = (image1Width * bytesPerPixel) + rowPaddingBytes;
+    for (let y = 0; y < image1Height; y++) {
+        for (let x = 0; x < image1Width; x++) {
+            for (let i = 0; i < 3; i++) {
+                let j = headerSize + (y * rowSize) + (x * bytesPerPixel) + i;
+                if (image1[j] !== image2[j]) {
+                    const channel = ["red", "green", "blue"][i];
+                    return { equal: false, message: `Mismatch at pixel (${x}, ${160 - y - 1}) and channel ${channel}: ${image1[j]} vs ${image2[j]}.` };
+                }
+            }
+        }
+    }
+
+    return { equal: true, message: "" };
+}
+
+export { byteArrayToBitmap, compareBitmaps };

@@ -35,11 +35,12 @@ class Display {
         }
     }
 
-    saveToFile() {
+    saveToFile() : string {
         const bitmap = byteArrayToBitmap(this.buffer, displaySize.width, displaySize.height);
         const date = new Date();
         const filename = `./logs/display/gba_display_output_${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}.bmp`;
         writeFileSync(filename, bitmap);
+        return filename;
     }
 
     reset() {

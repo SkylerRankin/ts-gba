@@ -1,54 +1,93 @@
-import { readFileSync } from "fs";
+import { readFileSync, rmSync } from "fs";
 import { GBA } from "../../emulator/gba";
+import { compareBitmaps } from "../../emulator/image";
 
 
-const executeROM = (romPath: string, frames: number) => {
-    const gba = new GBA();
-    gba.cpu.bootBIOS = false;
-    gba.reset();
-
-    const rom = new Uint8Array(readFileSync(romPath));
-    gba.loadROM(rom);
-    gba.status = 'running';
-    const start = performance.now();
-    for (let i = 0; i < frames; i++) {
-        gba.runFrame();
+// Tests that run a test rom for a specified number of frames, and compare the
+// display at that frame to a reference bitmap image.
+const romFrameTests = [
+    {
+        name: "three_squares",
+        romPath: "src/test/emulator/data/roms/three_squares.gba",
+        frameChecks: [
+            {
+                frame: 2,
+                path: "src/test/emulator/data/frames/three_squares.bmp"
+            }
+        ]
+    },
+    {
+        name: "mode_3_lines",
+        romPath: "src/test/emulator/data/roms/mode_3_lines.gba",
+        frameChecks: [
+            {
+                frame: 2,
+                path: "src/test/emulator/data/frames/mode_3_lines.bmp"
+            }
+        ]
+    },
+    {
+        name: "mode_4_page_flip",
+        romPath: "src/test/emulator/data/roms/mode_4_page_flip.gba",
+        frameChecks: [
+            {
+                frame: 2,
+                path: "src/test/emulator/data/frames/mode_4_page_front.bmp"
+            },
+            {
+                frame: 4,
+                path: "src/test/emulator/data/frames/mode_4_page_back.bmp"
+            }
+        ]
+    },
+    {
+        name: "bitmap_mode_switch",
+        romPath: "src/test/emulator/data/roms/bitmap_mode_switch.gba",
+        frameChecks: [
+            {
+                frame: 1,
+                path: "src/test/emulator/data/frames/mode_3_data.bmp"
+            },
+            {
+                frame: 2,
+                path: "src/test/emulator/data/frames/mode_4_data.bmp"
+            },
+            {
+                frame: 3,
+                path: "src/test/emulator/data/frames/mode_5_data.bmp"
+            }
+        ]
     }
-    const elapsedMS = performance.now() - start;
-    gba.display.saveToFile();
+];
 
-    const cyclesPerSecond = gba.cycles / elapsedMS * 1000;
-    const mHz = cyclesPerSecond / 1000000;
-
-    console.log(`cpu cycles = ${gba.cycles}, ${elapsedMS} ms, ${mHz} mHz`);
-    console.log(gba.cpu.profiler);
-    console.log(`${gba.cpu.profiler.instructionTimings.total / gba.cpu.profiler.instructionTimings.count} ms per instruction`);
+const assertCurrentDisplayValue = (gba: GBA, expectedFramePath: string) => {
+    const path = gba.display.saveToFile();
+    const actualImage = new Uint8Array(readFileSync(path));
+    const expectedImage = new Uint8Array(readFileSync(expectedFramePath));
+    const result = compareBitmaps(actualImage, expectedImage);
+    expect(result.equal, result.message).toBeTruthy();
+    rmSync(path);
 }
 
-test('three_squares', () => {
-    const filePath = "src/test/emulator/data/roms/three_squares.gba";
-    const frames = 2;
-    executeROM(filePath, frames);
-});
+describe("Test ROM output display checks", () => {
+    romFrameTests.forEach(config => {
+        test(config.name, () => {
+            const gba = new GBA();
+            gba.cpu.bootBIOS = false;
+            gba.reset();
 
-
-test('mode 3 lines', () => {
-    const filePath = "src/test/emulator/data/roms/mode_3_lines.gba";
-    const frames = 3;
-    executeROM(filePath, frames);
-});
-
-
-test("mode 4", () => {
-    const filePath = "src/test/emulator/data/roms/mode_4_page_flip.gba";
-    // Running 4 frames will render the second page
-    const frames = 2;
-    executeROM(filePath, frames);
-});
-
-test("bitmap mode switch", () => {
-    const filePath = "src/test/emulator/data/roms/bitmap_mode_switch.gba";
-    // Running for 1 frame uses mode 3, 2 frames uses mode 4, and 3 frames uses mode 5
-    const frames = 3;
-    executeROM(filePath, frames);
+            const maxFrames = config.frameChecks[config.frameChecks.length - 1].frame;
+            const rom = new Uint8Array(readFileSync(config.romPath));
+            gba.loadROM(rom);
+            gba.status = "running";
+            let nextFrameCheck = 0;
+            for (let i = 0; i < maxFrames; i++) {
+                gba.runFrame();
+                if (nextFrameCheck < config.frameChecks.length && i === config.frameChecks[nextFrameCheck].frame - 1) {
+                    assertCurrentDisplayValue(gba, config.frameChecks[nextFrameCheck].path);
+                    nextFrameCheck++;
+                }
+            }
+        });
+    });
 });
