@@ -1,16 +1,16 @@
-import { processTHUMB } from "../../emulator/thumbInstructionProcessors";
-import { CPU } from "../../emulator/cpu";
+import { processTHUMB } from "../../src/emulator/thumbInstructionProcessors";
+import { CPU } from "../../src/emulator/cpu";
 import { readFileSync } from "fs";
-import { toBigEndianInt16 } from "../../emulator/math";
+import { toBigEndianInt16 } from "../../src/emulator/math";
 import { executeInstructionTestFile } from "./test_utilities";
-import { Memory } from "../../emulator/memory";
+import { Memory } from "../../src/emulator/memory";
 
 
 test("Identify THUMB op-codes", () => {
     const memory = new Memory();
     const cpu = new CPU(memory);
 
-    const test_cases = readFileSync("src/test/emulator/data/opcodes_thumb.txt").toString()
+    const test_cases = readFileSync("test/emulator/data/opcodes_thumb.txt").toString()
         .split(/\r?\n/)
         .filter(line => !line.startsWith("#") && line.length > 0)
         .map(line => {
@@ -27,17 +27,17 @@ test("Identify THUMB op-codes", () => {
 });
 
 test("Execute data processing THUMB instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/data_processing_thumb.txt", processTHUMB)
+    executeInstructionTestFile("test/emulator/data/data_processing_thumb.txt", processTHUMB)
 });
 
 test("Execute branch THUMB instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/branch_thumb.txt", processTHUMB);
+    executeInstructionTestFile("test/emulator/data/branch_thumb.txt", processTHUMB);
 });
 
 test("Execute load/store THUMB instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/load_store_thumb.txt", processTHUMB);
+    executeInstructionTestFile("test/emulator/data/load_store_thumb.txt", processTHUMB);
 });
 
 test("Execute load/store multiple THUMB instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/load_store_multiple_thumb.txt", processTHUMB);
+    executeInstructionTestFile("test/emulator/data/load_store_multiple_thumb.txt", processTHUMB);
 });

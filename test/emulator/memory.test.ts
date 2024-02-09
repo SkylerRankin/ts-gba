@@ -1,4 +1,4 @@
-import { Memory } from "../../emulator/memory";
+import { Memory } from "../../src/emulator/memory";
 
 
 test('Set word in WRAM', () => {

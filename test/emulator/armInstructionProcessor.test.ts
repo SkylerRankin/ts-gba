@@ -1,15 +1,16 @@
-import { getShiftOperandValue, processARM } from "../../emulator/armInstructionProcessors";
-import { CPU } from "../../emulator/cpu";
+// import { getShiftOperandValue, processARM } from "emulator/armInstructionProcessors";
+import { CPU } from "../../src/emulator/cpu";
 import { readFileSync } from "fs";
-import { toBigEndianInt32 } from "../../emulator/math";
+import { toBigEndianInt32 } from "../../src/emulator/math";
 import { executeInstructionTestFile, executeLoadStoreAddressTestFile } from "./test_utilities";
-import { Memory } from "../../emulator/memory";
+import { Memory } from "../../src/emulator/memory";
+import { getShiftOperandValue, processARM } from "../../src/emulator/armInstructionProcessors";
 
 test("Identify ARM op-codes", () => {
     const memory = new Memory();
     const cpu = new CPU(memory);
 
-    const test_cases = readFileSync("src/test/emulator/data/opcodes_arm.txt").toString()
+    const test_cases = readFileSync("./test/emulator/data/opcodes_arm.txt").toString()
         .split(/\r?\n/)
         .filter(line => !line.startsWith("#") && line.length > 0)
         .map(line => {
@@ -52,7 +53,7 @@ test("Determine data processing shift operand values/carries (addressing mode 1)
     // R10[7:0] = 64
     cpu.setGeneralRegister(10, 0xFFFFFF40);
 
-    const test_cases = readFileSync("src/test/emulator/data/addressing_mode_1_arm.txt").toString()
+    const test_cases = readFileSync("./test/emulator/data/addressing_mode_1_arm.txt").toString()
         .split(/\r?\n/)
         .filter(line => !line.startsWith("#") && line.length > 0)
         .map(line => {
@@ -73,41 +74,41 @@ test("Determine data processing shift operand values/carries (addressing mode 1)
 });
 
 test('Determine load/store addresses (addressing mode 2)', () => {
-    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_2_arm.txt", false);
+    executeLoadStoreAddressTestFile("test/emulator/data/addressing_mode_2_arm.txt", false);
 });
 
 test('Determine load/store addresses (addressing mode 3)', () => {
-    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_3_arm.txt", false);
+    executeLoadStoreAddressTestFile("test/emulator/data/addressing_mode_3_arm.txt", false);
 });
 
 test('Determine load/store multiple addresses (addressing mode 4)', () => {
-    executeLoadStoreAddressTestFile("src/test/emulator/data/addressing_mode_4_arm.txt", true);
+    executeLoadStoreAddressTestFile("test/emulator/data/addressing_mode_4_arm.txt", true);
 });
 
 test("Execute data processing ARM instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/data_processing_arm.txt", processARM)
+    executeInstructionTestFile("test/emulator/data/data_processing_arm.txt", processARM)
 });
 
 test("Execute branch ARM instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/branch_arm.txt", processARM);
+    executeInstructionTestFile("./test/emulator/data/branch_arm.txt", processARM);
 });
 
 test("Execute multiply ARM instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/multiply_arm.txt", processARM);
+    executeInstructionTestFile("./test/emulator/data/multiply_arm.txt", processARM);
 })
 
 test("Execute status register access ARM instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/status_register_access_arm.txt", processARM);
+    executeInstructionTestFile("./test/emulator/data/status_register_access_arm.txt", processARM);
 });
 
 test("Execute semaphore ARM instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/semaphore_arm.txt", processARM);
+    executeInstructionTestFile("./test/emulator/data/semaphore_arm.txt", processARM);
 });
 
 test("Execute load/store ARM instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/load_store_arm.txt", processARM);
+    executeInstructionTestFile("./test/emulator/data/load_store_arm.txt", processARM);
 });
 
 test("Execute load/store multiple ARM instructions", () => {
-    executeInstructionTestFile("src/test/emulator/data/load_store_multiple_arm.txt", processARM);
+    executeInstructionTestFile("./test/emulator/data/load_store_multiple_arm.txt", processARM);
 });

@@ -1,6 +1,6 @@
 import { readFileSync, rmSync } from "fs";
-import { GBA } from "../../emulator/gba";
-import { compareBitmaps } from "../../emulator/image";
+import { GBA } from "../../src/emulator/gba";
+import { compareBitmaps } from "../../src/emulator/image";
 
 
 // Tests that run a test rom for a specified number of frames, and compare the
@@ -8,53 +8,53 @@ import { compareBitmaps } from "../../emulator/image";
 const romFrameTests = [
     {
         name: "three_squares",
-        romPath: "src/test/emulator/data/roms/three_squares.gba",
+        romPath: "test/emulator/data/roms/three_squares.gba",
         frameChecks: [
             {
                 frame: 2,
-                path: "src/test/emulator/data/frames/three_squares.bmp"
+                path: "test/emulator/data/frames/three_squares.bmp"
             }
         ]
     },
     {
         name: "mode_3_lines",
-        romPath: "src/test/emulator/data/roms/mode_3_lines.gba",
+        romPath: "test/emulator/data/roms/mode_3_lines.gba",
         frameChecks: [
             {
                 frame: 2,
-                path: "src/test/emulator/data/frames/mode_3_lines.bmp"
+                path: "test/emulator/data/frames/mode_3_lines.bmp"
             }
         ]
     },
     {
         name: "mode_4_page_flip",
-        romPath: "src/test/emulator/data/roms/mode_4_page_flip.gba",
+        romPath: "test/emulator/data/roms/mode_4_page_flip.gba",
         frameChecks: [
             {
                 frame: 2,
-                path: "src/test/emulator/data/frames/mode_4_page_front.bmp"
+                path: "test/emulator/data/frames/mode_4_page_front.bmp"
             },
             {
                 frame: 4,
-                path: "src/test/emulator/data/frames/mode_4_page_back.bmp"
+                path: "test/emulator/data/frames/mode_4_page_back.bmp"
             }
         ]
     },
     {
         name: "bitmap_mode_switch",
-        romPath: "src/test/emulator/data/roms/bitmap_mode_switch.gba",
+        romPath: "test/emulator/data/roms/bitmap_mode_switch.gba",
         frameChecks: [
             {
                 frame: 1,
-                path: "src/test/emulator/data/frames/mode_3_data.bmp"
+                path: "test/emulator/data/frames/mode_3_data.bmp"
             },
             {
                 frame: 2,
-                path: "src/test/emulator/data/frames/mode_4_data.bmp"
+                path: "test/emulator/data/frames/mode_4_data.bmp"
             },
             {
                 frame: 3,
-                path: "src/test/emulator/data/frames/mode_5_data.bmp"
+                path: "test/emulator/data/frames/mode_5_data.bmp"
             }
         ]
     }

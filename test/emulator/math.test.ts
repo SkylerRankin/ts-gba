@@ -1,6 +1,6 @@
 import {
     encodeWithRotation, rotateRight, rotateLeft, signExtend,
-    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom, twosComplementNegation, int16ToByteArray, int8ToByteArray } from '../../emulator/math';
+    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom, twosComplementNegation, int16ToByteArray, int8ToByteArray } from '../../src/emulator/math';
 
 test('logicalShiftLeft', () => {
     expect(logicalShiftLeft(2, 0)).toStrictEqual([2, 0]);

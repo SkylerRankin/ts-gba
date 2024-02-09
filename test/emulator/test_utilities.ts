@@ -1,8 +1,8 @@
 import { readFileSync } from "fs";
-import { CPU, OperatingModeCodes, OperatingModeNames, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../emulator/cpu";
-import { parseNumericLiteral } from "../../emulator/math";
-import { getLoadStoreAddress, getLoadStoreMultipleAddress } from "../../emulator/armInstructionProcessors";
-import { Memory } from "../../emulator/memory";
+import { CPU, OperatingModeCodes, OperatingModeNames, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../src/emulator/cpu";
+import { parseNumericLiteral } from "../../src/emulator/math";
+import { getLoadStoreAddress, getLoadStoreMultipleAddress } from "../../src/emulator/armInstructionProcessors";
+import { Memory } from "../../src/emulator/memory";
 
 const parseInstructionFileUpdateString = (text: string) => {
     const registerUpdates: { [key: number]: number; } = {};
