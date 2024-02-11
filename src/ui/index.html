@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            * {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+
+            #container {
+                width: 1000px;
+                margin: 50px auto;
+            }
+
+            #tab_container {
+                width: 480px;
+                display: inline-block;
+                min-height: 320px;
+            }
+
+            #tab_row {
+                margin-bottom: 20px;
+                display: flex;
+            }
+
+            .tab {
+                box-sizing: border-box;
+                width: 50px;
+                color: #9c9c9c;
+                font-weight: bold;
+                cursor: pointer;
+                /* text-align: center; */
+            }
+
+            .tab_selected {
+                color: black;
+            }
+
+            .tab_hidden {
+                display: none;
+            }
+        </style>
+
+        <script>
+            const state = {
+                selectedTab: 0
+            };
+
+            const onTabSelect = (tabIndex) => {
+                for (let i = 0; i < 3; i++) {
+                    const tab = document.getElementById(`tab${i}`);
+                    const tabContainer = document.getElementById(`tab${i}_container`);
+                    if (i === tabIndex) {
+                        tab.classList.add('tab_selected');
+                        tabContainer.classList.remove('tab_hidden');
+
+                    } else {
+                        tab.classList.remove('tab_selected');
+                        tabContainer.classList.add('tab_hidden');
+                    }
+                }
+            }
+
+            const onROMUpload = (event) => {
+                if (!event.files || !event.files[0]) {
+
+                }
+                const fileReader = new FileReader();
+                fileReader.onloadend = event => {
+                    if (fileReader.result !== null) {
+                        console.log(`completed loading rom`);
+                        console.log(fileReader.result);
+                    }
+                };
+                fileReader.readAsArrayBuffer(event.files[0]);
+            }
+
+        </script>
+    </head>
+    <body>
+        <div id="container">
+            <div style="margin-bottom: 20px;">
+                <a href="asd" style="color: #0398fc; text-decoration: none; font-size: 20px; font-weight: bold;">ts-gba</a>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <canvas id="canvas" width="480px" height="320px" style="background-color: blanchedalmond;"></canvas>
+                <div id="tab_container">
+                    <div id="tab_row">
+                        <div id="tab0" class="tab tab_selected" onclick="onTabSelect(0)">Game</div>
+                        <div id="tab1" class="tab" onclick="onTabSelect(1)">CPU</div>
+                        <div id="tab2" class="tab" onclick="onTabSelect(2)">PPU</div>
+                    </div>
+                    <div id="tab0_container" class="tab_content">
+                        <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
+                        <button id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</button>
+                        <button>Pause</button>
+                        <button>Reset</button>
+                    </div>
+                    <div id="tab1_container" class="tab_hidden tab_content">
+                        tab 1, empty
+                    </div>
+                    <div id="tab2_container" class="tab_hidden tab_content">
+                        tab 2, empty
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,32 +1,32 @@
 
 type ProfileMetric = {
-    min: number;
-    max: number;
-    total: number;
-    count: number;
+    min: bigint;
+    max: bigint;
+    total: bigint;
+    count: bigint;
 }
 
 
 class CPUProfiler {
 
     instructionTimings: ProfileMetric = {
-        min: 99999999,
-        max: 0,
-        total: 0,
-        count: 0
+        min: BigInt(999999999),
+        max: BigInt(0),
+        total: BigInt(0),
+        count: BigInt(0)
     };
-    currentInstructionStart: number = 0;
+    currentInstructionStart: bigint = BigInt(0);
 
     startInstructionExecution() {
-        this.currentInstructionStart = performance.now();
+        this.currentInstructionStart = process.hrtime.bigint();
     }
 
     endInstructionExecution() {
-        const elapsed = performance.now() - this.currentInstructionStart;
-        this.instructionTimings.min = Math.min(this.instructionTimings.min, elapsed);
-        this.instructionTimings.max = Math.max(this.instructionTimings.min, elapsed);
+        const elapsed = process.hrtime.bigint() - this.currentInstructionStart;
+        if (this.instructionTimings.min > elapsed) this.instructionTimings.min = elapsed;
+        if (this.instructionTimings.max < elapsed) this.instructionTimings.max = elapsed;
         this.instructionTimings.total += elapsed;
-        this.instructionTimings.count += 1;
+        this.instructionTimings.count += BigInt(1);
     }
 
 }
