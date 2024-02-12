@@ -80,12 +80,18 @@ const signExtend = (n: number, bits: number) : number => {
 }
 
 const byteArrayToInt32 = (a: Uint8Array, bigEndian: boolean) : number => {
-    const data = new Uint8Array(a);
-    if (bigEndian) data.reverse();
     let result = 0;
-    for (let i = 0; i < data.length; i++) {
-        result |= data[i] << (i * 8);
+
+    if (bigEndian) {
+        for (let i = 0; i < a.length; i++) {
+            result |= a[i] << ((a.length - i - 1) * 8);
+        }
+    } else {
+        for (let i = 0; i < a.length; i++) {
+            result |= a[i] << (i * 8);
+        }
     }
+
     return result >>> 0;
 }
 

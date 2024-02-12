@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <script src="./tsgba.js"></script>
         <style>
             * {
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -9,6 +10,15 @@
             #container {
                 width: 1000px;
                 margin: 50px auto;
+            }
+
+            #canvas_container canvas {
+                position: absolute;
+                image-rendering: pixelated;
+            }
+
+            .canvas_hidden {
+                display: none;
             }
 
             #tab_container {
@@ -28,7 +38,7 @@
                 color: #9c9c9c;
                 font-weight: bold;
                 cursor: pointer;
-                /* text-align: center; */
+                text-align: center;
             }
 
             .tab_selected {
@@ -41,9 +51,8 @@
         </style>
 
         <script>
-            const state = {
-                selectedTab: 0
-            };
+            let gba = null;
+            let romLoaded = false;
 
             const onTabSelect = (tabIndex) => {
                 for (let i = 0; i < 3; i++) {
@@ -62,18 +71,38 @@
 
             const onROMUpload = (event) => {
                 if (!event.files || !event.files[0]) {
-
+                    console.error(`No ROM file uploaded.`);
+                    return;
                 }
                 const fileReader = new FileReader();
                 fileReader.onloadend = event => {
                     if (fileReader.result !== null) {
-                        console.log(`completed loading rom`);
-                        console.log(fileReader.result);
+                        const buffer = new Uint8Array(fileReader.result);
+                        gba.reset();
+                        gba.loadROM(buffer);
+                        romLoaded = true;
+                        console.log(`ROM loaded`);
                     }
                 };
                 fileReader.readAsArrayBuffer(event.files[0]);
             }
 
+            window.onload = () => {
+                gba = new window.GBA();
+
+                document.getElementById("startButton").onclick = () => {
+                    if (romLoaded) {
+                        gba.run();
+                    } else {
+                        console.warn("No rom loaded");
+                    }
+                };
+
+                document.getElementById("resetButton").onclick = () => {
+                    gba.reset();
+                    romLoaded = false;
+                };
+            }
         </script>
     </head>
     <body>
@@ -82,7 +111,10 @@
                 <a href="asd" style="color: #0398fc; text-decoration: none; font-size: 20px; font-weight: bold;">ts-gba</a>
             </div>
             <div style="display: flex; justify-content: space-between;">
-                <canvas id="canvas" width="480px" height="320px" style="background-color: blanchedalmond;"></canvas>
+                <div id="canvas_container">
+                    <canvas id="frame_0_canvas" width="480px" height="320px" style="background-color: blanchedalmond;"></canvas>
+                    <canvas id="frame_1_canvas" width="480px" height="320px" style="background-color: coral;" class="canvas_hidden"></canvas>
+                </div>
                 <div id="tab_container">
                     <div id="tab_row">
                         <div id="tab0" class="tab tab_selected" onclick="onTabSelect(0)">Game</div>
@@ -90,10 +122,28 @@
                         <div id="tab2" class="tab" onclick="onTabSelect(2)">PPU</div>
                     </div>
                     <div id="tab0_container" class="tab_content">
-                        <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
-                        <button id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</button>
-                        <button>Pause</button>
-                        <button>Reset</button>
+                        <div>
+                            <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
+                            <button id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</button>
+                            <button id="startButton">Start</button>
+                            <button id="resetButton">Reset</button>
+                        </div>
+                        <div>
+                            <table>
+                                <tr>
+                                    <td>FPS</td>
+                                    <td><span id="fpsText">0</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-right: 20px;">Last frame cycles</td>
+                                    <td><span id="lastFrameCyclesText">0</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Last frame ms</td>
+                                    <td><span id="lastFrameMSText">0</span></td>
+                                </tr>
+                            </table>
+                        </div>
                     </div>
                     <div id="tab1_container" class="tab_hidden tab_content">
                         tab 1, empty

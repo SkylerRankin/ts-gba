@@ -1,5 +1,5 @@
 import { CPU } from "./cpu";
-import { Display } from "./display";
+import { CanvasDisplay, Display } from "./display";
 import { Memory } from "./memory";
 import { PPU } from "./ppu";
 
@@ -16,10 +16,18 @@ type GBAStatus = 'running' | 'paused';
 class GBA implements GBAType {
     status: GBAStatus = 'paused';
     cycles: number = 0;
-    memory: Memory = new Memory();
-    display: Display = new Display();
-    cpu: CPU = new CPU(this.memory);
-    ppu: PPU = new PPU(this.memory, this.display);
+    memory: Memory;
+    display: Display;
+    cpu: CPU;
+    ppu: PPU;
+    nextFrameTimer: number = 0;
+
+    constructor() {
+        this.memory = new Memory();
+        this.cpu = new CPU(this.memory);
+        this.display = new CanvasDisplay();
+        this.ppu = new PPU(this.memory, this.display);
+    }
 
     loadROM(rom: Uint8Array) {
         this.memory.loadROM(rom);
@@ -31,6 +39,8 @@ class GBA implements GBAType {
     }
 
     runFrame() {
+        const frameStart = performance.now();
+        const cyclesStart = this.cycles;
         while (true) {
             this.cpu.step();
             this.ppu.step(this.cycles);
@@ -41,20 +51,24 @@ class GBA implements GBAType {
                 break;
             }
         }
+        console.log(`Frame time: ${performance.now() - frameStart} ms`);
+        console.log(`Cycles: ${this.cycles - cyclesStart}`);
 
         if (this.status === 'running') {
             // Doesn't seem to work in a node environment
-            // setTimeout(this.runFrame, 16);
+            this.nextFrameTimer = window.setTimeout(() => { this.runFrame(); }, 16);
         }
     }
 
     pause() {
         this.status = 'paused';
+        window.clearTimeout(this.nextFrameTimer);
     }
 
     reset() {
         this.status = 'paused';
         this.cycles = 0;
+        window.clearTimeout(this.nextFrameTimer);
 
         this.memory.reset();
         this.cpu.reset();
@@ -63,6 +77,9 @@ class GBA implements GBAType {
     }
 
 }
+
+// Define the GBA class on window for use in frontend.
+(window as any).GBA = GBA;
 
 export { GBA }
 export { GBAType }

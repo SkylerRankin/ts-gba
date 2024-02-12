@@ -1,4 +1,4 @@
-import { writeFileSync } from 'fs';
+// import { writeFileSync } from 'fs';
 import { OperatingState, CPU, Reg, OperatingMode } from './cpu';
 import { byteArrayToInt32 } from './math';
 
@@ -86,7 +86,7 @@ class StateHistory implements StateHistoryType {
 
         const date = new Date();
         const filename = `./logs/cpu_state_history_${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}.txt`;
-        writeFileSync(filename, data);
+        // writeFileSync(filename, data);
     }
 
 }

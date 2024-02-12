@@ -1,55 +1,74 @@
-import { writeFileSync } from "fs";
-import { byteArrayToBitmap } from "./image";
-
 type RGBColor = {
     red: number,
     green: number,
     blue: number
 }
 
-const displaySize = {
+const DisplaySize = {
     width: 240,
     height: 160
 };
 
-class Display {
+const CanvasScaling = 2;
 
-    buffer: number[][];
+interface Display {
+    setPixel: (x: number, y: number, color: RGBColor) => void;
+    setFrame: (frame: number) => void;
+    reset: () => void;
+}
+
+class CanvasDisplay implements Display {
+
+    // TODO: is this dual canvas approach efficient for handling the two frames?
+    currentContext: number;
+    canvases: HTMLCanvasElement[];
+    contexts: CanvasRenderingContext2D[];
 
     constructor() {
-        this.buffer = Array(displaySize.width * displaySize.height);
-        this.reset();
+        this.canvases = [
+            document.getElementById("frame_0_canvas") as HTMLCanvasElement,
+            document.getElementById("frame_1_canvas") as HTMLCanvasElement
+        ];
+        this.contexts = [
+            this.canvases[0]?.getContext("2d") as CanvasRenderingContext2D,
+            this.canvases[1]?.getContext("2d") as CanvasRenderingContext2D
+        ];
+
+        for (let i = 0; i < 2; i++) {
+            this.contexts[i]?.scale(CanvasScaling, CanvasScaling);
+        }
+        
+        this.currentContext = 0;
     }
 
     setPixel(x: number, y: number, color: RGBColor) {
-        this.buffer[y * displaySize.width + x][0] = color.red;
-        this.buffer[y * displaySize.width + x][1] = color.green;
-        this.buffer[y * displaySize.width + x][2] = color.blue;
+        const context = this.contexts[this.currentContext];
+        // TODO: batch these draw calls and write once with putImageData
+        context.fillStyle = `rgb(${color.red}, ${color.green}, ${color.blue})`;
+        context.fillRect(x, y, 1, 1);
     }
 
-    load(display: Display) {
-        for (let i = 0; i < this.buffer.length; i++) {
-            for (let j = 0; j < this.buffer[i].length; j++) {
-                this.buffer[i][j] = display.buffer[i][j];
-            }
+    setFrame(frame: number) {
+        if (frame === 0) {
+            this.canvases[0].classList.remove("canvas_hidden");
+            this.canvases[1].classList.add("canvas_hidden");
+        } else {
+            this.canvases[1].classList.remove("canvas_hidden");
+            this.canvases[0].classList.add("canvas_hidden");
         }
-    }
 
-    saveToFile() : string {
-        const bitmap = byteArrayToBitmap(this.buffer, displaySize.width, displaySize.height);
-        const date = new Date();
-        const filename = `./logs/display/gba_display_output_${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}.bmp`;
-        writeFileSync(filename, bitmap);
-        return filename;
+        this.currentContext = frame;
     }
 
     reset() {
-        for (let i = 0; i < this.buffer.length; i++) {
-            this.buffer[i] = [0, 0, 0];
+        for (let i = 0; i < 2; i++) {
+            this.contexts[i].fillStyle = "#ededed";
+            this.contexts[i].fillRect(0, 0, DisplaySize.width, DisplaySize.height);
         }
+        this.currentContext = 0;
     }
 
 }
 
-export { Display };
+export { CanvasDisplay, Display, DisplaySize };
 export type { RGBColor };

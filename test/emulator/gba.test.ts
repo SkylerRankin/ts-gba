@@ -1,6 +1,7 @@
 import { readFileSync, rmSync } from "fs";
 import { GBA } from "../../src/emulator/gba";
 import { compareBitmaps } from "../../src/emulator/image";
+import { FileDisplay } from "./test_utilities";
 
 
 // Tests that run a test rom for a specified number of frames, and compare the
@@ -61,7 +62,7 @@ const romFrameTests = [
 ];
 
 const assertCurrentDisplayValue = (gba: GBA, expectedFramePath: string) => {
-    const path = gba.display.saveToFile();
+    const path = (gba.display as FileDisplay).saveToFile();
     const actualImage = new Uint8Array(readFileSync(path));
     const expectedImage = new Uint8Array(readFileSync(expectedFramePath));
     const result = compareBitmaps(actualImage, expectedImage);
@@ -73,13 +74,15 @@ describe("Test ROM output display checks", () => {
     romFrameTests.forEach(config => {
         test(config.name, () => {
             const gba = new GBA();
+            gba.display = new FileDisplay();
+            gba.ppu.display = gba.display;
             gba.cpu.bootBIOS = false;
             gba.reset();
 
             const maxFrames = config.frameChecks[config.frameChecks.length - 1].frame;
             const rom = new Uint8Array(readFileSync(config.romPath));
             gba.loadROM(rom);
-            gba.status = "running";
+            gba.status = "paused";
             let nextFrameCheck = 0;
             for (let i = 0; i < maxFrames; i++) {
                 gba.runFrame();

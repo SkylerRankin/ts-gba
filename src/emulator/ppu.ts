@@ -36,14 +36,10 @@ const DisplayConstants = {
 
 type DisplayMode4Config = {
     currentFrame: number,
-    display0Backup: Display,
-    display1Backup: Display
 };
 
 type DisplayMode5Config = {
     currentFrame: number,
-    display0Backup: Display,
-    display1Backup: Display
 };
 
 const displayRegisters: {[key in DisplayRegister]: number} = {
@@ -84,13 +80,9 @@ class PPU implements PPUType {
             "3": undefined,
             "4": {
                 currentFrame: 0,
-                display0Backup: new Display(),
-                display1Backup: new Display(),
             } as DisplayMode4Config,
             "5": {
                 currentFrame: 0,
-                display0Backup: new Display(),
-                display1Backup: new Display(),
             } as DisplayMode5Config,
         };
     }
@@ -213,13 +205,7 @@ class PPU implements PPUType {
         if (frame !== state.currentFrame) {
             // Previous scanline was rendered to a different frame. Load in the new frame before
             // writing and save previous before rendering the next scanline.
-            if (frame === 0) {
-                state.display1Backup.load(this.display);
-                this.display.load(state.display0Backup);
-            } else {
-                state.display0Backup.load(this.display);
-                this.display.load(state.display1Backup);
-            }
+            this.display.setFrame(frame);
             state.currentFrame = frame;
         }
 
@@ -248,13 +234,7 @@ class PPU implements PPUType {
         if (frame !== state.currentFrame) {
             // Previous scanline was rendered to a different frame. Load in the new frame before
             // writing and save previous before rendering the next scanline.
-            if (frame === 0) {
-                state.display1Backup.load(this.display);
-                this.display.load(state.display0Backup);
-            } else {
-                state.display0Backup.load(this.display);
-                this.display.load(state.display1Backup);
-            }
+            this.display.setFrame(0);
             state.currentFrame = frame;
         }
 

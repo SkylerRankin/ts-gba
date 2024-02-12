@@ -1,8 +1,11 @@
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { CPU, OperatingModeCodes, OperatingModeNames, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../src/emulator/cpu";
 import { parseNumericLiteral } from "../../src/emulator/math";
 import { getLoadStoreAddress, getLoadStoreMultipleAddress } from "../../src/emulator/armInstructionProcessors";
 import { Memory } from "../../src/emulator/memory";
+import { Display, DisplaySize, RGBColor } from "../../src/emulator/display";
+import { byteArrayToBitmap } from "../../src/emulator/image";
+import { GBA } from "../../src/emulator/gba";
 
 const parseInstructionFileUpdateString = (text: string) => {
     const registerUpdates: { [key: number]: number; } = {};
@@ -419,4 +422,48 @@ const executeLoadStoreAddressTestFile = (filePath: string, multipleAddress: bool
         });
 }
 
-export { executeInstructionTestFile, executeLoadStoreAddressTestFile };
+// Implementation of the display interface for rendering to a file, rather than a Canvas element.
+class FileDisplay implements Display {
+
+    currentFrame: number;
+    buffers: number[][][];
+
+    constructor() {
+        this.currentFrame = 0;
+        this.buffers = [
+            Array(DisplaySize.width * DisplaySize.height),
+            Array(DisplaySize.width * DisplaySize.height)
+        ];
+        this.reset();
+    }
+
+    setFrame(frame: number) {
+        this.currentFrame = frame;
+    }
+
+    setPixel(x: number, y: number, color: RGBColor) {
+        const buffer = this.buffers[this.currentFrame];
+        buffer[y * DisplaySize.width + x][0] = color.red;
+        buffer[y * DisplaySize.width + x][1] = color.green;
+        buffer[y * DisplaySize.width + x][2] = color.blue;
+    }
+
+    saveToFile() : string {
+        const buffer = this.buffers[this.currentFrame];
+        const bitmap = byteArrayToBitmap(buffer, DisplaySize.width, DisplaySize.height);
+        const date = new Date();
+        const filename = `./logs/display/gba_display_output_${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}.bmp`;
+        writeFileSync(filename, bitmap);
+        return filename;
+    }
+
+    reset() {
+        for (let frame = 0; frame < 2; frame++) {
+            for (let i = 0; i < this.buffers[frame].length; i++) {
+                this.buffers[frame][i] = [0, 0, 0];
+            }
+        }
+    }
+}
+
+export { executeInstructionTestFile, executeLoadStoreAddressTestFile, FileDisplay };

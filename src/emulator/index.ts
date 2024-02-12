@@ -1,9 +1,9 @@
-import { readFileSync } from "fs";
+// import { readFileSync } from "fs";
 import { GBA } from "./gba";
 
 const arrayMin = (a: any[]) => a.reduce((c, p) => c < p ? c : p, a[0]);
 const arrayMax = (a: any[]) => a.reduce((c, p) => c > p ? c : p, a[0]);
-const arraySum = (a: any[]) => a.reduce((c, p) => c + p, BigInt(0));
+const arraySum = (a: any[]) => a.reduce((c, p) => c + p, 0);
 
 
 const executeROM = (romPath: string, frames: number) => {
@@ -11,35 +11,36 @@ const executeROM = (romPath: string, frames: number) => {
     gba.cpu.bootBIOS = false;
     gba.reset();
 
-    const rom = new Uint8Array(readFileSync(romPath));
+    // const rom = new Uint8Array(readFileSync(romPath));
+    const rom = new Uint8Array();
     gba.loadROM(rom);
     gba.status = 'running';
-    const start = process.hrtime.bigint();
+    const start = performance.now();
     const frameTimes = [];
     const cyclesPerFrame = [];
 
     for (let i = 0; i < frames; i++) {
-        const frameStart = process.hrtime.bigint();
+        const frameStart = performance.now()
         const cyclesStart = gba.cycles;
         gba.runFrame();
-        frameTimes.push(process.hrtime.bigint() - frameStart);
-        cyclesPerFrame.push(BigInt(gba.cycles) - BigInt(cyclesStart));
+        frameTimes.push(performance.now() - frameStart);
+        cyclesPerFrame.push(gba.cycles - cyclesStart);
     }
-    const elapsedNS = process.hrtime.bigint() - start;
+    const elapsedNS = performance.now() - start;
     gba.display.saveToFile();
 
-    const cyclesPerSecond = BigInt(gba.cycles) / elapsedNS * BigInt(1e9);
-    const mHz = cyclesPerSecond / BigInt(1e6);
+    const cyclesPerSecond = gba.cycles / elapsedNS * 1e9;
+    const mHz = cyclesPerSecond / 1e6;
 
     console.log(`cpu cycles = ${gba.cycles}, ${elapsedNS} ns, ${mHz} mHz`);
     console.log(gba.cpu.profiler);
     console.log(`${gba.cpu.profiler.instructionTimings.total / gba.cpu.profiler.instructionTimings.count} ns per instruction`);
 
-    console.log(`avg frame time = ${arraySum(frameTimes) / BigInt(frameTimes.length)} ns`);
+    console.log(`avg frame time = ${arraySum(frameTimes) / frameTimes.length} ns`);
     console.log(`max frame time = ${arrayMax(frameTimes)} ns`);
     console.log(`min frame time = ${arrayMin(frameTimes)} ns`);
 
-    console.log(`avg cycles per frame = ${arraySum(cyclesPerFrame) / BigInt(cyclesPerFrame.length)}`);
+    console.log(`avg cycles per frame = ${arraySum(cyclesPerFrame) / cyclesPerFrame.length}`);
     console.log(`max cycles per frame = ${arrayMax(cyclesPerFrame)}`);
     console.log(`min cycles per frame = ${arrayMin(cyclesPerFrame)}`);
 }
