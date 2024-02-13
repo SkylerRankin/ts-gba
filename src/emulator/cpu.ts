@@ -12,9 +12,11 @@ import { CPUProfiler } from './cpuProfiler';
 
 type CPUType = {
     memory: Memory,
+    currentGeneralRegisters: number[],
     generalRegisters: number[][],
+    currentStatusRegisters: number[],
     statusRegisters: number[][],
-    operatingMode: OperatingMode,
+    operatingMode: number,
     operatingState: OperatingState,
     history: StateHistory,
     profiler: CPUProfiler,
@@ -30,9 +32,8 @@ type CPUType = {
     getStatusRegister: (reg: StatusRegister) => number,
 
     setGeneralRegister: (reg: number, value: number) => void,
-    setGeneralRegisterByMode(reg: number, value: number, mode: OperatingMode) : void,
     getGeneralRegister: (reg: number) => number,
-    getGeneralRegisterByMode: (reg: number, mode: OperatingMode) => number,
+    getGeneralRegisterByMode: (reg: number, mode: number) => number,
 
     getBytesFromMemory(address: number, bytes: number) : Uint8Array,
     setBytesInMemory(address: number, bytes: Uint8Array) : void,
@@ -47,8 +48,18 @@ const OperatingModeCodes = {
     'und': 0b11011,
     'sys': 0b11111
 };
+const OperatingModeCodeToIndex = [0, 1, 2, 3, -1, -1, -1, 4, -1, -1, -1, 5, -1, -1, -1, 6];
+const OperatingModes = {
+    'usr': 0,
+    'fiq': 1,
+    'irq': 2,
+    'svc': 3,
+    'abt': 4,
+    'und': 5,
+    'sys': 6
+};
 const OperatingModeNames = ['usr', 'fiq', 'irq', 'svc', 'abt', 'und', 'sys'];
-type OperatingMode = 'usr' | 'fiq' | 'irq' | 'svc' | 'abt' | 'und' | 'sys';
+// type OperatingMode = 'usr' | 'fiq' | 'irq' | 'svc' | 'abt' | 'und' | 'sys';
 // CPSR[5] = 1 for Thumb, 0 for ARM
 type OperatingState = 'ARM' | 'THUMB';
 
@@ -72,34 +83,6 @@ const cpsrBitOffsetMapping: {[key in StatusRegisterKey]: number} = {
 
 const statusRegisterFlags: StatusRegisterKey[] = ['n', 'z', 'c', 'v', 'i', 'f', 't'];
 
-/** 
- * Lists of the banked registers for each mode for each state. Banked registers
- * have their own register value in each state. Non-banked registers share the
- * same physical register. This means banked register values would be saved
- * when operating mode changes and non-banked register values can be
- * overwritten.
- */
-const BankedRegisters = {
-    'ARM': [
-        [], // User
-        [8, 9, 10, 11, 12, Reg.SP, Reg.LR], // FIQ
-        [Reg.SP, Reg.LR], // IRQ
-        [Reg.SP, Reg.LR], // SVC
-        [Reg.SP, Reg.LR], // ABT
-        [Reg.SP, Reg.LR], // UND
-        [], // SYS
-    ],
-    'THUMB': [
-        [], // User
-        [Reg.SP, Reg.LR], // FIQ
-        [Reg.SP, Reg.LR], // IRQ
-        [Reg.SP, Reg.LR], // SVC
-        [Reg.SP, Reg.LR], // ABT
-        [Reg.SP, Reg.LR], // UND
-        [], // SYS
-    ]
-};
-
 /**
  * Status register flag values:
  * t = 0 for ARM, 1 for Thumb
@@ -111,9 +94,11 @@ type StatusRegisterUpdate = StatusRegisterKey[];
 
 class CPU implements CPUType {
     memory: Memory;
+    currentGeneralRegisters = [] as number[];
     generalRegisters = [] as number[][];
+    currentStatusRegisters = [] as number[];
     statusRegisters = [] as number[][];
-    operatingMode = 'usr' as OperatingMode;
+    operatingMode = OperatingModes.usr;
     operatingState = 'ARM' as OperatingState;
     history = new StateHistory();
     profiler = new CPUProfiler();
@@ -123,13 +108,14 @@ class CPU implements CPUType {
 
     constructor(memory: Memory) {
         this.memory = memory;
+        this.currentGeneralRegisters = new Array<number>(16).fill(0);
+        this.currentStatusRegisters = new Array<number>(2).fill(0);
         for (let i = 0; i < 7; i++) {
             this.generalRegisters.push(new Array<number>(16).fill(0));
             this.statusRegisters.push(new Array<number>(2).fill(0));
         }
-        this.statusRegisters[0][0] = (0b1011 << 28 >>> 0) || 0b11011;
         this.setGeneralRegister(Reg.PC, 0x00000008);
-        this.setModeBits(OperatingModeCodes.sys);
+        this.setModeBits(OperatingModeCodes.usr);
     }
 
     loadProgram(program: Uint8Array) : void {
@@ -181,11 +167,16 @@ class CPU implements CPUType {
      */
     reset() : void {
         this.history.reset();
-        this.generalRegisters.fill(new Array<number>(16).fill(0), 0, this.generalRegisters.length);
-        this.statusRegisters.fill(new Array<number>(2).fill(0), 0, this.generalRegisters.length);
+        this.currentGeneralRegisters.fill(0);
+        this.currentStatusRegisters.fill(0);
+        for (let i = 0; i < this.generalRegisters.length; i++) {
+            this.generalRegisters[i].fill(0);
+        }
+        this.statusRegisters[0].fill(0);
+        this.statusRegisters[1].fill(0);
         this.operatingState = 'ARM';
         this.bigEndian = false;
-        this.setModeBits(OperatingModeCodes.sys);
+        this.setModeBits(OperatingModeCodes.usr);
         this.setStatusRegisterFlag('t', 0);
 
         if (this.bootBIOS) {
@@ -235,7 +226,7 @@ class CPU implements CPUType {
     }
 
     setStatusRegisterFlag(flag: StatusRegisterKey, value: number) : void {
-        let cpsr = this.getStatusRegister('CPSR');
+        let cpsr = this.currentStatusRegisters[0];
         const mask = 1 << cpsrBitOffsetMapping[flag];
 
         if (value === 0) {
@@ -248,26 +239,69 @@ class CPU implements CPUType {
             this.operatingState = value === 0 ? 'ARM' : 'THUMB';
         }
 
-        this.statusRegisters[0][0] = cpsr;
+        this.currentStatusRegisters[0] = cpsr;
     }
 
     setModeBits(value: number) : void {
-        const modeEncoding = Object.entries(OperatingModeCodes).find(([k, v]) => v == value);
-        if (modeEncoding) {
-            this.statusRegisters[0][0] &= ~0x1F;
-            this.statusRegisters[0][0] |= value;
-            this.operatingMode = modeEncoding[0] as OperatingMode;
-        } else {
-            throw Error(`Invalid mode bits ${value.toString(2)}`);
-        }
+        const previousMode = this.currentStatusRegisters[0] & 0x1F;
+        this.currentStatusRegisters[0] &= ~0x1F;
+        this.currentStatusRegisters[0] |= value;
+        this.operatingMode = OperatingModeCodeToIndex[value & 0xF];
+        this.updateCurrentRegisters(OperatingModeCodeToIndex[previousMode & 0xF], OperatingModeCodeToIndex[value & 0xF]);
     }
 
     spsrToCPSR() : void {
-        if (this.operatingMode === 'usr' || this.operatingMode === 'sys') {
+        if (this.operatingMode === OperatingModes.usr || this.operatingMode === OperatingModes.sys) {
             // No SPSR in User or System mode, so nothing to copy.
         } else {
-            const operatingModeIndex = OperatingModeNames.indexOf(this.operatingMode);
-            this.statusRegisters[0][0] = this.statusRegisters[operatingModeIndex][1];
+            this.currentStatusRegisters[0] = this.currentStatusRegisters[1];
+        }
+    }
+
+    /**
+     * When a mode switch occurs, the current general and status registers are
+     * updated to those corresponding to the new mode.
+     * 
+     * General registers R0-R7 are all un-banked, so they are shared between all
+     * operating modes. Un-banked register values are stored in the user mode
+     * (index 0) general register during swaps. The remaining general registers
+     * can be banked, meaning they can be saved and loaded in on mode switches.
+     */
+    updateCurrentRegisters(previousMode: number, newMode: number) : void {
+        // R8 - R12 are banked only for FIQ mode.
+        if (previousMode === OperatingModes.fiq) {
+            for (let register = 8; register <= 12; register++) {
+                this.generalRegisters[previousMode][register] = this.currentGeneralRegisters[register];
+                this.currentGeneralRegisters[register] = this.generalRegisters[0][register];
+            }
+        } else if (newMode === OperatingModes.fiq) {
+            for (let register = 8; register <= 12; register++) {
+                this.generalRegisters[0][register] = this.currentGeneralRegisters[register];
+                this.currentGeneralRegisters[register] = this.generalRegisters[newMode][register];
+            }
+        }
+
+        // R13 - R14 are banked for modes SVC, ABT, UND, IRQ, and FIQ.
+        if (previousMode >= OperatingModes.fiq && previousMode <= OperatingModes.und) {
+            this.generalRegisters[previousMode][13] = this.currentGeneralRegisters[13];
+            this.generalRegisters[previousMode][14] = this.currentGeneralRegisters[14];
+
+            // System mode (index 6) is banked with user mode (index 0). All other modes are
+            // individual, so the new mode can be used directly.
+            const newModeIndex = newMode === 6 ? 0 : newMode;
+            this.currentGeneralRegisters[13] = this.generalRegisters[newModeIndex][13];
+            this.currentGeneralRegisters[14] = this.generalRegisters[newModeIndex][14];
+        } else if (newMode >= OperatingModes.fiq && newMode <= OperatingModes.und) {
+            this.generalRegisters[0][13] = this.currentGeneralRegisters[13];
+            this.generalRegisters[0][14] = this.currentGeneralRegisters[14];
+            this.currentGeneralRegisters[13] = this.generalRegisters[newMode][13];
+            this.currentGeneralRegisters[14] = this.generalRegisters[newMode][14];
+        }
+
+        // Update SPSR registers
+        if (previousMode >= OperatingModes.fiq && previousMode <= OperatingModes.und) {
+            this.statusRegisters[previousMode][1] = this.currentStatusRegisters[1];
+            this.currentStatusRegisters[1] = this.statusRegisters[newMode][1];
         }
     }
 
@@ -279,23 +313,17 @@ class CPU implements CPUType {
      * ARM and THUMB state have this status register setup.
      */
     getStatusRegister(reg: StatusRegister): number {
-        if (reg === 'SPSR' && (this.operatingMode == 'usr' || this.operatingMode === 'sys')) {
+        if (reg === 'SPSR' && (this.operatingMode == OperatingModes.usr || this.operatingMode === OperatingModes.sys)) {
             throw Error(`Cannot access SPSR in operating mode ${this.operatingMode}.`);
         }
-        const operatingModeIndex = OperatingModeNames.indexOf(this.operatingMode);
         switch (reg) {
-            case 'CPSR': return this.statusRegisters[0][0];
-            case 'SPSR': return this.statusRegisters[operatingModeIndex][1];
+            case 'CPSR': return this.currentStatusRegisters[0];
+            case 'SPSR': return this.currentStatusRegisters[1];
         }
     }
 
     setGeneralRegister(reg: number, value: number): void {
-        const operatingModeIndex = OperatingModeNames.indexOf(this.operatingMode);
-        if (BankedRegisters[this.operatingState][operatingModeIndex].includes(reg)) {
-            this.generalRegisters[operatingModeIndex][reg] = value;
-        } else {
-            this.generalRegisters[0][reg] = value;
-        }
+        this.currentGeneralRegisters[reg] = value;
     }
 
     setStatusRegister(reg: StatusRegister, value: number): void {
@@ -307,36 +335,30 @@ class CPU implements CPUType {
                 const tFlag = (value >>> cpsrBitOffsetMapping['t']) & 0x1;
                 this.setStatusRegisterFlag('t', tFlag);
 
-                this.statusRegisters[0][0] = value;
+                this.currentStatusRegisters[0] = value;
                 break;
             };
             case 'SPSR': {
-                const operatingModeIndex = OperatingModeNames.indexOf(this.operatingMode);
                 if (this.currentModeHasSPSR()) {
-                    this.statusRegisters[operatingModeIndex][1] = value;
+                    this.currentStatusRegisters[1] = value;
                     break;
                 } else {
-                    throw Error(`Cannot set ${reg} in mode ${OperatingModeNames[operatingModeIndex]}.`);
+                    throw Error(`Cannot set ${reg} in mode ${OperatingModeNames[this.operatingMode]}.`);
                 }
             };
         }
     }
 
-    setGeneralRegisterByMode(reg: number, value: number, mode: OperatingMode) : void {
-        this.generalRegisters[OperatingModeNames.indexOf(mode)][reg] = value;
-    }
-
     getGeneralRegister(reg: number): number {
-        const operatingModeIndex = OperatingModeNames.indexOf(this.operatingMode);
-        if (BankedRegisters[this.operatingState][operatingModeIndex].includes(reg)) {
-            return this.generalRegisters[operatingModeIndex][reg];
-        } else {
-            return this.generalRegisters[0][reg];
-        }
+        return this.currentGeneralRegisters[reg];
     }
 
-    getGeneralRegisterByMode(reg: number, mode: OperatingMode) : number {
-        return this.generalRegisters[OperatingModeNames.indexOf(mode)][reg];
+    getGeneralRegisterByMode(reg: number, mode: number) : number {
+        if (this.operatingMode === mode || reg <= 7 || reg === 15) {
+            return this.currentGeneralRegisters[reg];
+        } else {
+            return this.generalRegisters[mode][reg];
+        }
     }
 
     getStateSummary() : {[key: string] : string | number | number[]} {
@@ -392,17 +414,17 @@ class CPU implements CPUType {
     }
 
     inAPrivilegedMode() : boolean {
-        return this.operatingMode !== 'usr';
+        return this.operatingMode !== OperatingModes.usr;
     }
 
     currentModeHasSPSR() : boolean {
         return (
-            this.operatingMode !== 'usr' &&
-            this.operatingMode !== 'sys'
+            this.operatingMode !== OperatingModes.usr &&
+            this.operatingMode !== OperatingModes.sys
         );
     }
 
 }
 
-export { CPU, OperatingModeCodes, Reg, statusRegisterFlags, cpsrBitOffsetMapping, OperatingModeNames }
-export type { CPUType, StatusRegisterUpdate, OperatingMode, OperatingState, StatusRegisterKey }
+export { CPU, OperatingModeCodes, OperatingModes, Reg, statusRegisterFlags, cpsrBitOffsetMapping, OperatingModeNames }
+export type { CPUType, StatusRegisterUpdate, OperatingState, StatusRegisterKey }

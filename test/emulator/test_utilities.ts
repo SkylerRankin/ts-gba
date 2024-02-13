@@ -1,14 +1,13 @@
 import { readFileSync, writeFileSync } from "fs";
-import { CPU, OperatingModeCodes, OperatingModeNames, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../src/emulator/cpu";
+import { CPU, OperatingModeCodes, OperatingModeNames, OperatingModes, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../src/emulator/cpu";
 import { parseNumericLiteral } from "../../src/emulator/math";
 import { getLoadStoreAddress, getLoadStoreMultipleAddress } from "../../src/emulator/armInstructionProcessors";
 import { Memory } from "../../src/emulator/memory";
 import { Display, DisplaySize, RGBColor } from "../../src/emulator/display";
 import { byteArrayToBitmap } from "../../src/emulator/image";
-import { GBA } from "../../src/emulator/gba";
 
 const parseInstructionFileUpdateString = (text: string) => {
-    const registerUpdates: { [key: number]: number; } = {};
+    const registerUpdates: { [key: string]: number } = {};
     const cpsrUpdates: { [key: string]: number; } = {};
     const spsrUpdates: { [key: string]: number; } = {};
     text.split(",")
@@ -17,9 +16,8 @@ const parseInstructionFileUpdateString = (text: string) => {
         .forEach(i => {
             const equalsIndex = i.indexOf("=");
             if (i.startsWith("r")) {
-                const register = Number.parseInt(i.substring(1, equalsIndex));
-                expect(register >= 0 && register <= 15).toBeTruthy();
-                const value = Number.parseInt(i.substring(equalsIndex + 1)) >>> 0;
+                const register = "R" + i.substring(1, equalsIndex);
+                const value = parseNumericLiteral(i.substring(equalsIndex + 1)) >>> 0;
                 registerUpdates[register] = value;
             } else {
                 let flag = i.substring(0, equalsIndex);
@@ -114,7 +112,7 @@ const getTestCases = (filePath: string) => {
 
             const spaceIndex = line.indexOf(" ");
             const instruction = Number.parseInt(line.substring(0, spaceIndex)) >>> 0;
-            let registerUpdates: { [key: number]: number; } = {};
+            let registerUpdates: { [key: string]: number } = {};
             let cpsrUpdates: { [key: string]: number; } = {};
             let spsrUpdates: { [key: string]: number; } = {};
 
@@ -154,6 +152,57 @@ const mockGetBytesFromMemory = (address: number, bytes: number, testMemory: Uint
     return result;
 }
 
+/**
+ * Creates a map of register names to values, collecting banked registers into a single entry.
+ */
+const getRegisterSet = (cpu: CPU) => {
+    const registers: {[key: string]: number} = {};
+
+    // Registers 0-7 and 15 are fully banked and stored permanently in the current general register list.
+    for (let i = 0; i <= 7; i++) {
+        registers[`R${i}`] = cpu.currentGeneralRegisters[i];
+    }
+    registers['R15'] = cpu.currentGeneralRegisters[15];
+
+    // Registers 8-12 are banked for all modes besides FIQ
+    if (cpu.operatingMode === OperatingModes.fiq) {
+        for (let i = 8; i <= 12; i++) {
+            registers[`R${i}_fiq`] = cpu.currentGeneralRegisters[i];
+            registers[`R${i}`] = cpu.generalRegisters[0][i];
+        }
+    } else {
+        for (let i = 8; i <= 12; i++) {
+            registers[`R${i}_fiq`] = cpu.generalRegisters[OperatingModes.fiq][i];
+            registers[`R${i}`] = cpu.currentGeneralRegisters[i];
+        }
+    }
+
+    [OperatingModes.svc, OperatingModes.abt, OperatingModes.und, OperatingModes.irq, OperatingModes.fiq].forEach(mode => {
+        if (cpu.operatingMode === mode) {
+            for (let i = 13; i <= 14; i++) {
+                registers[`R${i}_${OperatingModeNames[mode]}`] = cpu.currentGeneralRegisters[i];
+            }
+        } else {
+            for (let i = 13; i <= 14; i++) {
+                registers[`R${i}_${OperatingModeNames[mode]}`] = cpu.generalRegisters[mode][i];
+            }
+        }
+    });
+
+    if (cpu.operatingMode === OperatingModes.usr || cpu.operatingMode === OperatingModes.sys) {
+        for (let i = 13; i <= 14; i++) {
+            registers[`R${i}`] = cpu.currentGeneralRegisters[i];
+        }
+    } else {
+        for (let i = 13; i <= 14; i++) {
+            registers[`R${i}`] = cpu.generalRegisters[0][i];
+        }
+    }
+
+    Object.keys(registers).forEach(k => registers[k] = registers[k] >>> 0);
+    return registers;
+}
+
 const executeInstructionTestFile = (filePath: string, processingFunction: any) => {
     const memory = new Memory();
     const cpu = new CPU(memory);
@@ -170,7 +219,8 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
         if (!t.instruction) {
             // Manual register updates
             Object.entries(t.registerUpdates).forEach(([register, value]) => {
-                cpu.setGeneralRegister(Number.parseInt(register), value);
+                const reg = Number.parseInt(register.substring(1, register.includes("_") ? register.indexOf("_") : register.length));
+                cpu.setGeneralRegister(reg, value);
             });
 
             // Manual CPSR updates
@@ -218,7 +268,7 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
             return;
         }
 
-        const previousRegisters = cpu.generalRegisters[0].map(v => v >>> 0);
+        const previousRegisters = getRegisterSet(cpu);
         const previousCPSRFlags = statusRegisterFlags.map(f => cpu.getStatusRegisterFlag('CPSR', f));
         const previousCPSRMode = cpu.getStatusRegister('CPSR') & 0x1F;
         const previousSPSRFlags = cpu.currentModeHasSPSR() ? statusRegisterFlags.map(f => cpu.getStatusRegisterFlag('SPSR', f)) : null;
@@ -226,7 +276,7 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
 
         processingFunction(cpu, t.instruction);
 
-        const updatedRegisters = cpu.generalRegisters[0].map(v => v >>> 0);
+        const updatedRegisters = getRegisterSet(cpu);
         const updatedCPSRFlags = statusRegisterFlags.map(f => cpu.getStatusRegisterFlag('CPSR', f));
         const updatedCPSRMode = cpu.getStatusRegister('CPSR') & 0x1F;
         const updatedSPSRFlags = cpu.currentModeHasSPSR() ? statusRegisterFlags.map(f => cpu.getStatusRegisterFlag('SPSR', f)) : null;
@@ -234,20 +284,21 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
 
         const messagePrefix = `Line ${t.lineNumber}: 0x${t.instruction.toString(16)}:`;
 
-        // Check registers
-        for (let i = 0; i < 16; i++) {
-            if (i in t.registerUpdates) {
+        // Check mode specific registers
+        Object.keys(previousRegisters).forEach(registerKey => {
+            if (registerKey in t.registerUpdates) {
                 expect(
-                    updatedRegisters[i],
-                    `${messagePrefix} Expected R${i} to be updated to 0x${(t.registerUpdates[i] >>> 0).toString(16)}, but was 0x${updatedRegisters[i].toString(16)}.`
-                ).toBe(t.registerUpdates[i]);
+                    updatedRegisters[registerKey],
+                    `${messagePrefix} Expected ${registerKey} to be updated to 0x${(t.registerUpdates[registerKey] >>> 0).toString(16)}, but was 0x${updatedRegisters[registerKey].toString(16)}.`
+                ).toBe(t.registerUpdates[registerKey]);
             } else {
+                // No update specified for this register
                 expect(
-                    updatedRegisters[i],
-                    `${messagePrefix} Expected R${i} to be unchanged with value 0x${(previousRegisters[i] >>> 0).toString(16)}, but was 0x${updatedRegisters[i].toString(16)}.`
-                ).toBe(previousRegisters[i]);
+                    updatedRegisters[registerKey],
+                    `${messagePrefix} Expected ${registerKey} to be unchanged with value 0x${(previousRegisters[registerKey] >>> 0).toString(16)}, but was 0x${updatedRegisters[registerKey].toString(16)}.`
+                ).toBe(previousRegisters[registerKey]);
             }
-        }
+        });
 
         // Check CPSR flags
         statusRegisterFlags.forEach((flag, i) => {
@@ -324,7 +375,7 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
 // Manually setting bits in the SPSR is not normally done, but is useful for setting up unit tests.
 // Thus this function is not a part of the CPU class.
 const setSPSRFlag = (cpu: CPU, flag: StatusRegisterKey, value: number) => {
-    if (cpu.operatingMode == 'usr' || cpu.operatingMode === 'sys') {
+    if (cpu.operatingMode == OperatingModes.usr || cpu.operatingMode === OperatingModes.sys) {
         throw Error(`Cannot access SPSR in operating mode ${cpu.operatingMode}.`);
     }
 
@@ -337,19 +388,17 @@ const setSPSRFlag = (cpu: CPU, flag: StatusRegisterKey, value: number) => {
         spsr |= mask;
     }
 
-    const operatingModeIndex = OperatingModeNames.indexOf(cpu.operatingMode);
-    cpu.statusRegisters[operatingModeIndex][1] = spsr;
+    cpu.currentStatusRegisters[1] = spsr;
 }
 
 const setSPSRMode = (cpu: CPU, value: number) => {
-    if (cpu.operatingMode == 'usr' || cpu.operatingMode === 'sys') {
+    if (cpu.operatingMode == OperatingModes.usr || cpu.operatingMode === OperatingModes.sys) {
         throw Error(`Cannot access SPSR in operating mode ${cpu.operatingMode}.`);
     }
 
     if (Object.values(OperatingModeCodes).includes(value)) {
-        const operatingModeIndex = OperatingModeNames.indexOf(cpu.operatingMode);
-        cpu.statusRegisters[operatingModeIndex][1] &= ~0x1F;
-        cpu.statusRegisters[operatingModeIndex][1] |= value;
+        cpu.currentStatusRegisters[1] &= ~0x1F;
+        cpu.currentStatusRegisters[1] |= value;
     } else {
         throw Error(`Invalid mode bits ${value.toString(2)}`);
     }

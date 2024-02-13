@@ -1,10 +1,10 @@
 // import { writeFileSync } from 'fs';
-import { OperatingState, CPU, Reg, OperatingMode } from './cpu';
+import { OperatingState, CPU, Reg } from './cpu';
 import { byteArrayToInt32 } from './math';
 
 type HistoryLog = {
     operatingState: OperatingState,
-    operatingMode: OperatingMode,
+    operatingMode: number,
     instructionName: string,
     instruction: number,
     conditionMet: boolean,
@@ -15,7 +15,7 @@ type HistoryLog = {
 
 const emptyHistoryLog: HistoryLog = {
     operatingState: 'ARM',
-    operatingMode: 'und',
+    operatingMode: 0,
     instructionName: '',
     instruction: 0,
     conditionMet: false,

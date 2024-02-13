@@ -1,4 +1,4 @@
-import { CPU, Reg } from './cpu';
+import { CPU, OperatingModes, Reg } from './cpu';
 import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray, halfWordAlignAddress } from './math';
 
 type ProcessedInstructionOptions = {
@@ -1012,7 +1012,11 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             for (let i = 0; i <= 14; i++) {
                 if (((regList >>> i) & 0x1) === 1) {
                     const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
-                    cpu.setGeneralRegisterByMode(i, riValue, 'usr');
+                    if (cpu.operatingMode === OperatingModes.usr || i <= 7) {
+                        cpu.setGeneralRegister(i, riValue);
+                    } else {
+                        cpu.generalRegisters[OperatingModes.usr][i] = riValue;
+                    }
                     address += 4;
                 }
             }
@@ -1021,7 +1025,11 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             for (let i = 0; i <= 14; i++) {
                 if (((regList >>> i) & 0x1) === 1) {
                     const riValue = byteArrayToInt32(cpu.getBytesFromMemory(address, 4), cpu.bigEndian);
-                    cpu.setGeneralRegisterByMode(i, riValue, 'usr');
+                    if (cpu.operatingMode === OperatingModes.usr || i <= 7) {
+                        cpu.setGeneralRegister(i, riValue);
+                    } else {
+                        cpu.generalRegisters[OperatingModes.usr][i] = riValue;
+                    }
                     address += 4;
                 }
             }
@@ -1053,7 +1061,7 @@ const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
         if (((regList >> i) & 0x1) === 1) {
             const riValue = type === 1 ?
                 cpu.getGeneralRegister(i) :
-                cpu.getGeneralRegisterByMode(i, 'usr');
+                cpu.getGeneralRegisterByMode(i, OperatingModes.usr);
             const bytes = int32ToByteArray(riValue, cpu.bigEndian);
             cpu.setBytesInMemory(address, bytes);
             address += 4;
