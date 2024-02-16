@@ -105,6 +105,7 @@ class CPU implements CPUType {
     bigEndian = false;
     bootBIOS = true;
     historyEnabled = false;
+    instructionSize = 4;
 
     constructor(memory: Memory) {
         this.memory = memory;
@@ -129,36 +130,20 @@ class CPU implements CPUType {
     }
 
     step() : void {
-        if (this.historyEnabled) {
-            this.history.startLog();
-            this.history.logCPU(this);
-        }
-
         const pc = this.getGeneralRegister(Reg.PC);
-        const instructionSize = this.operatingState === 'ARM' ? 4 : 2;
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
-        const instruction = byteArrayToInt32(this.memory.getBytes(pc - (instructionSize * 2), instructionSize), this.bigEndian);
+        const instruction = byteArrayToInt32(this.memory.getBytes(pc - (this.instructionSize * 2), this.instructionSize), this.bigEndian);
         const condition = instruction >>> 28;
         let options: ProcessedInstructionOptions | undefined;
 
         if (this.operatingState === 'ARM' && this.conditionIsMet(condition)) {
-            this.history.currentLog.conditionMet = true;
-            this.profiler.startInstructionExecution();
             options = processARM(this, instruction);
-            this.profiler.endInstructionExecution();
         } else if (this.operatingState === 'THUMB') {
-            this.history.currentLog.conditionMet = true;
-            this.profiler.startInstructionExecution();
             options = processTHUMB(this, instruction);
-            this.profiler.endInstructionExecution();
         }
 
         if (!options || options.incrementPC) {
-            this.setGeneralRegister(Reg.PC, pc + instructionSize);
-        }
-
-        if (this.historyEnabled) {
-            this.history.endLog();
+            this.setGeneralRegister(Reg.PC, pc + this.instructionSize);
         }
     }
 
@@ -175,6 +160,7 @@ class CPU implements CPUType {
         this.statusRegisters[0].fill(0);
         this.statusRegisters[1].fill(0);
         this.operatingState = 'ARM';
+        this.instructionSize = 4;
         this.bigEndian = false;
         this.setModeBits(OperatingModeCodes.usr);
         this.setStatusRegisterFlag('t', 0);
@@ -237,6 +223,7 @@ class CPU implements CPUType {
 
         if (flag === 't') {
             this.operatingState = value === 0 ? 'ARM' : 'THUMB';
+            this.instructionSize = this.operatingState === 'ARM' ? 4 : 2;
         }
 
         this.currentStatusRegisters[0] = cpsr;

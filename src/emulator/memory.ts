@@ -1,4 +1,5 @@
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'BG_OBJ' | 'VRAM' | 'OAM' | 'ROM' | 'UNUSED';
+const segmentsByIndex: MemorySegment[] = ['BIOS', 'WRAM_O', 'WRAM_I', 'IO', 'BG_OBJ', 'VRAM', 'OAM', 'ROM', 'UNUSED'];
 const segments: {[key in MemorySegment]: {[key in 'start' | 'end']: number}} = {
     'BIOS':     { start: 0x00000000, end: 0x00003FFF },
     'WRAM_O':   { start: 0x02000000, end: 0x0203FFFF },
@@ -42,15 +43,13 @@ class Memory implements MemoryType {
         this.memoryBlocks.BIOS.fill(0);
     }
 
+    /**
+     * Use bits 28-24 to determine the segment for a given address. This fails to consider accesses that are out
+     * of the actual bounds of the segment.
+     */
     getSegment = (address: number): MemorySegment => {
-        let segment: MemorySegment = 'UNUSED';
-        (Object.keys(segments) as MemorySegment[]).forEach((s: MemorySegment) => {
-            if (segments[s].start <= address &&
-                segments[s].end > address) {
-                segment = s;
-            }
-        });
-        return segment;
+        const segmentIndex = Math.max((address >> 24) - 1, 0);
+        return segmentsByIndex[segmentIndex];
     }
 
     getBytes = (address: number, bytes: number): Uint8Array => {
