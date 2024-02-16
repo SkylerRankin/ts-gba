@@ -73,8 +73,7 @@ const assertCurrentDisplayValue = (gba: GBA, expectedFramePath: string) => {
 describe("Test ROM output display checks", () => {
     romFrameTests.forEach(config => {
         test(config.name, () => {
-            const gba = new GBA();
-            gba.display = new FileDisplay();
+            const gba = new GBA(new FileDisplay());
             gba.ppu.display = gba.display;
             gba.cpu.bootBIOS = false;
             gba.reset();

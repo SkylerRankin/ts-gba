@@ -22,10 +22,10 @@ class GBA implements GBAType {
     ppu: PPU;
     nextFrameTimer: number = 0;
 
-    constructor() {
+    constructor(display: Display = new CanvasDisplay()) {
         this.memory = new Memory();
         this.cpu = new CPU(this.memory);
-        this.display = new CanvasDisplay();
+        this.display = display;
         this.ppu = new PPU(this.memory, this.display);
     }
 
@@ -51,8 +51,7 @@ class GBA implements GBAType {
                 break;
             }
         }
-        console.log(`Frame time: ${performance.now() - frameStart} ms`);
-        console.log(`Cycles: ${this.cycles - cyclesStart}`);
+        console.log(`Frame time: ${performance.now() - frameStart} ms, cycles = ${this.cycles - cyclesStart}`);
 
         if (this.status === 'running') {
             // Doesn't seem to work in a node environment

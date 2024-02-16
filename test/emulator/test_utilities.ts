@@ -497,6 +497,8 @@ class FileDisplay implements Display {
         buffer[y * DisplaySize.width + x][2] = color.blue;
     }
 
+    drawFrame() {}
+
     saveToFile() : string {
         const buffer = this.buffers[this.currentFrame];
         const bitmap = byteArrayToBitmap(buffer, DisplaySize.width, DisplaySize.height);

@@ -149,6 +149,7 @@ class PPU implements PPUType {
                     this.displayState = 'vBlank';
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
                     this.vBlankAck = true;
+                    this.display.drawFrame();
                 }
                 break;
             case 'vBlank':
