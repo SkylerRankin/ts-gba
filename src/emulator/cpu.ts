@@ -132,11 +132,13 @@ class CPU implements CPUType {
     step() : void {
         const pc = this.getGeneralRegister(Reg.PC);
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
-        const instruction = byteArrayToInt32(this.memory.getBytes(pc - (this.instructionSize * 2), this.instructionSize), this.bigEndian);
-        const condition = instruction >>> 28;
+        const instruction = this.operatingState === 'ARM' ?
+            this.memory.getInt32(pc - 8) :
+            this.memory.getInt16(pc - 4);
+
         let options: ProcessedInstructionOptions | undefined;
 
-        if (this.operatingState === 'ARM' && this.conditionIsMet(condition)) {
+        if (this.operatingState === 'ARM' && this.conditionIsMet(instruction >>> 28)) {
             options = processARM(this, instruction);
         } else if (this.operatingState === 'THUMB') {
             options = processTHUMB(this, instruction);

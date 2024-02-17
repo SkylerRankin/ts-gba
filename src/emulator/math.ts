@@ -146,7 +146,7 @@ const toBigEndianInt16 = (n: number): number => {
 }
 
 const isNegative32 = (n: number): boolean => {
-    return ((n >>> 31) & 0x1) === 1;
+    return (n & 0x80000000) !== 0;
 }
 
 const isNegative = (n: number, bits: number): boolean => {

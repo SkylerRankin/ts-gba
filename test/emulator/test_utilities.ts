@@ -129,29 +129,6 @@ const getTestCases = (filePath: string) => {
         });
 }
 
-const mockSetBytesInMemory = (address: number, bytes: Uint8Array, testMemory: Uint8Array) => {
-    if (address >= 1000) {
-        throw Error(`Address outside bounds of test memory (0-999): ${address}.`);
-    }
-
-    for (let i = 0; i < bytes.length; i++) {
-        testMemory[address + i] = bytes[i];
-    }
-}
-
-const mockGetBytesFromMemory = (address: number, bytes: number, testMemory: Uint8Array) => {
-    if (address >= 1000) {
-        throw Error(`Address outside bounds of test memory (0-999): ${address}.`);
-    }
-
-    const result = new Uint8Array(bytes);
-    for (let i = 0; i < bytes; i++) {
-        result[i] = testMemory[address + i];
-    }
-
-    return result;
-}
-
 /**
  * Creates a map of register names to values, collecting banked registers into a single entry.
  */
@@ -209,11 +186,6 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
     cpu.bigEndian = false;
     cpu.reset();
 
-    const testMemory = new Uint8Array(1000);
-
-    jest.spyOn(cpu, "setBytesInMemory").mockImplementation((address, bytes) => mockSetBytesInMemory(address, bytes, testMemory));
-    jest.spyOn(cpu, "getBytesFromMemory").mockImplementation((address, bytes) => mockGetBytesFromMemory(address, bytes, testMemory));
-    
     const test_cases = getTestCases(filePath);
     test_cases.forEach(t => {
         if (!t.instruction) {
@@ -257,9 +229,10 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
                 Object.entries(t.memoryUpdates).forEach(([address, bytes]) => {
                     for (let i = 0; i < bytes.length; i++) {
                         const byteAddress = Number.parseInt(address) + i;
+                        const actualValue = cpu.memory.getInt8(byteAddress);
                         expect(
-                            testMemory[byteAddress],
-                            `Line ${t.lineNumber}: Expected byte at address 0x${byteAddress.toString(16)} to be 0x${bytes[i].toString(16)}, but got 0x${testMemory[byteAddress].toString(16)}.`
+                            actualValue,
+                            `Line ${t.lineNumber}: Expected byte at address 0x${byteAddress.toString(16)} to be 0x${bytes[i].toString(16)}, but got 0x${actualValue.toString(16)}.`
                         ).toBe(bytes[i]);
                     }
                 });

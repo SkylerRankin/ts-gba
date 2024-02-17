@@ -851,8 +851,7 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + (imm * 4);
-            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
             break;
         }
         case 2: {
@@ -860,8 +859,7 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
             break;
         }
         case 3: {
@@ -869,8 +867,7 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const imm = i & 0xFF;
             const pc = cpu.getGeneralRegister(Reg.PC);
             const address = (((pc >> 2)) << 2) + (imm * 4);
-            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
             break;
         }
         case 4: {
@@ -878,8 +875,7 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             const imm = i & 0xFF;
             const sp = cpu.getGeneralRegister(Reg.SP);
             const address = sp + (imm * 4);
-            const data = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
         }
     }
 
@@ -895,8 +891,7 @@ const processLDRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + imm;
-            const data = cpu.getBytesFromMemory(address, 1);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt8(address));
             break;
         }
         case 2: {
@@ -904,8 +899,7 @@ const processLDRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            const data = cpu.getBytesFromMemory(address, 1);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt8(address));
             break;
         }
     }
@@ -922,8 +916,7 @@ const processLDRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + (imm * 2);
-            const data = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt16(halfWordAlignAddress(address)));
             break;
         }
         case 2: {
@@ -931,8 +924,7 @@ const processLDRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
             const rn = (i >>> 3) & 0x7;
             const rd = i & 0x7;
             const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-            const data = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
-            cpu.setGeneralRegister(rd, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(rd, cpu.memory.getInt16(halfWordAlignAddress(address)));
             break;
         }
     }
@@ -947,8 +939,7 @@ const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rn = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-    const data = cpu.getBytesFromMemory(address, 1);
-    cpu.setGeneralRegister(rd, signExtend(data[0], 8));
+    cpu.setGeneralRegister(rd, signExtend(cpu.memory.getInt8(address), 8));
 
     return { incrementPC: true };
 }
@@ -960,8 +951,8 @@ const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rn = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-    const data = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
-    cpu.setGeneralRegister(rd, signExtend(byteArrayToInt32(data, cpu.bigEndian), 16));
+    cpu.setGeneralRegister(rd, signExtend(cpu.memory.getInt16(halfWordAlignAddress(address)), 16));
+
     return { incrementPC: true };
 }
 
@@ -1067,8 +1058,7 @@ const processLDMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     let address = wordAlignAddress(startAddress);
     for (let reg = 0; reg <= 7; reg++) {
         if (((regList >>> reg) & 0x1) === 1) {
-            let data = cpu.getBytesFromMemory(address, 4);
-            cpu.setGeneralRegister(reg, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(reg, cpu.memory.getInt32(address));
             address += 4;
         }
     }
@@ -1095,16 +1085,13 @@ const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
     for (let i = 0; i <= 7; i++) {
         if (((regList >>> i) & 0x1) === 1) {
-            const data = cpu.getBytesFromMemory(address, 4);
-            cpu.setGeneralRegister(i, byteArrayToInt32(data, cpu.bigEndian));
+            cpu.setGeneralRegister(i, cpu.memory.getInt32(address));
             address += 4;
         }
     }
 
     if (r === 1) {
-        const value = cpu.getBytesFromMemory(address, 4);
-        const newPC = byteArrayToInt32(value, cpu.bigEndian) & 0xFFFFFFFE;
-        cpu.setGeneralRegister(Reg.PC, newPC);
+        cpu.setGeneralRegister(Reg.PC, cpu.memory.getInt32(address) & 0xFFFFFFFE);
         address += 4;
     }
 

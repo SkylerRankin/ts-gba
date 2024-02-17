@@ -1,6 +1,6 @@
 import {
     encodeWithRotation, rotateRight, rotateLeft, signExtend,
-    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom, twosComplementNegation, int16ToByteArray, int8ToByteArray } from '../../src/emulator/math';
+    byteArrayToInt32, int32ToByteArray, toBigEndianInt32, toBigEndianInt16, logicalShiftLeft, borrowFrom, twosComplementNegation, int16ToByteArray, int8ToByteArray, isNegative32 } from '../../src/emulator/math';
 
 test('logicalShiftLeft', () => {
     expect(logicalShiftLeft(2, 0)).toStrictEqual([2, 0]);
@@ -104,4 +104,12 @@ test('twosComplementNegation', () => {
     expect(twosComplementNegation(0xFFFFFFFF)).toBe(1);
     expect(twosComplementNegation(0xA03)).toBe(0xFFFFF5FD);
     expect(twosComplementNegation(0xFFFFF5FD)).toBe(0xA03);
+});
+
+test('isNegative32', () => {
+    expect(isNegative32(0x0)).toBeFalsy();
+    expect(isNegative32(0xFF)).toBeFalsy();
+    expect(isNegative32(0x7FFFFFFF)).toBeFalsy();
+    expect(isNegative32(0x8013FFFF)).toBeTruthy();
+    expect(isNegative32(0xFFFFFFFF)).toBeTruthy();
 });

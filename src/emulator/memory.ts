@@ -17,6 +17,9 @@ interface MemoryType {
     reset: () => void
     getSegment: (address: number) => MemorySegment
     getBytes: (address: number, bytes: number) => Uint8Array
+    getInt8: (address: number) => number
+    getInt16: (address: number) => number
+    getInt32: (address: number) => number
     setBytes: (address: number, data: Uint8Array) => void
     loadROM: (rom: Uint8Array) => void
 };
@@ -55,10 +58,41 @@ class Memory implements MemoryType {
     getBytes = (address: number, bytes: number): Uint8Array => {
         const segment = this.getSegment(address);
         address = address - segments[segment].start;
+
         const result = new Uint8Array(bytes);
         for (let i = 0; i < bytes; i++) {
             result[i] = this.memoryBlocks[segment][address + i];
         }
+        return result;
+    }
+
+    getInt32 = (address: number): number => {
+        const segment = this.getSegment(address);
+        address = address - segments[segment].start;
+
+        let result = 0;
+        result |= this.memoryBlocks[segment][address + 0] << (0 * 8);
+        result |= this.memoryBlocks[segment][address + 1] << (1 * 8);
+        result |= this.memoryBlocks[segment][address + 2] << (2 * 8);
+        result |= this.memoryBlocks[segment][address + 3] << (3 * 8);
+        return result;
+    }
+
+    getInt16 = (address: number): number => {
+        const segment = this.getSegment(address);
+        address = address - segments[segment].start;
+        let result = 0;
+
+        result |= this.memoryBlocks[segment][address + 0] << (0 * 8);
+        result |= this.memoryBlocks[segment][address + 1] << (1 * 8);
+
+        return result;
+    }
+
+    getInt8 = (address: number): number => {
+        const segment = this.getSegment(address);
+        address = address - segments[segment].start;
+        let result = this.memoryBlocks[segment][address];
         return result;
     }
 
