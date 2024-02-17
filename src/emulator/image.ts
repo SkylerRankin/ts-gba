@@ -46,9 +46,9 @@ const byteArrayToBitmap = (colorData: number[][], width: number, height: number)
 
     for (let y = height - 1; y >= 0; y--) {
         for (let x = 0; x < width; x++) {
-            bmp[i++] = colorData[y * width + x][0];
-            bmp[i++] = colorData[y * width + x][1];
             bmp[i++] = colorData[y * width + x][2];
+            bmp[i++] = colorData[y * width + x][1];
+            bmp[i++] = colorData[y * width + x][0];
         }
         for (let x = 0; x < rowPaddingBytes; x++) {
             bmp[i++] = 0;

@@ -258,9 +258,9 @@ class PPU implements PPUType {
     get15BitColorFromAddress(address: number) : RGBColor {
         const colorData = byteArrayToInt32(this.memory.getBytes(address, 2), false);
         return {
-            red: 255 * ((colorData >>> 10) & 0x1F) / 32,
+            red: 255 * ((colorData >>> 0) & 0x1F) / 32,
             green: 255 * ((colorData >>> 5) & 0x1F) / 32,
-            blue: 255 * ((colorData >>> 0) & 0x1F) / 32,
+            blue: 255 * ((colorData >>> 10) & 0x1F) / 32,
         };
     }
 
