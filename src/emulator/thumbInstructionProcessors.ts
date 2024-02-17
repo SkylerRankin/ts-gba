@@ -93,7 +93,9 @@ const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 // Branch Instructions
 const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`B (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     let pcUpdated = false;
     const instructionSize = 2;
@@ -134,7 +136,9 @@ const processB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptio
 }
 
 const processBL_BLX1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('BL');
+    // #REMOVE_IN_BUILD_END
 
     const instructionSize = 2;
     const h = (i >>> 11) & 0x3;
@@ -163,7 +167,9 @@ const processBL_BLX1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('BX');
+    // #REMOVE_IN_BUILD_END
 
     const instructionSize = 2;
     const h2 = (i >>> 6) & 0x1;
@@ -176,7 +182,9 @@ const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processBLX2 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('BL');
+    // #REMOVE_IN_BUILD_END
 
     const instructionSize = 2;
     const h2 = (i >>> 6) & 0x1;
@@ -194,7 +202,10 @@ const processBLX2 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 // Data Processing Instructions
 
 const processADC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('ADC');
+    // #REMOVE_IN_BUILD_END
+
     const rm = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const operand1 = cpu.getGeneralRegister(rd);
@@ -215,7 +226,10 @@ const processADC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processADD = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`ADD (${type})`);
+    // #REMOVE_IN_BUILD_END
+
     let rd;
     let op1;
     let op2;
@@ -295,7 +309,10 @@ const processADD = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processAND = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('AND');
+    // #REMOVE_IN_BUILD_END
+
     const rm = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const result = cpu.getGeneralRegister(rm) & cpu.getGeneralRegister(rd);
@@ -316,7 +333,10 @@ const processAND = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processASR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`ASR (${type})`);
+    // #REMOVE_IN_BUILD_END
+
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -368,7 +388,10 @@ const processASR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processBIC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('BIC');
+    // #REMOVE_IN_BUILD_END
+
     const rm = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const result = (cpu.getGeneralRegister(rd) & (~cpu.getGeneralRegister(rm))) & 0xFFFFFFFF;
@@ -385,7 +408,10 @@ const processBIC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processCMN = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('CMN');
+    // #REMOVE_IN_BUILD_END
+
     cpu.clearConditionCodeFlags();
     const rm = (i >>> 3) & 0x7;
     const rn = i & 0x7;
@@ -402,7 +428,10 @@ const processCMN = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processCMP = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`CMP (${type})`);
+    // #REMOVE_IN_BUILD_END
+
     cpu.clearConditionCodeFlags();
     let operand1;
     let operand2;
@@ -450,7 +479,10 @@ const processCMP = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processEOR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('EOR');
+    // #REMOVE_IN_BUILD_END
+
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -467,7 +499,10 @@ const processEOR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLSL = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LSL (${type})`);
+    // #REMOVE_IN_BUILD_END
+
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -526,7 +561,9 @@ const processLSL = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processLSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LSR (${type})`);
+    // #REMOVE_IN_BUILD_END
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -585,7 +622,9 @@ const processLSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processMOV = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`MOV (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -635,7 +674,11 @@ const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
      * signed and unsigned multiplications. Therefore this instruction works for any combination
      * of signed and unsigned inputs.
      */
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('MUL');
+    // #REMOVE_IN_BUILD_END
+
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -655,7 +698,10 @@ const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processMVN = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('MVN');
+    // #REMOVE_IN_BUILD_END
+
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     cpu.clearConditionCodeFlags();
@@ -674,7 +720,10 @@ const processMVN = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processNEG = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('NEG');
+    // #REMOVE_IN_BUILD_END
+
     cpu.clearConditionCodeFlags();
 
     const rm = (i >>> 3) & 0x7;
@@ -693,7 +742,10 @@ const processNEG = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processORR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('ORR');
+    // #REMOVE_IN_BUILD_END
+
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -712,7 +764,10 @@ const processORR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processROR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('ROR');
+    // #REMOVE_IN_BUILD_END
+
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -743,7 +798,10 @@ const processROR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSBC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('SBC');
+    // #REMOVE_IN_BUILD_END
+
     const cFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     cpu.clearConditionCodeFlags();
 
@@ -764,7 +822,9 @@ const processSBC = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSUB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`SUB (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -823,7 +883,10 @@ const processSUB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processTST = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('TST');
+    // #REMOVE_IN_BUILD_END
+
     const prevCFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
     const prevVFlag = cpu.getStatusRegisterFlag('CPSR', 'v');
     cpu.clearConditionCodeFlags();
@@ -843,7 +906,9 @@ const processTST = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 // load / Store Instructions
 
 const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LDR (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -883,7 +948,9 @@ const processLDR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processLDRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LDRB (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -908,7 +975,9 @@ const processLDRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
 }
 
 const processLDRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LDRH (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -933,7 +1002,9 @@ const processLDRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
 }
 
 const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRSB');
+    // #REMOVE_IN_BUILD_END
 
     const rm = (i >>> 6) & 0x7;
     const rn = (i >>> 3) & 0x7;
@@ -945,7 +1016,9 @@ const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRSH');
+    // #REMOVE_IN_BUILD_END
 
     const rm = (i >>> 6) & 0x7;
     const rn = (i >>> 3) & 0x7;
@@ -957,7 +1030,9 @@ const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSTR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`STR (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -993,7 +1068,9 @@ const processSTR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processSTRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`STRB (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -1020,7 +1097,9 @@ const processSTRB = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
 }
 
 const processSTRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`STRH (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     switch (type) {
         case 1: {
@@ -1049,7 +1128,9 @@ const processSTRH = (cpu: CPU, i: number, type: number) : ProcessedInstructionOp
 // Load / Store Multiple Instructions
 
 const processLDMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDMIA');
+    // #REMOVE_IN_BUILD_END
 
     const rn = (i >>> 8) & 0x7;
     const regList = i & 0xFF;
@@ -1074,7 +1155,9 @@ const processLDMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('POP');
+    // #REMOVE_IN_BUILD_END
 
     const r = (i >>> 8) & 0x1;
     const regList = i & 0xFF;
@@ -1095,6 +1178,7 @@ const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         address += 4;
     }
 
+    // TODO: remove these checks in builds
     if (endAddress !== address) {
         throw Error(`End address ${asHex(address)} != expected end address ${asHex(endAddress)}.`);
     }
@@ -1105,7 +1189,9 @@ const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processPUSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('PUSH');
+    // #REMOVE_IN_BUILD_END
 
     const r = (i >>> 8) & 0x1;
     const regList = i & 0xFF;
@@ -1138,7 +1224,9 @@ const processPUSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSTMIA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('STMIA');
+    // #REMOVE_IN_BUILD_END
 
     const rn = (i >>> 8) & 0x7;
     const rnValue = cpu.getGeneralRegister(rn);

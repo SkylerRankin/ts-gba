@@ -504,7 +504,11 @@ const processAnd = (data: DataProcessingParameter) : number => {
     const value132 = value1 & 0xFFFFFFFF;
     const value232 = value2 & 0xFFFFFFFF;
     const result32 = value132 & value232;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('AND');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
@@ -521,7 +525,11 @@ const processAnd = (data: DataProcessingParameter) : number => {
 
 const processEor = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('EOR');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, value1 ^ value2);
     const result = cpu.getGeneralRegister(rd);
     if (sFlag) {
@@ -539,7 +547,11 @@ const processEor = (data: DataProcessingParameter) : number => {
 
 const processSub = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('SUB');
+    // #REMOVE_IN_BUILD_END
+
     const result = value1 - value2;
     const result32 = result & 0xFFFFFFFF;
     cpu.setGeneralRegister(rd, result32);
@@ -557,7 +569,11 @@ const processRsb = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const result = value2 - value1;
     const result32 = result & 0xFFFFFFFF;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('RSB');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -575,7 +591,11 @@ const processAdd = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const result32 = (value1 + value2) & 0xFFFFFFFF;
     const result = value1 + value2;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('ADD');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -597,7 +617,11 @@ const processAdd = (data: DataProcessingParameter) : number => {
 const processAdc = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag} = data;
     const cFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('ADC');
+    // #REMOVE_IN_BUILD_END
+
     const result = value1 + value2 + cFlag;
     const result32 = result & 0xFFFFFFFF;
     cpu.setGeneralRegister(rd, result32);
@@ -624,7 +648,11 @@ const processSbc = (data: DataProcessingParameter) : number => {
     const notCarry = cFlag === 1 ? 0 : 1;
     const result = value1 - value2 - notCarry;
     const result32 = result & 0xFFFFFFFF;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('SBC');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -644,7 +672,11 @@ const processRsc = (data: DataProcessingParameter) : number => {
     const notCarry = cFlag === 1 ? 0 : 1;
     const result = value2 - value1 - notCarry;
     const result32 = result & 0xFFFFFFFF;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('RSC');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -661,7 +693,11 @@ const processRsc = (data: DataProcessingParameter) : number => {
 
 const processTst = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag, shiftCarry} = data;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('TST');
+    // #REMOVE_IN_BUILD_END
+
     const aluOut = (value1 & value2) & 0xFFFFFFFF;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -674,7 +710,11 @@ const processTst = (data: DataProcessingParameter) : number => {
 
 const processTeq = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag, shiftCarry} = data;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('TEQ');
+    // #REMOVE_IN_BUILD_END
+
     const aluOut = (value1 ^ value2) & 0xFFFFFFFF;
     if (sFlag) {
         cpu.clearConditionCodeFlags();
@@ -687,7 +727,11 @@ const processTeq = (data: DataProcessingParameter) : number => {
 
 const processCmp = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag} = data;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('CMP');
+    // #REMOVE_IN_BUILD_END
+
     const aluOut = value1 - value2;
     const aluOut32 = aluOut & 0xFFFFFFFF;
     if (sFlag) {
@@ -704,7 +748,11 @@ const processCmp = (data: DataProcessingParameter) : number => {
 
 const processCmn = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, sFlag} = data;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('CMN');
+    // #REMOVE_IN_BUILD_END
+
     const aluOut = value1 + value2;
     const aluOut32 = aluOut & 0xFFFFFFFF;
     if (sFlag) {
@@ -727,7 +775,11 @@ const processCmn = (data: DataProcessingParameter) : number => {
 const processOrr = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
     const result32 = (value1 | value2) & 0xFFFFFFFF;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('ORR');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
@@ -745,7 +797,11 @@ const processOrr = (data: DataProcessingParameter) : number => {
 const processMov = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
     const result32 = value2 & 0xFFFFFFFF;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('MOV');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
@@ -763,7 +819,11 @@ const processMov = (data: DataProcessingParameter) : number => {
 const processBic = (data: DataProcessingParameter) : number => {
     const {cpu, value1, value2, rd, sFlag, shiftCarry} = data;
     const result = (value1 & (~value2)) & 0xFFFFFFFF;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('BIC');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result);
     if (sFlag) {
         if (rd === 15) {
@@ -781,7 +841,11 @@ const processBic = (data: DataProcessingParameter) : number => {
 const processMvn = (data: DataProcessingParameter) : number => {
     const {cpu, value2, rd, sFlag, shiftCarry} = data;
     const result32 = ~value2 & 0xFFFFFFFF;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('MVN');
+    // #REMOVE_IN_BUILD_END
+
     cpu.setGeneralRegister(rd, result32);
     if (sFlag) {
         if (rd === 15) {
@@ -800,7 +864,10 @@ const processMvn = (data: DataProcessingParameter) : number => {
 
 const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const lFlag = (i >>> 24) & 0x1;
+
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(lFlag ? "BL" : "B");
+    // #REMOVE_IN_BUILD_END
 
     const instructionSize = 4;
     const imm = signExtend(i & 0xFFFFFF, 24);
@@ -814,14 +881,20 @@ const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processBLX = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`BLX (${type})`);
+    // #REMOVE_IN_BUILD_END
+
     cpu.history.addError(`Unsupported BLX instruction: 0x${(i >>> 0).toString(16)}. This instruction is only available on ARMv5 and above.`);
     return { incrementPC: false };
 
 }
 
 const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('BX');
+    // #REMOVE_IN_BUILD_END
+
     const rm = i & 0xF;
     const rmValue = cpu.getGeneralRegister(rm);
     const thumbModeSwitch = (rmValue & 0x1) === 1;
@@ -835,7 +908,10 @@ const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 // Load & Store Instructions
 
 const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDR');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = cpu.getBytesFromMemory(wordAlignAddress(address), 4);
@@ -856,7 +932,10 @@ const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLDRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRB');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const value = cpu.getBytesFromMemory(address, 1)[0];
@@ -865,7 +944,10 @@ const processLDRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLDRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRBT');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     
     // The instruction only uses addressing mode 2 post indexing. But instead of having
@@ -879,7 +961,10 @@ const processLDRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLDRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRH');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = cpu.getBytesFromMemory(halfWordAlignAddress(address), 2);
@@ -889,7 +974,10 @@ const processLDRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRSB');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const value = signExtend(cpu.getBytesFromMemory(address, 1)[0], 8);
@@ -898,7 +986,10 @@ const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRSH');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     let value = byteArrayToInt32(cpu.getBytesFromMemory(halfWordAlignAddress(address), 2), cpu.bigEndian);
@@ -908,7 +999,10 @@ const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processLDRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('LDRT');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
 
     // The instruction only uses addressing mode 2 post indexing. But instead of having
@@ -928,7 +1022,10 @@ const processLDRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSTR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('STR');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
@@ -937,7 +1034,10 @@ const processSTR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSTRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('STRB');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
     const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
@@ -946,7 +1046,10 @@ const processSTRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSTRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('STRBT');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
 
     // The instruction only uses addressing mode 2 post indexing. But instead of having
@@ -960,7 +1063,10 @@ const processSTRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSTRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('STRH');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
     const rdValue = cpu.getGeneralRegister(rd);
     const address = getLoadStoreAddress(cpu, i);
@@ -971,7 +1077,10 @@ const processSTRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSTRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('STRT');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 12) & 0xF;
 
     // The instruction only uses addressing mode 2 post indexing. But instead of having
@@ -987,7 +1096,10 @@ const processSTRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 // Load & Store Multiple Instructions
 
 const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LDM (${type})`);
+    // #REMOVE_IN_BUILD_END
+
     const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
     const regList = (i & 0xFFFF);
     let address = wordAlignAddress(startAddress);
@@ -1053,7 +1165,10 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 }
 
 const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`STM (${type})`);
+    // #REMOVE_IN_BUILD_END
+
     const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
     const regList = i & 0xFFFF;
     let address = startAddress;
@@ -1077,7 +1192,10 @@ const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 // Multiply Instructions
 
 const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('MUL');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 16) & 0xF;
     const rs = (i >>> 8) & 0xF;
     const rm = i & 0xF;
@@ -1097,7 +1215,10 @@ const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processMLA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('MLA');
+    // #REMOVE_IN_BUILD_END
+
     const rd = (i >>> 16) & 0xF;
     const rn = (i >>> 12) & 0xF;
     const rs = (i >>> 8) & 0xF;
@@ -1118,7 +1239,10 @@ const processMLA = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('SMULL');
+    // #REMOVE_IN_BUILD_END
+
     const rdHi = (i >>> 16) & 0xF;
     const rdLo = (i >>> 12) & 0xF;
     const rs = (i >>> 8) & 0xF;
@@ -1148,7 +1272,10 @@ const processSMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processUMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('UMULL');
+    // #REMOVE_IN_BUILD_END
+
     const rdHi = (i >>> 16) & 0xF;
     const rdLo = (i >>> 12) & 0xF;
     const rs = (i >>> 8) & 0xF;
@@ -1173,7 +1300,10 @@ const processUMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('SMLAL');
+    // #REMOVE_IN_BUILD_END
+
     const rdHi = (i >>> 16) & 0xF;
     const rdLo = (i >>> 12) & 0xF;
     const rs = (i >>> 8) & 0xF;
@@ -1209,7 +1339,10 @@ const processSMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processUMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('UMLAL');
+    // #REMOVE_IN_BUILD_END
+
     const rdHi = (i >>> 16) & 0xF;
     const rdLo = (i >>> 12) & 0xF;
     const rs = (i >>> 8) & 0xF;
@@ -1242,7 +1375,10 @@ const processUMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 // Miscellaneous Arithmetic Instructions
 
  const processCLZ = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('CLZ');
+    // #REMOVE_IN_BUILD_END
+
     cpu.history.addError(`CLZ instruction (0x${i.toString(16)}) is only supported in architecture version 5 and above.`);
     return { incrementPC: true };
  }
@@ -1250,7 +1386,9 @@ const processUMLAL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
  // Status Register Instructions
 
 const processMRS = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('MRS');
+    // #REMOVE_IN_BUILD_END
 
     const rFlag = (i >>> 22) & 0x1;
     const rd = (i >> 12) & 0xF;
@@ -1267,7 +1405,9 @@ const processMRS = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`MSR`);
+    // #REMOVE_IN_BUILD_END
 
     // type = 1 => immediate operand, 2 => register operand
     let operand;
@@ -1348,7 +1488,9 @@ const processMSR = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
 // Semaphore Instructions
 
 const processSWP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('SWP');
+    // #REMOVE_IN_BUILD_END
 
     const rn = (i >>> 16) & 0xF;
     const rnValue = cpu.getGeneralRegister(rn);
@@ -1379,7 +1521,9 @@ const processSWP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 }
 
 const processSWPB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName('SWPB');
+    // #REMOVE_IN_BUILD_END
 
     const rn = (i >>> 16) & 0xF;
     const rnValue = cpu.getGeneralRegister(rn);

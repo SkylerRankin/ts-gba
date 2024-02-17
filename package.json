@@ -11,7 +11,7 @@
   "scripts": {
     "test": "jest --coverage",
     "build_node": "esbuild .\\src\\emulator\\index.ts --bundle --outfile=out.js --platform=node",
-    "build_web": "esbuild .\\src\\emulator\\gba.ts --bundle --outfile=tsgba.js --platform=browser && move tsgba.js .\\dist\\tsgba.js && copy .\\src\\ui\\index.html .\\dist\\index.html"
+    "build_web": "node .\\build.js && copy .\\src\\ui\\index.html .\\dist\\index.html"
   },
   "devDependencies": {
     "esbuild": "0.20.0",
