@@ -213,14 +213,14 @@ class CPU implements CPUType {
         return (cpsr >>> bitOffset) & 0x1;
     }
 
-    setStatusRegisterFlag(flag: StatusRegisterKey, value: number) : void {
+    setStatusRegisterFlag(flag: StatusRegisterKey, value: number | boolean) : void {
         let cpsr = this.currentStatusRegisters[0];
         const mask = 1 << cpsrBitOffsetMapping[flag];
 
-        if (value === 0) {
-            cpsr &= ~mask;
-        } else {
+        if (value) {
             cpsr |= mask;
+        } else {
+            cpsr &= ~mask;
         }
 
         if (flag === 't') {
