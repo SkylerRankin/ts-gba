@@ -166,6 +166,7 @@ class CPU implements CPUType {
         this.bigEndian = false;
         this.setModeBits(OperatingModeCodes.usr);
         this.setStatusRegisterFlag('t', 0);
+        this.bootBIOS = false;
 
         if (this.bootBIOS) {
             this.setGeneralRegister(Reg.PC, 0x00000008);

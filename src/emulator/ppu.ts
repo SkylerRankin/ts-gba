@@ -59,7 +59,6 @@ class PPU implements PPUType {
     display: Display;
     currentScanline: number;
     displayState: DisplayState;
-    displayStateStart: number;
     nextCycleTrigger: number;
     // A flag read and modified by core GBA to know when a frame has completed rendering.
     vBlankAck: boolean;
@@ -70,7 +69,6 @@ class PPU implements PPUType {
         this.display = display;
         this.currentScanline = -1;
         this.displayState = 'vBlank';
-        this.displayStateStart = 0;
         this.nextCycleTrigger = -1;
         this.vBlankAck = false;
         this.displayModeState = {
@@ -90,7 +88,7 @@ class PPU implements PPUType {
     renderScanline(y: number) {
         const displayControl = this.memory.getBytes(displayRegisters.DISPCNT, 2);
         const displayMode = displayControl[0] & 0x7;
-        
+
         switch (displayMode) {
             case 0x0:
                 // console.log('Display mode 0 not implemented.');
@@ -171,10 +169,9 @@ class PPU implements PPUType {
     }
 
     reset() {
-        this.currentScanline = -1;
+        this.currentScanline = DisplayConstants.vDrawPixels + DisplayConstants.hBlankPixels;
         this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([0, 0]));
         this.displayState = 'vBlank';
-        this.displayStateStart = 0;
         this.nextCycleTrigger = 0;
         this.vBlankAck = false;
     }

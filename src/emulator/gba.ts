@@ -65,7 +65,8 @@ class GBA implements GBAType {
 
         if (this.status === 'running') {
             // Doesn't seem to work in a node environment
-            this.nextFrameTimer = window.setTimeout(() => { this.runFrame(); }, 16);
+            const frameDelay = Math.max(16 - frameTime, 16); // TODO: reduce the max delay to 1?
+            this.nextFrameTimer = window.setTimeout(() => { this.runFrame(); }, frameDelay);
         }
     }
 

@@ -89,6 +89,7 @@
 
             window.onload = () => {
                 gba = new window.GBA();
+                gba.reset();
 
                 document.getElementById("startButton").onclick = () => {
                     if (romLoaded) {
@@ -112,8 +113,8 @@
             </div>
             <div style="display: flex; justify-content: space-between;">
                 <div id="canvas_container">
-                    <canvas id="frame_0_canvas" width="480px" height="320px" style="background-color: blanchedalmond;"></canvas>
-                    <canvas id="frame_1_canvas" width="480px" height="320px" style="background-color: coral;" class="canvas_hidden"></canvas>
+                    <canvas id="frame_0_canvas" width="480px" height="320px"></canvas>
+                    <canvas id="frame_1_canvas" width="480px" height="320px" class="canvas_hidden"></canvas>
                 </div>
                 <div id="tab_container">
                     <div id="tab_row">
