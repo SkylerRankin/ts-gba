@@ -21,12 +21,14 @@ class GBA implements GBAType {
     cpu: CPU;
     ppu: PPU;
     nextFrameTimer: number = 0;
+    frameQueue: number[] = [];
 
     constructor(display: Display = new CanvasDisplay()) {
         this.memory = new Memory();
         this.cpu = new CPU(this.memory);
         this.display = display;
         this.ppu = new PPU(this.memory, this.display);
+        this.frameQueue = new Array<number>();
     }
 
     loadROM(rom: Uint8Array) {
@@ -51,7 +53,15 @@ class GBA implements GBAType {
                 break;
             }
         }
-        console.log(`Frame time: ${performance.now() - frameStart} ms, cycles = ${this.cycles - cyclesStart}`);
+        const frameTime = performance.now() - frameStart;
+        this.frameQueue.push(frameTime);
+
+        if (this.frameQueue.length > 100) {
+            this.frameQueue.splice(0, 1);
+        }
+
+        const average = this.frameQueue.reduce((a, b) => a + b, 0) / this.frameQueue.length;
+        console.log(`Average frame time: ${average.toFixed(2)} ms, fps = ${(1000 / average).toFixed(2)}, cycles = ${this.cycles - cyclesStart}`);
 
         if (this.status === 'running') {
             // Doesn't seem to work in a node environment
