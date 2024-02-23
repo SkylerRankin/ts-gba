@@ -476,7 +476,7 @@ class FileDisplay implements Display {
         const buffer = this.buffers[this.currentFrame];
         const bitmap = byteArrayToBitmap(buffer, DisplaySize.width, DisplaySize.height);
         const date = new Date();
-        const filename = `./logs/display/gba_display_output_${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}.bmp`;
+        const filename = `./logs/display/gba_display_output_${date.getHours()}-${date.getMinutes()}-${date.getMilliseconds()}.bmp`;
         writeFileSync(filename, bitmap);
         return filename;
     }

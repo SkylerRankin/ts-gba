@@ -24,7 +24,7 @@ const DisplayConstants = {
     hDrawPixels: 240,
     hDrawCycles: 240 * 4,
     hBlankPixels: 68,
-    hBlankCycles: 68 * 6,
+    hBlankCycles: 68 * 4,
     scanlineLength: 1232,
     vDrawPixels: 160,
     vBlankPixels: 68,
@@ -134,6 +134,7 @@ class PPU implements PPUType {
                 // V Draw completed
                 this.displayState = 'hBlank';
                 this.nextCycleTrigger = cpuCycles + DisplayConstants.hBlankCycles;
+                this.renderScanline(this.currentScanline);
                 break;
             case 'hBlank':
                 // H Blank completed
@@ -142,11 +143,10 @@ class PPU implements PPUType {
                     this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
                     this.displayState = 'hDraw';
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
-                    this.renderScanline(this.currentScanline);
                 } else {
+                    this.currentScanline += 1;
                     this.displayState = 'vBlank';
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
-                    this.vBlankAck = true;
                     this.display.drawFrame();
                 }
                 break;
@@ -158,21 +158,21 @@ class PPU implements PPUType {
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
                 } else {
                     // Completed all vblank empty scanlines, returning to top scanline.
+                    this.vBlankAck = true;
                     this.displayState = 'hDraw';
                     this.currentScanline = 0;
                     this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
-                    this.renderScanline(this.currentScanline);
                 }
                 break;
         }
     }
 
     reset() {
-        this.currentScanline = DisplayConstants.vDrawPixels + DisplayConstants.hBlankPixels;
+        this.currentScanline = 0;
         this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([0, 0]));
-        this.displayState = 'vBlank';
-        this.nextCycleTrigger = 0;
+        this.displayState = 'hDraw';
+        this.nextCycleTrigger = DisplayConstants.hDrawCycles;
         this.vBlankAck = false;
     }
 

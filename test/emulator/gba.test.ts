@@ -6,6 +6,7 @@ import { FileDisplay } from "./test_utilities";
 
 // Tests that run a test rom for a specified number of frames, and compare the
 // display at that frame to a reference bitmap image.
+// TODO: These tests should not be taking multiple frames to render
 const romFrameTests = [
     {
         name: "three_squares",
@@ -32,11 +33,11 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/mode_4_page_flip.gba",
         frameChecks: [
             {
-                frame: 2,
+                frame: 3,
                 path: "test/emulator/data/frames/mode_4_page_front.bmp"
             },
             {
-                frame: 4,
+                frame: 5,
                 path: "test/emulator/data/frames/mode_4_page_back.bmp"
             }
         ]
