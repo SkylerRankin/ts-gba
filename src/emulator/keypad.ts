@@ -27,13 +27,13 @@ class Keypad {
     }
 
     onKeyDown(key: Key) {
-        let keyInput = this.memory.getInt16(KeyInputRegister);
+        let keyInput = this.memory.getInt16(KeyInputRegister).value;
         keyInput &= ~(1 << KeyOffset[key]);
         this.memory.setBytes(KeyInputRegister, int16ToByteArray(keyInput, false));
     }
 
     onKeyUp(key: Key) {
-        let keyInput = this.memory.getInt16(KeyInputRegister);
+        let keyInput = this.memory.getInt16(KeyInputRegister).value;
         keyInput |= (1 << KeyOffset[key]);
         this.memory.setBytes(KeyInputRegister, int16ToByteArray(keyInput, false));
     }

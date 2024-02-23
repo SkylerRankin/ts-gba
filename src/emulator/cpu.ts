@@ -2,7 +2,6 @@ import { processARM, ProcessedInstructionOptions } from './armInstructionProcess
 import { processTHUMB } from './thumbInstructionProcessors';
 import { Memory } from './memory';
 import { StateHistory } from './stateHistory';
-import { byteArrayToInt32 } from './math';
 import { CPUProfiler } from './cpuProfiler';
 
 /**
@@ -12,6 +11,7 @@ import { CPUProfiler } from './cpuProfiler';
 
 type CPUType = {
     memory: Memory,
+    cycles: number,
     currentGeneralRegisters: number[],
     generalRegisters: number[][],
     currentStatusRegisters: number[],
@@ -35,8 +35,6 @@ type CPUType = {
     setGeneralRegister: (reg: number, value: number) => void,
     getGeneralRegister: (reg: number) => number,
     getGeneralRegisterByMode: (reg: number, mode: number) => number,
-
-    setBytesInMemory(address: number, bytes: Uint8Array) : void,
 }
 
 const OperatingModeCodes = {
@@ -94,6 +92,7 @@ type StatusRegisterUpdate = StatusRegisterKey[];
 
 class CPU implements CPUType {
     memory: Memory;
+    cycles: number;
     currentGeneralRegisters = [] as number[];
     generalRegisters = [] as number[][];
     currentStatusRegisters = [] as number[];
@@ -111,6 +110,7 @@ class CPU implements CPUType {
 
     constructor(memory: Memory) {
         this.memory = memory;
+        this.cycles = 0;
         this.currentGeneralRegisters = new Array<number>(16).fill(0);
         this.currentStatusRegisters = new Array<number>(2).fill(0);
         for (let i = 0; i < 7; i++) {
@@ -133,16 +133,17 @@ class CPU implements CPUType {
         const pc = this.getGeneralRegister(Reg.PC);
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
         const instruction = this.operatingState === 'ARM' ?
-            this.memory.getInt32(pc - 8) :
-            this.memory.getInt16(pc - 4);
+            this.memory.getInt32(pc - 8).value :
+            this.memory.getInt16(pc - 4).value;
 
         let options: ProcessedInstructionOptions | undefined;
-
         if (this.operatingState === 'ARM' && this.conditionIsMet(instruction >>> 28)) {
             options = processARM(this, instruction);
         } else if (this.operatingState === 'THUMB') {
             options = processTHUMB(this, instruction);
         }
+
+        this.cycles += 1;
 
         if (!options || options.incrementPC) {
             this.setGeneralRegister(Reg.PC, pc + this.instructionSize);
@@ -154,6 +155,7 @@ class CPU implements CPUType {
      */
     reset() : void {
         this.history.reset();
+        this.cycles = 0;
         this.currentGeneralRegisters.fill(0);
         this.currentStatusRegisters.fill(0);
         for (let i = 0; i < this.generalRegisters.length; i++) {
@@ -381,11 +383,6 @@ class CPU implements CPUType {
         };
 
         return summary;
-    }
-
-    setBytesInMemory(address: number, bytes: Uint8Array) : void {
-        // TODO enforce which memory blocks can be written in which operating mode
-        this.memory.setBytes(address, bytes);
     }
 
     inAPrivilegedMode() : boolean {

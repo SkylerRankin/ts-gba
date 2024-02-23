@@ -13,7 +13,7 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/three_squares.gba",
         frameChecks: [
             {
-                frame: 2,
+                frame: 3,
                 path: "test/emulator/data/frames/three_squares.bmp"
             }
         ]
@@ -23,7 +23,7 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/mode_3_lines.gba",
         frameChecks: [
             {
-                frame: 3,
+                frame: 4,
                 path: "test/emulator/data/frames/mode_3_lines.bmp"
             }
         ]
@@ -37,7 +37,7 @@ const romFrameTests = [
                 path: "test/emulator/data/frames/mode_4_page_front.bmp"
             },
             {
-                frame: 5,
+                frame: 6,
                 path: "test/emulator/data/frames/mode_4_page_back.bmp"
             }
         ]
@@ -47,15 +47,15 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/bitmap_mode_switch.gba",
         frameChecks: [
             {
-                frame: 2,
+                frame: 3,
                 path: "test/emulator/data/frames/mode_3_data.bmp"
             },
             {
-                frame: 3,
+                frame: 4,
                 path: "test/emulator/data/frames/mode_4_data.bmp"
             },
             {
-                frame: 4,
+                frame: 5,
                 path: "test/emulator/data/frames/mode_5_data.bmp"
             }
         ]

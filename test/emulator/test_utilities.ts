@@ -220,7 +220,7 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
             // Manual memory updates
             if (t.memoryUpdates && t.setMemory) {
                 Object.entries(t.memoryUpdates).forEach(([address, bytes]) => {
-                    cpu.setBytesInMemory(Number.parseInt(address), bytes);
+                    cpu.memory.setBytes(Number.parseInt(address), bytes);
                 });
             }
 
@@ -229,7 +229,7 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
                 Object.entries(t.memoryUpdates).forEach(([address, bytes]) => {
                     for (let i = 0; i < bytes.length; i++) {
                         const byteAddress = Number.parseInt(address) + i;
-                        const actualValue = cpu.memory.getInt8(byteAddress);
+                        const actualValue = cpu.memory.getInt8(byteAddress).value;
                         expect(
                             actualValue,
                             `Line ${t.lineNumber}: Expected byte at address 0x${byteAddress.toString(16)} to be 0x${bytes[i].toString(16)}, but got 0x${actualValue.toString(16)}.`

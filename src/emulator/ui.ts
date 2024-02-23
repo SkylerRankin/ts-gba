@@ -19,11 +19,11 @@ const getInstructionTableLines = (baseAddress: number, length: number, gba: GBA)
     for (let i = 0; i < length; i++) {
         const address = start + i * gba.cpu.instructionSize;
         const instructionText = thumbMode ?
-            disassembleTHUMB(gba.cpu, gba.cpu.memory.getInt16(address) >>> 0, address) :
-            disassembleARM(gba.cpu, gba.cpu.memory.getInt32(address) >>> 0, address);
+            disassembleTHUMB(gba.cpu, gba.cpu.memory.getInt16(address).value >>> 0, address) :
+            disassembleARM(gba.cpu, gba.cpu.memory.getInt32(address).value >>> 0, address);
         const line = {
             address: address,
-            instruction: (thumbMode ? gba.cpu.memory.getInt16(address) : gba.cpu.memory.getInt32(address)) >>> 0,
+            instruction: (thumbMode ? gba.cpu.memory.getInt16(address).value : gba.cpu.memory.getInt32(address).value) >>> 0,
             text: instructionText
         };
         lines.push(line);
@@ -51,7 +51,7 @@ const getFrameInfo = (gba: GBA) => {
     if (gba.status === 'running') {
         frameTime = gba.frameQueue.reduce((a, b) => a + b, 0) / gba.frameQueue.length;
         fps = 1000 / frameTime;
-        cycles = gba.cycles;
+        cycles = gba.cpu.cycles;
     }
 
     return { fps, frameTime, cycles };

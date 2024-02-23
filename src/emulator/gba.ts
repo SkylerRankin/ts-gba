@@ -17,7 +17,6 @@ type GBAStatus = 'running' | 'paused';
 
 class GBA implements GBAType {
     status: GBAStatus = 'paused';
-    cycles: number = 0;
     memory: Memory;
     display: Display;
     cpu: CPU;
@@ -47,8 +46,7 @@ class GBA implements GBAType {
 
     runStep() {
         this.cpu.step();
-        this.ppu.step(this.cycles);
-        this.cycles += 1;
+        this.ppu.step(this.cpu.cycles);
     }
 
     runFrame() {
@@ -87,7 +85,6 @@ class GBA implements GBAType {
 
     reset() {
         this.status = 'paused';
-        this.cycles = 0;
         window.clearTimeout(this.nextFrameTimer);
 
         this.memory.reset();
