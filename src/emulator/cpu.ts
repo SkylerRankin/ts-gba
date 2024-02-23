@@ -35,7 +35,6 @@ type CPUType = {
     getGeneralRegister: (reg: number) => number,
     getGeneralRegisterByMode: (reg: number, mode: number) => number,
 
-    getBytesFromMemory(address: number, bytes: number) : Uint8Array,
     setBytesInMemory(address: number, bytes: Uint8Array) : void,
 }
 
@@ -391,11 +390,6 @@ class CPU implements CPUType {
         };
 
         return summary;
-    }
-
-    getBytesFromMemory(address: number, bytes: number) : Uint8Array {
-        // TODO enforce which memory blocks can be read in which operating mode
-        return this.memory.getBytes(address, bytes);
     }
 
     setBytesInMemory(address: number, bytes: Uint8Array) : void {
