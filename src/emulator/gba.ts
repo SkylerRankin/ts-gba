@@ -2,6 +2,7 @@ import { CPU } from "./cpu";
 import { CanvasDisplay, Display } from "./display";
 import { Memory } from "./memory";
 import { PPU } from "./ppu";
+import { UI } from "./ui";
 
 interface GBAType {
     loadROM(rom: Uint8Array) : void;
@@ -40,14 +41,17 @@ class GBA implements GBAType {
         this.runFrame();
     }
 
+    runStep() {
+        this.cpu.step();
+        this.ppu.step(this.cycles);
+        this.cycles += 1;
+    }
+
     runFrame() {
         const frameStart = performance.now();
         const cyclesStart = this.cycles;
         while (true) {
-            this.cpu.step();
-            this.ppu.step(this.cycles);
-            this.cycles += 1;
-
+            this.runStep();
             if (this.ppu.vBlankAck) {
                 this.ppu.vBlankAck = false;
                 break;
@@ -90,6 +94,8 @@ class GBA implements GBAType {
 
 // Define the GBA class on window for use in frontend.
 (window as any).GBA = GBA;
+// Define the UI class on window for use in frontend.
+(window as any).UI = UI;
 
 export { GBA }
 export { GBAType }

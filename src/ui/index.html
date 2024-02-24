@@ -5,6 +5,9 @@
         <style>
             * {
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                -webkit-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
             }
 
             #container {
@@ -15,6 +18,11 @@
             #canvas_container canvas {
                 position: absolute;
                 image-rendering: pixelated;
+                background-color: #e1e1e1;
+            }
+
+            .hidden {
+                display: none;
             }
 
             .canvas_hidden {
@@ -48,11 +56,48 @@
             .tab_hidden {
                 display: none;
             }
+
+            .tab_content {
+                /* background-color: #e1e1e1; */
+            }
+
+            .button {
+                display: inline-block;
+                background-color: aquamarine;
+                border-radius: 5px;
+                text-align: center;
+                line-height: 20px;
+                cursor: pointer;
+                width: 80px;
+                height: 20px;
+                font-size: 10px;
+            }
+
+            .button:hover {
+                background-color: aqua;
+            }
+
+            #instruction_table {
+                width: 100%;
+            }
+
+            #instruction_table, #instruction_table > tr, #instruction_table > tr > td {
+                border: 1px solid #e1e1e1;
+                border-collapse: collapse;
+            }
+
         </style>
 
         <script>
             let gba = null;
             let romLoaded = false;
+            let running = false;
+
+            let instructionTableState = {
+                pcOffset: 0,
+                checkScroll: true,
+                activeAddress: 0
+            };
 
             const onTabSelect = (tabIndex) => {
                 for (let i = 0; i < 3; i++) {
@@ -82,9 +127,78 @@
                         gba.loadROM(buffer);
                         romLoaded = true;
                         console.log(`ROM loaded`);
+                        onPause();
                     }
                 };
                 fileReader.readAsArrayBuffer(event.files[0]);
+            }
+
+            const onRun = () => {
+                instructionTableState.pcOffset = 0;
+                document.getElementById("instruction_table_warning").classList.remove("hidden");
+                document.getElementById("instruction_table").classList.add("hidden");
+                romLoaded = true;
+                gba.run();
+            }
+
+            const onPause = () => {
+                gba.pause();
+                document.getElementById("instruction_table_warning").classList.add("hidden");
+                document.getElementById("instruction_table").classList.remove("hidden");
+
+                // Focus instruction list on PC on pause
+                instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
+                updateInstructionList();
+            }
+
+            const onReset = () => {
+                gba.reset();
+                document.getElementById("instruction_table_warning").classList.add("hidden");
+                document.getElementById("instruction_table").classList.remove("hidden");
+                romLoaded = false;
+            }
+
+            const onStep = () => {
+                gba.runStep();
+                instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
+                instructionTableState.pcOffset = 0;
+                updateInstructionList();
+            }
+
+            const updateInstructionList = () => {
+                const pc = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
+                const lines = window.UI.getInstructionTableLines(instructionTableState.activeAddress + instructionTableState.pcOffset * gba.cpu.instructionSize, 11, gba);
+
+                const table = document.getElementById("instruction_table");
+                table.replaceChildren([]);
+                lines.forEach(line => {
+                    const tr = document.createElement("tr");
+                    if (line.address === pc) {
+                        tr.style = "background-color: #4287f5;";
+                    }
+
+                    const breakPoint = document.createElement("td");
+                    breakPoint.innerHTML = "O";
+                    breakPoint.style = "width: 5%;";
+
+                    const address = document.createElement("td");
+                    address.innerHTML = `0x${line.address.toString(16).padStart(8, '0')}`;
+                    address.style = "width: 20%;";
+
+                    const instruction = document.createElement("td");
+                    instruction.innerHTML = `0x${line.instruction.toString(16).padStart(gba.cpu.operatingMode === "ARM" ? 8 : 4, '0')}`;
+                    instruction.style = "width: 20%;";
+
+                    const text = document.createElement("td");
+                    text.innerHTML = line.text.toLowerCase();
+                    text.style = "width: 50%;";
+
+                    tr.appendChild(breakPoint);
+                    tr.appendChild(address);
+                    tr.appendChild(instruction);
+                    tr.appendChild(text);
+                    table.appendChild(tr);
+                });
             }
 
             window.onload = () => {
@@ -93,23 +207,33 @@
 
                 document.getElementById("startButton").onclick = () => {
                     if (romLoaded) {
-                        gba.run();
+                        onRun();
                     } else {
                         console.warn("No rom loaded");
                     }
                 };
+                document.getElementById("resetButton").onclick = () => { onReset(); };
+                document.getElementById("instruction_table").addEventListener("wheel", (event) => {
+                    if (!instructionTableState.checkScroll) return;
+                    instructionTableState.pcOffset += Math.sign(event.wheelDeltaY) * -1;
+                    requestAnimationFrame(() => {
+                        updateInstructionList();
+                        instructionTableState.checkScroll = true;
+                    });
+                    instructionTableState.checkScroll = false;
+                });
 
-                document.getElementById("resetButton").onclick = () => {
-                    gba.reset();
-                    romLoaded = false;
-                };
+                document.getElementById("debug_reset_button").addEventListener("click", () => { onReset(); });
+                document.getElementById("debug_run_button").addEventListener("click", () => { onRun(); });
+                document.getElementById("debug_pause_button").addEventListener("click", () => { onPause(); });
+                document.getElementById("debug_step_button").addEventListener("click", () => { onStep(); });
             }
         </script>
     </head>
     <body>
         <div id="container">
             <div style="margin-bottom: 20px;">
-                <a href="asd" style="color: #0398fc; text-decoration: none; font-size: 20px; font-weight: bold;">ts-gba</a>
+                <a href="https://github.com/SkylerRankin/ts-gba" style="color: #0398fc; text-decoration: none; font-size: 20px; font-weight: bold;">ts-gba</a>
             </div>
             <div style="display: flex; justify-content: space-between;">
                 <div id="canvas_container">
@@ -118,11 +242,11 @@
                 </div>
                 <div id="tab_container">
                     <div id="tab_row">
-                        <div id="tab0" class="tab tab_selected" onclick="onTabSelect(0)">Game</div>
-                        <div id="tab1" class="tab" onclick="onTabSelect(1)">CPU</div>
+                        <div id="tab0" class="tab" onclick="onTabSelect(0)">Game</div>
+                        <div id="tab1" class="tab tab_selected" onclick="onTabSelect(1)">CPU</div>
                         <div id="tab2" class="tab" onclick="onTabSelect(2)">PPU</div>
                     </div>
-                    <div id="tab0_container" class="tab_content">
+                    <div id="tab0_container" class="tab_content tab_hidden">
                         <div>
                             <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
                             <button id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</button>
@@ -146,8 +270,16 @@
                             </table>
                         </div>
                     </div>
-                    <div id="tab1_container" class="tab_hidden tab_content">
-                        tab 1, empty
+                    <div id="tab1_container" class="tab_content">
+                        <div>
+                            <div class="button" id="debug_reset_button">Reset</div>
+                            <div class="button" id="debug_run_button">Run</div>
+                            <div class="button" id="debug_pause_button">Pause</div>
+                            <div class="button" id="debug_step_button">Step</div>
+                        </div>
+                        <div style="background-color: bisque;">instructions</div>
+                        <table id="instruction_table" class="hidden"></table>
+                        <div id="instruction_table_warning" class="hidden">Not shown while emulator is running</div>
                     </div>
                     <div id="tab2_container" class="tab_hidden tab_content">
                         tab 2, empty
