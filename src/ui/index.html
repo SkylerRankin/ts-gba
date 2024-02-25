@@ -21,6 +21,14 @@
                 background-color: #e1e1e1;
             }
 
+            #cpu_info_container {
+                font-size: 12px;
+            }
+
+            #cpu_info_warning {
+                font-size: 12px;
+            }
+
             .hidden {
                 display: none;
             }
@@ -36,45 +44,62 @@
             }
 
             #tab_row {
-                margin-bottom: 20px;
+                margin-bottom: 30px;
                 display: flex;
             }
 
             .tab {
-                box-sizing: border-box;
-                width: 50px;
-                color: #9c9c9c;
-                font-weight: bold;
+                border-bottom: solid 1px #969696;
+                width: 100px;
+                color: #969696;
                 cursor: pointer;
-                text-align: center;
+                text-align: left;
+                padding-left: 5px;
+                width: 80px;
+                margin-right: 20px;
             }
 
             .tab_selected {
                 color: black;
+                font-weight: bold;
             }
 
             .tab_hidden {
                 display: none;
             }
 
-            .tab_content {
-                /* background-color: #e1e1e1; */
+            #game_control_container > div {
+                margin-right: 20px;
             }
 
             .button {
                 display: inline-block;
-                background-color: aquamarine;
-                border-radius: 5px;
+                border: solid 1px #969696;
+                border-radius: 3px;
                 text-align: center;
                 line-height: 20px;
                 cursor: pointer;
                 width: 80px;
                 height: 20px;
-                font-size: 10px;
+                font-size: 12px;
             }
 
             .button:hover {
-                background-color: aqua;
+                background-color: #cccccc;
+            }
+
+            #step_button_container {
+                margin-bottom: 10px;
+                display: flex;
+                justify-content: space-between;
+            }
+
+            #step_button_container > div {
+                flex-grow: 1;
+            }
+
+            #step_button_container > div + div {
+                margin-left: 20px;
             }
 
             #instruction_table {
@@ -82,18 +107,24 @@
             }
 
             #instruction_table, #instruction_table > tr, #instruction_table > tr > td {
-                border: 1px solid #e1e1e1;
                 border-collapse: collapse;
             }
 
             .instruction_table_pc_row {
-                background-color: #4287f5;
+                background-color: #5996f7;
             }
 
             .instruction_table_breakpoint_row {
-                color: red;
+                font-weight: bold;
+                color: #942b2b;
             }
 
+            #registers_table_container, #instruction_table_container {
+                padding: 5px;
+                border: solid 1px #969696;
+                border-radius: 3px;
+                margin-bottom: 10px;
+            }
 
             #registers_table {
                 width: 100%;
@@ -101,7 +132,6 @@
             }
 
             #registers_table, #registers_table > tr, #registers_table > tr > td {
-                /* border: 1px solid #e1e1e1; */
                 border-collapse: collapse;
             }
 
@@ -116,14 +146,18 @@
 
             #instruction_jump_container {
                 display: flex;
-                
+                margin-bottom: 10px;
             }
 
             #instruction_jump_container > div {
-                background-color: aquamarine;
                 flex-grow: 1;
                 margin-left: 20px;
                 text-align: center;
+            }
+
+            #instruction_jump_container > input {
+                border: solid 1px #969696;
+                border-radius: 3px;
             }
 
         </style>
@@ -341,43 +375,27 @@
                 </div>
                 <div id="tab_container">
                     <div id="tab_row">
-                        <div id="tab0" class="tab" onclick="onTabSelect(0)">Game</div>
-                        <div id="tab1" class="tab tab_selected" onclick="onTabSelect(1)">CPU</div>
+                        <div id="tab0" class="tab tab_selected" onclick="onTabSelect(0)">Game</div>
+                        <div id="tab1" class="tab" onclick="onTabSelect(1)">CPU</div>
                         <div id="tab2" class="tab" onclick="onTabSelect(2)">PPU</div>
                     </div>
-                    <div id="tab0_container" class="tab_content tab_hidden">
-                        <div>
+                    <div id="tab0_container" class="tab_content">
+                        <div id="game_control_container">
                             <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
-                            <button id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</button>
-                            <button id="startButton">Start</button>
-                            <button id="resetButton">Reset</button>
-                        </div>
-                        <div>
-                            <table>
-                                <tr>
-                                    <td>FPS</td>
-                                    <td><span id="fpsText">0</span></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding-right: 20px;">Last frame cycles</td>
-                                    <td><span id="lastFrameCyclesText">0</span></td>
-                                </tr>
-                                <tr>
-                                    <td>Last frame ms</td>
-                                    <td><span id="lastFrameMSText">0</span></td>
-                                </tr>
-                            </table>
+                            <div class="button" id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</div>
+                            <div class="button" id="startButton">Start</div>
+                            <div class="button" id="resetButton">Reset</div>
                         </div>
                     </div>
-                    <div id="tab1_container" class="tab_content">
-                        <div>
+                    <div id="tab1_container" class="tab_content tab_hidden">
+                        <div id="step_button_container">
                             <div class="button" id="debug_reset_button">Reset</div>
                             <div class="button" id="debug_run_button">Run</div>
                             <div class="button" id="debug_pause_button">Pause</div>
                             <div class="button" id="debug_step_button">Step</div>
                         </div>
                         <div id="cpu_info_container" class="hidden">
-                            <div>
+                            <div id="registers_table_container">
                                 <table id="registers_table">
                                     <tr>
                                         <td>R0</td>
@@ -442,14 +460,17 @@
                                     </tr>
                                 </table>
                             </div>
-                            <table id="instruction_table"></table>
+                            <div id="instruction_table_container">
+                                <table id="instruction_table"></table>
+                            </div>
                             <div id="instruction_jump_container">
                                 <input id="instruction_jump_input" type="text" value="08000000">
-                                <div id="instruction_jump_button">Jump</div>
-                                <div id="instruction_pc_button">Return to PC</div>
+                                <div class="button" id="instruction_jump_button">Jump</div>
+                                <div class="button" id="instruction_pc_button">Return to PC</div>
                             </div>
-                            <div>
-                                <ul>
+                            <div style>
+                                <div>Debugger notes:</div>
+                                <ul style="margin-top: 0px;">
                                     <li>Double click instruction to set breakpoint, will be highlighted in red</li>
                                     <li>Current PC is highlighted in blue</li>
                                     <li>All instructions in table are decoded according to current operating state, may not be correct</li>
