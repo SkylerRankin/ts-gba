@@ -1,16 +1,16 @@
 import { CPU, Reg } from './cpu';
 import { isNegative } from './math';
 
-const disassembleTHUMB = (cpu: CPU, i: number) : string => {
+const disassembleTHUMB = (cpu: CPU, i: number, instructionAddress: number) : string => {
 
     // Exception Generating Instructions
     if (i >>> 8 === 0b10111110) return disassembleBKPT(cpu, i);
     if (i >>> 8 === 0b11011111) return disassembleSWI(cpu, i);
 
     // Branch Instructions
-    if ((i >>> 12 & 0xF) === 0b1101) return disassembleB1(cpu, i);
-    if ((i >>> 11 & 0x1F) === 0b11100) return disassembleB2(cpu, i);
-    if ((i >>> 13 & 0x7) === 0b111) return disassembleBL_BLX1(cpu, i);
+    if ((i >>> 12 & 0xF) === 0b1101) return disassembleB1(cpu, i, instructionAddress);
+    if ((i >>> 11 & 0x1F) === 0b11100) return disassembleB2(cpu, i, instructionAddress);
+    if ((i >>> 13 & 0x7) === 0b111) return disassembleBL_BLX1(cpu, i, instructionAddress);
     if ((i >>> 7 & 0x1FF) === 0b010001110) return disassembleBX(cpu, i);
     if ((i >>> 7 & 0x1FF) === 0b010001111) return disassembleBLX2(cpu, i);
 
@@ -103,10 +103,10 @@ const parseCondition = (condition: number) : string => {
 
 // Branch Instructions
 
-const disassembleB1 = (cpu: CPU, i: number) : string => {
+const disassembleB1 = (cpu: CPU, i: number, instructionAddress: number) : string => {
     const condition = (i >>> 8) & 0xF;
     const imm = i & 0xFF;
-    const pc = cpu.getGeneralRegister(Reg.PC);
+    const pc = instructionAddress + 4;
     let offset;
     if (isNegative(imm, 8)) {
         offset = -1 * (((~imm) + 1) & 0xFF);
@@ -117,9 +117,9 @@ const disassembleB1 = (cpu: CPU, i: number) : string => {
     return `B${parseCondition(condition)} ${newPC.toString(16).padStart(8, '0')}`;
 }
 
-const disassembleB2 = (cpu: CPU, i: number) : string => {
+const disassembleB2 = (cpu: CPU, i: number, instructionAddress: number) : string => {
     const imm = i & 0x7FF;
-    const pc = cpu.getGeneralRegister(Reg.PC);
+    const pc = instructionAddress + 4;
     let offset;
     if (isNegative(imm, 11)) {
         offset = -1 * (((~(imm << 1)) + 1) & 0x7FF);
@@ -130,11 +130,11 @@ const disassembleB2 = (cpu: CPU, i: number) : string => {
     return `B ${newPC.toString(16).padStart(8, '0')}`;
 }
 
-const disassembleBL_BLX1 = (cpu: CPU, i: number) : string => {
+const disassembleBL_BLX1 = (cpu: CPU, i: number, instructionAddress: number) : string => {
     const instructionSize = 2;
     const h = (i >>> 11) & 0x3;
     const offset = i & 0x7FF;
-    const pc = cpu.getGeneralRegister(Reg.PC);
+    const pc = instructionAddress + instructionSize * 2;
 
     if (h === 0b10) {
         const signExtendedOffset = isNegative(offset, 11) ?

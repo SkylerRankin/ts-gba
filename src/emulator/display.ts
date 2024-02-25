@@ -67,11 +67,11 @@ class CanvasDisplay implements Display {
 
     setFrame(frame: number) {
         if (frame === 0) {
-            this.canvases[0].classList.remove("canvas_hidden");
-            this.canvases[1].classList.add("canvas_hidden");
+            this.canvases[0].classList.remove("hidden");
+            this.canvases[1].classList.add("hidden");
         } else {
-            this.canvases[1].classList.remove("canvas_hidden");
-            this.canvases[0].classList.add("canvas_hidden");
+            this.canvases[1].classList.remove("hidden");
+            this.canvases[0].classList.add("hidden");
         }
 
         this.currentContext = frame;

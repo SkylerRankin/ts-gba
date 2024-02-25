@@ -19,8 +19,8 @@ const getInstructionTableLines = (baseAddress: number, length: number, gba: GBA)
     for (let i = 0; i < length; i++) {
         const address = start + i * gba.cpu.instructionSize;
         const instructionText = thumbMode ?
-            disassembleTHUMB(gba.cpu, gba.cpu.memory.getInt16(address) >>> 0) :
-            disassembleARM(gba.cpu, gba.cpu.memory.getInt32(address) >>> 0);
+            disassembleTHUMB(gba.cpu, gba.cpu.memory.getInt16(address) >>> 0, address) :
+            disassembleARM(gba.cpu, gba.cpu.memory.getInt32(address) >>> 0, address);
         const line = {
             address: address,
             instruction: (thumbMode ? gba.cpu.memory.getInt16(address) : gba.cpu.memory.getInt32(address)) >>> 0,

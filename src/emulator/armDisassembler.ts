@@ -2,16 +2,16 @@ import { CPU, Reg } from './cpu';
 import { rotateRight, signExtend } from './math';
 
 
-const disassembleARM = (cpu: CPU, i: number) : string => {
+const disassembleARM = (cpu: CPU, i: number, instructionAddress: number) : string => {
     const bits = (i >>> 0).toString(2).padStart(32, '0')
         .split('').map((x: string) : number => parseInt(x)).reverse();
 
     // Branch instructions
-    if (((i >>> 4) & 0xFFFFFF) === 0x12FFF1) return disassembleBX(cpu, i);
-    if (((i >>> 25) & 0x7F) === 0x7D) return disassembleBLX(cpu, i, 1);
-    if (((i >>> 4) & 0xFFFFFF) === 0x12FFF3) return disassembleBLX(cpu, i, 2);
+    if (((i >>> 4) & 0xFFFFFF) === 0x12FFF1) return disassembleBX(cpu, i, instructionAddress);
+    if (((i >>> 25) & 0x7F) === 0x7D) return disassembleBLX(cpu, i, 1, instructionAddress);
+    if (((i >>> 4) & 0xFFFFFF) === 0x12FFF3) return disassembleBLX(cpu, i, 2, instructionAddress);
     // Check for B/BL after BLX(1) due to overlap in bits 27:25
-    if (((i >>> 25) & 0x7) === 0x5) return disassembleBBL(cpu, i);
+    if (((i >>> 25) & 0x7) === 0x5) return disassembleBBL(cpu, i, instructionAddress);
 
     // Load/store instructions
     if (((i >>> 26) & 0x3) === 0x1) {
@@ -382,21 +382,21 @@ const parseLoadStoreMultipleAddress = (cpu: CPU, i: number) : string => {
 
 // Branch Instructions
 
-const disassembleBBL = (cpu: CPU, i: number) : string => {
+const disassembleBBL = (cpu: CPU, i: number, instructionAddress: number) : string => {
     const lFlag = (i >>> 24) & 0x1;
     const instructionSize = 4;
     const imm = signExtend(i & 0xFFFFFF, 24);
-    const pc = cpu.getGeneralRegister(Reg.PC);
+    const pc = instructionAddress + instructionSize * 2;
     const newPC = pc + (imm << 2) + (instructionSize * 2);
     return `B${lFlag === 1 ? "L" : ""}${parseCondition(i)} ${(newPC).toString(16).padStart(8, "0")}`;
 }
 
-const disassembleBLX = (cpu: CPU, i: number, type: number) : string => {
+const disassembleBLX = (cpu: CPU, i: number, type: number, instructionAddress: number) : string => {
     return `Not supported`;
 
 }
 
-const disassembleBX = (cpu: CPU, i: number) : string => {
+const disassembleBX = (cpu: CPU, i: number, instructionAddress: number) : string => {
     const rm = i & 0xF;
     return `BX${parseCondition(i)} R${rm}`;
 }

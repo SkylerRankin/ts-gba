@@ -10,44 +10,30 @@
                 user-select: none;
             }
 
-            #container {
-                width: 1000px;
-                margin: 50px auto;
+            #container { width: 1000px; margin: 50px auto; }
+            #canvas_container canvas { position: absolute; image-rendering: pixelated; background-color: #e1e1e1; }
+            #game_control_container > div { margin-right: 20px; }
+            #title_link { color: #0398fc; text-decoration: none; font-size: 20px; font-weight: bold; }
+            #tab_container { width: 480px; display: inline-block; min-height: 320px; font-size: 12px; }
+            #tab_row { margin-bottom: 30px; display: flex; font-size: 16px; }
+            #step_button_container { margin-bottom: 10px; display: flex; justify-content: space-between; }
+            #step_button_container > div { flex-grow: 1; }
+            #step_button_container > div + div { margin-left: 20px; }
+            #instruction_table { width: 100%; }
+            #instruction_table, #instruction_table > tr, #instruction_table > tr > td { border-collapse: collapse; }
+            #registers_table_container, #instruction_table_container {
+                padding: 5px;
+                border: solid 1px #969696;
+                border-radius: 3px;
+                margin-bottom: 10px;
             }
+            #registers_table { width: 100%; }
+            #registers_table, #registers_table > tr, #registers_table > tr > td { border-collapse: collapse; }
+            #instruction_jump_container { display: flex; margin-bottom: 10px; }
+            #instruction_jump_container > div { flex-grow: 1; margin-left: 20px; text-align: center; }
+            #instruction_jump_container > input { border: solid 1px #969696; border-radius: 3px; }
 
-            #canvas_container canvas {
-                position: absolute;
-                image-rendering: pixelated;
-                background-color: #e1e1e1;
-            }
-
-            #cpu_info_container {
-                font-size: 12px;
-            }
-
-            #cpu_info_warning {
-                font-size: 12px;
-            }
-
-            .hidden {
-                display: none;
-            }
-
-            .canvas_hidden {
-                display: none;
-            }
-
-            #tab_container {
-                width: 480px;
-                display: inline-block;
-                min-height: 320px;
-            }
-
-            #tab_row {
-                margin-bottom: 30px;
-                display: flex;
-            }
-
+            .hidden { display: none; }
             .tab {
                 border-bottom: solid 1px #969696;
                 width: 100px;
@@ -58,20 +44,7 @@
                 width: 80px;
                 margin-right: 20px;
             }
-
-            .tab_selected {
-                color: black;
-                font-weight: bold;
-            }
-
-            .tab_hidden {
-                display: none;
-            }
-
-            #game_control_container > div {
-                margin-right: 20px;
-            }
-
+            .tab_selected { color: #000; font-weight: bold; }
             .button {
                 display: inline-block;
                 border: solid 1px #969696;
@@ -83,82 +56,11 @@
                 height: 20px;
                 font-size: 12px;
             }
-
-            .button:hover {
-                background-color: #cccccc;
-            }
-
-            #step_button_container {
-                margin-bottom: 10px;
-                display: flex;
-                justify-content: space-between;
-            }
-
-            #step_button_container > div {
-                flex-grow: 1;
-            }
-
-            #step_button_container > div + div {
-                margin-left: 20px;
-            }
-
-            #instruction_table {
-                width: 100%;
-            }
-
-            #instruction_table, #instruction_table > tr, #instruction_table > tr > td {
-                border-collapse: collapse;
-            }
-
-            .instruction_table_pc_row {
-                background-color: #5996f7;
-            }
-
-            .instruction_table_breakpoint_row {
-                font-weight: bold;
-                color: #942b2b;
-            }
-
-            #registers_table_container, #instruction_table_container {
-                padding: 5px;
-                border: solid 1px #969696;
-                border-radius: 3px;
-                margin-bottom: 10px;
-            }
-
-            #registers_table {
-                width: 100%;
-                font-size: 12px;
-            }
-
-            #registers_table, #registers_table > tr, #registers_table > tr > td {
-                border-collapse: collapse;
-            }
-
-            .cpsr_flag {
-                color: #e1e1e1;
-            }
-
-            .cpsr_flag_active {
-                color: black;
-                font-weight: bold;
-            }
-
-            #instruction_jump_container {
-                display: flex;
-                margin-bottom: 10px;
-            }
-
-            #instruction_jump_container > div {
-                flex-grow: 1;
-                margin-left: 20px;
-                text-align: center;
-            }
-
-            #instruction_jump_container > input {
-                border: solid 1px #969696;
-                border-radius: 3px;
-            }
+            .button:hover { background-color: #cccccc; }
+            .instruction_table_pc_row { background-color: #5996f7; }
+            .instruction_table_breakpoint_row { font-weight: bold; color: #942b2b; }
+            .cpsr_flag { color: #e1e1e1; }
+            .cpsr_flag_active { color: black; font-weight: bold; }
 
         </style>
 
@@ -182,11 +84,11 @@
                     const tabContainer = document.getElementById(`tab${i}_container`);
                     if (i === tabIndex) {
                         tab.classList.add('tab_selected');
-                        tabContainer.classList.remove('tab_hidden');
+                        tabContainer.classList.remove('hidden');
 
                     } else {
                         tab.classList.remove('tab_selected');
-                        tabContainer.classList.add('tab_hidden');
+                        tabContainer.classList.add('hidden');
                     }
                 }
             }
@@ -366,12 +268,12 @@
     <body>
         <div id="container">
             <div style="margin-bottom: 20px;">
-                <a href="https://github.com/SkylerRankin/ts-gba" style="color: #0398fc; text-decoration: none; font-size: 20px; font-weight: bold;">ts-gba</a>
+                <a href="https://github.com/SkylerRankin/ts-gba" id="title_link">ts-gba</a>
             </div>
             <div style="display: flex; justify-content: space-between;">
                 <div id="canvas_container">
                     <canvas id="frame_0_canvas" width="480px" height="320px"></canvas>
-                    <canvas id="frame_1_canvas" width="480px" height="320px" class="canvas_hidden"></canvas>
+                    <canvas id="frame_1_canvas" width="480px" height="320px" class="hidden"></canvas>
                 </div>
                 <div id="tab_container">
                     <div id="tab_row">
@@ -379,7 +281,7 @@
                         <div id="tab1" class="tab" onclick="onTabSelect(1)">CPU</div>
                         <div id="tab2" class="tab" onclick="onTabSelect(2)">PPU</div>
                     </div>
-                    <div id="tab0_container" class="tab_content">
+                    <div id="tab0_container" class="">
                         <div id="game_control_container">
                             <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
                             <div class="button" id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</div>
@@ -387,7 +289,7 @@
                             <div class="button" id="resetButton">Reset</div>
                         </div>
                     </div>
-                    <div id="tab1_container" class="tab_content tab_hidden">
+                    <div id="tab1_container" class="hidden">
                         <div id="step_button_container">
                             <div class="button" id="debug_reset_button">Reset</div>
                             <div class="button" id="debug_run_button">Run</div>
@@ -479,7 +381,7 @@
                         </div>
                         <div id="cpu_info_warning" class="hidden">Not updated while emulator is running</div>
                     </div>
-                    <div id="tab2_container" class="tab_hidden tab_content">
+                    <div id="tab2_container" class="hidden">
                         tab 2, empty
                     </div>
                 </div>
