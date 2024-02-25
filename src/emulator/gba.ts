@@ -1,4 +1,4 @@
-import { CPU } from "./cpu";
+import { CPU, Reg } from "./cpu";
 import { CanvasDisplay, Display } from "./display";
 import { Memory } from "./memory";
 import { PPU } from "./ppu";
@@ -52,6 +52,11 @@ class GBA implements GBAType {
         const cyclesStart = this.cycles;
         while (true) {
             this.runStep();
+            if (this.cpu.atBreakpoint()) {
+                this.pause();
+                this.cpu.breakpointCallback();
+                break;
+            }
             if (this.ppu.vBlankAck) {
                 this.ppu.vBlankAck = false;
                 break;

@@ -22,6 +22,7 @@ type CPUType = {
     profiler: CPUProfiler,
     bigEndian: boolean,
     historyEnabled: boolean,
+    breakpoints: Set<number>,
     
     reset: () => void,
     step: () => void,
@@ -105,6 +106,8 @@ class CPU implements CPUType {
     bootBIOS = true;
     historyEnabled = false;
     instructionSize = 4;
+    breakpoints = new Set<number>();
+    breakpointCallback = () => {};
 
     constructor(memory: Memory) {
         this.memory = memory;
@@ -123,9 +126,7 @@ class CPU implements CPUType {
     }
 
     atBreakpoint() : boolean {
-        // For testing, stop when the instruction is nop
-        return false;
-        // return this.rom[this.generalRegisters[this.operatingMode][Reg.PC]] == 0 || this.rom[this.generalRegisters[Reg.PC]] == undefined;
+        return this.breakpoints.has(this.getGeneralRegister(Reg.PC) - this.instructionSize * 2);
     }
 
     step() : void {
@@ -166,6 +167,7 @@ class CPU implements CPUType {
         this.setModeBits(OperatingModeCodes.usr);
         this.setStatusRegisterFlag('t', 0);
         this.bootBIOS = false;
+        this.breakpoints.clear();
 
         if (this.bootBIOS) {
             this.setGeneralRegister(Reg.PC, 0x00000008);
@@ -406,6 +408,14 @@ class CPU implements CPUType {
             this.operatingMode !== OperatingModes.usr &&
             this.operatingMode !== OperatingModes.sys
         );
+    }
+
+    setBreakpoint(address: number) {
+        this.breakpoints.add(address);
+    }
+
+    removeBreakpoint(address: number) {
+        this.breakpoints.delete(address);
     }
 
 }

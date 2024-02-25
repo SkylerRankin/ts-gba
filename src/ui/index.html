@@ -86,6 +86,46 @@
                 border-collapse: collapse;
             }
 
+            .instruction_table_pc_row {
+                background-color: #4287f5;
+            }
+
+            .instruction_table_breakpoint_row {
+                color: red;
+            }
+
+
+            #registers_table {
+                width: 100%;
+                font-size: 12px;
+            }
+
+            #registers_table, #registers_table > tr, #registers_table > tr > td {
+                /* border: 1px solid #e1e1e1; */
+                border-collapse: collapse;
+            }
+
+            .cpsr_flag {
+                color: #e1e1e1;
+            }
+
+            .cpsr_flag_active {
+                color: black;
+                font-weight: bold;
+            }
+
+            #instruction_jump_container {
+                display: flex;
+                
+            }
+
+            #instruction_jump_container > div {
+                background-color: aquamarine;
+                flex-grow: 1;
+                margin-left: 20px;
+                text-align: center;
+            }
+
         </style>
 
         <script>
@@ -96,7 +136,10 @@
             let instructionTableState = {
                 pcOffset: 0,
                 checkScroll: true,
-                activeAddress: 0
+                activeAddress: 0,
+                lastClickedRowAddress: 0,
+                lastClickedRowTime: 0,
+                doubleClickMs: 400,
             };
 
             const onTabSelect = (tabIndex) => {
@@ -135,26 +178,27 @@
 
             const onRun = () => {
                 instructionTableState.pcOffset = 0;
-                document.getElementById("instruction_table_warning").classList.remove("hidden");
-                document.getElementById("instruction_table").classList.add("hidden");
+                document.getElementById("cpu_info_warning").classList.remove("hidden");
+                document.getElementById("cpu_info_container").classList.add("hidden");
                 romLoaded = true;
                 gba.run();
             }
 
             const onPause = () => {
                 gba.pause();
-                document.getElementById("instruction_table_warning").classList.add("hidden");
-                document.getElementById("instruction_table").classList.remove("hidden");
+                document.getElementById("cpu_info_warning").classList.add("hidden");
+                document.getElementById("cpu_info_container").classList.remove("hidden");
 
                 // Focus instruction list on PC on pause
                 instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
                 updateInstructionList();
+                updateRegisters();
             }
 
             const onReset = () => {
                 gba.reset();
-                document.getElementById("instruction_table_warning").classList.add("hidden");
-                document.getElementById("instruction_table").classList.remove("hidden");
+                document.getElementById("cpu_info_warning").classList.add("hidden");
+                document.getElementById("cpu_info_container").classList.remove("hidden");
                 romLoaded = false;
             }
 
@@ -163,6 +207,35 @@
                 instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
                 instructionTableState.pcOffset = 0;
                 updateInstructionList();
+                updateRegisters();
+            }
+
+            const onSelectRow = () => {
+                const address = instructionTableState.lastClickedRowAddress;
+                if (gba.cpu.breakpoints.has(address)) {
+                    gba.cpu.removeBreakpoint(address);
+                } else {
+                    gba.cpu.setBreakpoint(address);
+                }
+                updateInstructionList();
+            }
+
+            const updateRegisters = () => {
+                const text = window.UI.getRegisterText(gba);
+
+                Object.entries(text).forEach(([key, text]) => {
+                    if (key.startsWith("r")) {
+                        document.getElementById(`${key}_value`).innerHTML = text;
+                    } else if (key === "cpsr") {
+                        document.getElementById("cpsr_value").innerHTML = text;
+                    } else if (key.startsWith("flag_")) {
+                        if (text === "true") {
+                            document.getElementById(key).classList.add("cpsr_flag_active");
+                        } else {
+                            document.getElementById(key).classList.remove("cpsr_flag_active");
+                        }
+                    }
+                });
             }
 
             const updateInstructionList = () => {
@@ -174,12 +247,23 @@
                 lines.forEach(line => {
                     const tr = document.createElement("tr");
                     if (line.address === pc) {
-                        tr.style = "background-color: #4287f5;";
+                        tr.classList.add("instruction_table_pc_row");
                     }
 
-                    const breakPoint = document.createElement("td");
-                    breakPoint.innerHTML = "O";
-                    breakPoint.style = "width: 5%;";
+                    if (gba.cpu.breakpoints.has(line.address)) {
+                        tr.classList.add("instruction_table_breakpoint_row");
+                    }
+
+                    tr.addEventListener("click", () => {
+                        if (instructionTableState.lastClickedRowAddress === line.address) {
+                            if (performance.now() - instructionTableState.lastClickedRowTime < instructionTableState.doubleClickMs) {
+                                onSelectRow();
+                            }
+                        } else {
+                            instructionTableState.lastClickedRowAddress = line.address;
+                        }
+                        instructionTableState.lastClickedRowTime = performance.now();
+                    });
 
                     const address = document.createElement("td");
                     address.innerHTML = `0x${line.address.toString(16).padStart(8, '0')}`;
@@ -193,7 +277,6 @@
                     text.innerHTML = line.text.toLowerCase();
                     text.style = "width: 50%;";
 
-                    tr.appendChild(breakPoint);
                     tr.appendChild(address);
                     tr.appendChild(instruction);
                     tr.appendChild(text);
@@ -227,6 +310,22 @@
                 document.getElementById("debug_run_button").addEventListener("click", () => { onRun(); });
                 document.getElementById("debug_pause_button").addEventListener("click", () => { onPause(); });
                 document.getElementById("debug_step_button").addEventListener("click", () => { onStep(); });
+                document.getElementById("instruction_jump_button").addEventListener("click", () => {
+                    let addressText = document.getElementById("instruction_jump_input").value;
+                    if (!addressText.startsWith("0x")) addressText = "0x" + addressText;
+                    const address = Number.parseInt(addressText);
+                    const instructionSize = gba.cpu.operatingMode === "ARM" ? 4 : 2;
+                    instructionTableState.pcOffset = (address - instructionTableState.activeAddress) / instructionSize;
+                    updateInstructionList();
+                });
+                document.getElementById("instruction_pc_button").addEventListener("click", () => {
+                    instructionTableState.pcOffset = 0;
+                    updateInstructionList();
+                });
+
+                gba.cpu.breakpointCallback = () => {
+                    onPause();
+                }
             }
         </script>
     </head>
@@ -277,9 +376,87 @@
                             <div class="button" id="debug_pause_button">Pause</div>
                             <div class="button" id="debug_step_button">Step</div>
                         </div>
-                        <div style="background-color: bisque;">instructions</div>
-                        <table id="instruction_table" class="hidden"></table>
-                        <div id="instruction_table_warning" class="hidden">Not shown while emulator is running</div>
+                        <div id="cpu_info_container" class="hidden">
+                            <div>
+                                <table id="registers_table">
+                                    <tr>
+                                        <td>R0</td>
+                                        <td id="r0_value">00000000</td>
+                                        <td>R8</td>
+                                        <td id="r8_value">00000000</td>
+                                        <td>CPSR</td>
+                                        <td id="cpsr_value">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>R1</td>
+                                        <td id="r1_value">00000000</td>
+                                        <td>R9</td>
+                                        <td id="r9_value">00000000</td>
+                                        <td>Flags</td>
+                                        <td>
+                                            <span id="flag_n" class="cpsr_flag">n</span>
+                                            <span id="flag_z" class="cpsr_flag">z</span>
+                                            <span id="flag_c" class="cpsr_flag">c</span>
+                                            <span id="flag_v" class="cpsr_flag">v</span>
+                                            <span id="flag_i" class="cpsr_flag">i</span>
+                                            <span id="flag_f" class="cpsr_flag">f</span>
+                                            <span id="flag_t" class="cpsr_flag">t</span>
+                                            <span id="flag_q" class="cpsr_flag">q</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>R2</td>
+                                        <td id="r2_value">00000000</td>
+                                        <td>R10</td>
+                                        <td id="r10_value">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>R3</td>
+                                        <td id="r3_value">00000000</td>
+                                        <td>R11</td>
+                                        <td id="r11_value">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>R4</td>
+                                        <td id="r4_value">00000000</td>
+                                        <td>R12</td>
+                                        <td id="r12_value">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>R5</td>
+                                        <td id="r5_value">00000000</td>
+                                        <td>R13</td>
+                                        <td id="r13_value">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>R6</td>
+                                        <td id="r6_value">00000000</td>
+                                        <td>R14</td>
+                                        <td id="r14_value">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>R7</td>
+                                        <td id="r7_value">00000000</td>
+                                        <td>R15</td>
+                                        <td id="r15_value">00000000</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <table id="instruction_table"></table>
+                            <div id="instruction_jump_container">
+                                <input id="instruction_jump_input" type="text" value="08000000">
+                                <div id="instruction_jump_button">Jump</div>
+                                <div id="instruction_pc_button">Return to PC</div>
+                            </div>
+                            <div>
+                                <ul>
+                                    <li>Double click instruction to set breakpoint, will be highlighted in red</li>
+                                    <li>Current PC is highlighted in blue</li>
+                                    <li>All instructions in table are decoded according to current operating state, may not be correct</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div id="cpu_info_warning" class="hidden">Not updated while emulator is running</div>
                     </div>
                     <div id="tab2_container" class="tab_hidden tab_content">
                         tab 2, empty
