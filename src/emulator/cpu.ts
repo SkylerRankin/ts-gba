@@ -177,36 +177,25 @@ class CPU implements CPUType {
     }
 
     conditionIsMet(condition: number) : boolean {
-        const nFlag = this.getStatusRegisterFlag('CPSR', 'n');
-        const zFlag = this.getStatusRegisterFlag('CPSR', 'z');
-        const cFlag = this.getStatusRegisterFlag('CPSR', 'c');
-        const vFlag = this.getStatusRegisterFlag('CPSR', 'v');
-
         switch (condition) {
-            case 0b0000: { return zFlag === 1; }
-            case 0b0001: { return zFlag === 0; }
-            case 0b0010: { return cFlag === 1; }
-            case 0b0011: { return cFlag === 0; }
-            case 0b0100: { return nFlag === 1; }
-            case 0b0101: { return nFlag === 0; }
-            case 0b0110: { return vFlag === 1; }
-            case 0b0111: { return vFlag === 0; }
-            case 0b1000: { return cFlag === 1 && zFlag === 0; }
-            case 0b1001: { return cFlag === 0 || zFlag === 1; }
-            case 0b1010: { return nFlag === vFlag; }
-            case 0b1011: { return nFlag !== vFlag; }
-            case 0b1100: { return zFlag === 0 && nFlag === vFlag; }
-            case 0b1101: { return zFlag === 1 || nFlag !== vFlag; }
+            case 0b0000: { return this.getStatusRegisterFlag('CPSR', 'z') === 1; }
+            case 0b0001: { return this.getStatusRegisterFlag('CPSR', 'z') === 0; }
+            case 0b0010: { return this.getStatusRegisterFlag('CPSR', 'c') === 1; }
+            case 0b0011: { return this.getStatusRegisterFlag('CPSR', 'c') === 0; }
+            case 0b0100: { return this.getStatusRegisterFlag('CPSR', 'n') === 1; }
+            case 0b0101: { return this.getStatusRegisterFlag('CPSR', 'n') === 0; }
+            case 0b0110: { return this.getStatusRegisterFlag('CPSR', 'v') === 1; }
+            case 0b0111: { return this.getStatusRegisterFlag('CPSR', 'v') === 0; }
+            case 0b1000: { return this.getStatusRegisterFlag('CPSR', 'c') === 1 && this.getStatusRegisterFlag('CPSR', 'z') === 0; }
+            case 0b1001: { return this.getStatusRegisterFlag('CPSR', 'c') === 0 || this.getStatusRegisterFlag('CPSR', 'z') === 1; }
+            case 0b1010: { return this.getStatusRegisterFlag('CPSR', 'n') === this.getStatusRegisterFlag('CPSR', 'v'); }
+            case 0b1011: { return this.getStatusRegisterFlag('CPSR', 'n') !== this.getStatusRegisterFlag('CPSR', 'v'); }
+            case 0b1100: { return this.getStatusRegisterFlag('CPSR', 'z') === 0 && this.getStatusRegisterFlag('CPSR', 'n') === this.getStatusRegisterFlag('CPSR', 'v'); }
+            case 0b1101: { return this.getStatusRegisterFlag('CPSR', 'z') === 1 || this.getStatusRegisterFlag('CPSR', 'n') !== this.getStatusRegisterFlag('CPSR', 'v'); }
             case 0b1110: { return true; }
             case 0b1111: { return true; }
             default: { throw Error(`Invalid condition opcode 0b${(condition >>> 0).toString(2)}.`); }
         }
-    }
-
-    clearConditionCodeFlags() : void {
-        ['n', 'z', 'c', 'v'].forEach(flag => {
-            this.setStatusRegisterFlag(flag as StatusRegisterKey, 0);
-        });
     }
 
     getStatusRegisterFlag(register: StatusRegister, flag: StatusRegisterKey) : number {

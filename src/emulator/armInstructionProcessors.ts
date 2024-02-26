@@ -1,5 +1,5 @@
 import { CPU, OperatingModes, Reg } from './cpu';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, byteArrayToInt32, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray, halfWordAlignAddress, signedOverflowFromAddition } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray, halfWordAlignAddress, signedOverflowFromAddition } from './math';
 
 type ProcessedInstructionOptions = {
     incrementPC: boolean
@@ -19,9 +19,6 @@ type DataProcessingParameter = {
  * on the given CPU.
  */
 const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
-    const bits = (i >>> 0).toString(2).padStart(32, '0')
-        .split('').map((x: string) : number => parseInt(x)).reverse();
-
     // Branch instructions
     if (((i >>> 4) & 0xFFFFFF) === 0x12FFF1) return processBX(cpu, i);
     if (((i >>> 25) & 0x7F) === 0x7D) return processBLX(cpu, i, 1);
@@ -29,36 +26,42 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // Check for B/BL after BLX(1) due to overlap in bits 27:25
     if (((i >>> 25) & 0x7) === 0x5) return processBBL(cpu, i);
 
+    const b15 = (i >> 15) & 0x1;
+    const b20 = (i >> 20) & 0x1;
+    const b21 = (i >> 21) & 0x1;
+    const b22 = (i >> 22) & 0x1;
+    const b24 = (i >> 24) & 0x1;
+
     // Load/store instructions
     if (((i >>> 26) & 0x3) === 0x1) {
-        if (bits[24] === 0 && ((i >>> 20) & 0x7) === 0x7) return processLDRBT(cpu, i);
-        if (bits[24] === 0 && ((i >>> 20) & 0x7) === 0x3) return processLDRT(cpu, i);
-        if (bits[22] === 0 && bits[20] === 1) return processLDR(cpu, i);
-        if (bits[22] === 1 && bits[20] === 1) return processLDRB(cpu, i);
-        if (bits[24] === 0 && ((i >>> 20) & 0x7) === 0b110) return processSTRBT(cpu, i);
-        if (bits[24] === 0 && ((i >>> 20) & 0x7) === 0b010) return processSTRT(cpu, i);
-        if (bits[22] === 0 && bits[20] === 0) return processSTR(cpu, i);
-        if (bits[22] === 1 && bits[20] === 0) return processSTRB(cpu, i);
-    } else if (((i >>> 25) & 0x7) === 0x0 && bits[20] === 1) {
+        if (b24 === 0 && ((i >>> 20) & 0x7) === 0x7) return processLDRBT(cpu, i);
+        if (b24 === 0 && ((i >>> 20) & 0x7) === 0x3) return processLDRT(cpu, i);
+        if (b22 === 0 && b20 === 1) return processLDR(cpu, i);
+        if (b22 === 1 && b20 === 1) return processLDRB(cpu, i);
+        if (b24 === 0 && ((i >>> 20) & 0x7) === 0b110) return processSTRBT(cpu, i);
+        if (b24 === 0 && ((i >>> 20) & 0x7) === 0b010) return processSTRT(cpu, i);
+        if (b22 === 0 && b20 === 0) return processSTR(cpu, i);
+        if (b22 === 1 && b20 === 0) return processSTRB(cpu, i);
+    } else if (((i >>> 25) & 0x7) === 0x0 && b20 === 1) {
         if (((i >>> 4) & 0xF) === 0xB) return processLDRH(cpu, i);
         if (((i >>> 4) & 0xF) === 0xD) return processLDRSB(cpu, i);
         if (((i >>> 4) & 0xF) === 0xF) return processLDRSH(cpu, i);
     } else if (((i >>> 25) & 0x7) === 0x4) {
-        if (bits[22] === 0 && bits[20] === 1) return processLDM(cpu, i, 1);
-        if (((i >>> 20) & 0x7) === 0x5 && bits[15] === 0) return processLDM(cpu, i, 2);
-        if (bits[22] === 1 && bits[20] === 1 && bits[15] === 1) return processLDM(cpu, i, 3);
+        if (b22 === 0 && b20 === 1) return processLDM(cpu, i, 1);
+        if (((i >>> 20) & 0x7) === 0x5 && b15 === 0) return processLDM(cpu, i, 2);
+        if (b22 === 1 && b20 === 1 && b15 === 1) return processLDM(cpu, i, 3);
     }
 
     // Coprocessor Load & Store
     if (((i >>> 25) & 0x7) === 0b110) {
-        if (bits[20] === 1) return processLDC(cpu, i);
-        if (bits[20] === 0) return processSTC(cpu, i);
+        if (b20 === 1) return processLDC(cpu, i);
+        if (b20 === 0) return processSTC(cpu, i);
     }
 
     // Coprocessor Data Processing and Register Transfers
     if (((i >>> 24) & 0xF) === 0b1110) {
-        if (bits[4] === 0) return processCDP(cpu, i);
-        else if (bits[20] === 0) return processMCR(cpu, i);
+        if (((i >> 4) & 0x1) === 0) return processCDP(cpu, i);
+        else if (b20 === 0) return processMCR(cpu, i);
         else return processMRC(cpu, i);
     }
 
@@ -81,20 +84,20 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // Bits 27:25 = 000
     if (((i >>> 25) & 0x7) === 0x0) {
         // Store Register Halfword
-        if (bits[20] === 0 && ((i >>> 4) & 0xF) === 0b1011) return processSTRH(cpu, i);
+        if (b20 === 0 && ((i >>> 4) & 0xF) === 0b1011) return processSTRH(cpu, i);
 
         // Multiply Instructions
         if (((i >>> 21) & 0x7F) === 0x1 && ((i >>> 4) & 0xF) === 0b1001) return processMLA(cpu, i);
         if (((i >>> 21) & 0x7F) === 0x0 && ((i >>> 12) & 0xF) === 0x0 && ((i >>> 4) & 0xF) === 0b1001) return processMUL(cpu, i);
         if (((i >>> 23) & 0x1F) === 0x1 && ((i >>> 4) & 0xF) === 0b1001) {
-            if (bits[22] === 0) {
-                if (bits[21] === 0) {
+            if (b22 === 0) {
+                if (b21 === 0) {
                     return processUMULL(cpu, i);
                 } else {
                     return processUMLAL(cpu, i);
                 }
             } else {
-                if (bits[21] === 0) {
+                if (b21 === 0) {
                     return processSMULL(cpu, i);
                 } else {
                     return processSMLAL(cpu, i);
@@ -108,8 +111,8 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     }
 
     // Store Multiple
-    if (((i >>> 25) & 0x7) === 0x4 && bits[22] === 0 && bits[20] === 0) return processSTM(cpu, i, 1);
-    if (((i >>> 25) & 0x7) === 0x4 && bits[22] === 1 && bits[20] === 0) return processSTM(cpu, i, 2);
+    if (((i >>> 25) & 0x7) === 0x4 && b22 === 0 && b20 === 0) return processSTM(cpu, i, 1);
+    if (((i >>> 25) & 0x7) === 0x4 && b22 === 1 && b20 === 0) return processSTM(cpu, i, 2);
 
     // CLZ
     if (((i >>> 16) & 0xFFF) === 0b000101101111 && ((i >>> 4) & 0xFF) === 0b11110001) return processCLZ(cpu, i);
@@ -329,22 +332,20 @@ const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
  * 
  */
 const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
-    const bits = (i >>> 0).toString(2).padStart(32, '0')
-        .split('').map((x: string) : number => parseInt(x)).reverse();
     const condition = (i >>> 28) & 0xF;
     const conditionPassed = cpu.conditionIsMet(condition);
     const mode = ((i >>> 26) & 0x3) === 0x1 ? 2 : 3;
-    const p = bits[24];
-    const u = bits[23];
-    const b = bits[22];
-    const w = bits[21];
-    const l = bits[20];
+    const p = (i >> 24) & 0x1;
+    const u = (i >> 23) & 0x1;
+    const b = (i >> 22) & 0x1;
+    const w = (i >> 21) & 0x1;
+    const l = (i >> 20) & 0x1;
     const rn = (i >>> 16) & 0xF;
     const rnValue = cpu.getGeneralRegister(rn);
     let address = 0;
 
     if (mode === 2) {
-        const immediate = bits[25] === 0;
+        const immediate = ((i >> 25) & 0x1) === 0;
         if (immediate) {
             const offset = i & 0xFFF;
             const sign = u === 1 ? 1 : -1;
@@ -419,7 +420,7 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
             }
         }
     } else if (mode === 3) {
-        const immediate = bits[22] === 1;
+        const immediate = ((i >> 22) & 0x1) === 1;
         const sign = u === 1 ? 1 : -1;
         let offset = 0;
         if (immediate) {
