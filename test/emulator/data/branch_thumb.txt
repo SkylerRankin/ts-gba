@@ -28,7 +28,7 @@ SET R15=0x113EA
 0xfe8d BL #0x1D102 Updates=[R14=0x113E9, R15=0x1D106]   # Positive offset, H=11 variant
 
 # --- BX ---
-SET R0=0xA001, R1=0xB10C, R14=0xFF002, T=0
+SET R0=0xA001, R1=0xB10C, R14=0xFF004, T=0
 0x4700 BX R0 Updates=[R15=0xA004, T=1]                  # With T transfer
-0x4708 BX R1 Updates=[R15=0xB110, T=0]                  # Without T transfer
-0x4770 BX R14 Updates=[R15=0xFF006, T=0]                # Using high bit
+0x4708 BX R1 Updates=[R15=0xB114, T=0]                  # Without T transfer
+0x4770 BX R14 Updates=[R15=0xFF00C, T=0]                # Using high bit

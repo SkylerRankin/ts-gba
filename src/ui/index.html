@@ -206,7 +206,7 @@
                     address.style = "width: 20%;";
 
                     const instruction = document.createElement("td");
-                    instruction.innerHTML = `0x${line.instruction.toString(16).padStart(gba.cpu.operatingMode === "ARM" ? 8 : 4, '0')}`;
+                    instruction.innerHTML = `0x${line.instruction.toString(16).padStart(gba.cpu.operatingState === "ARM" ? 8 : 4, '0')}`;
                     instruction.style = "width: 20%;";
 
                     const text = document.createElement("td");
@@ -250,7 +250,7 @@
                     let addressText = document.getElementById("instruction_jump_input").value;
                     if (!addressText.startsWith("0x")) addressText = "0x" + addressText;
                     const address = Number.parseInt(addressText);
-                    const instructionSize = gba.cpu.operatingMode === "ARM" ? 4 : 2;
+                    const instructionSize = gba.cpu.operatingState === "ARM" ? 4 : 2;
                     instructionTableState.pcOffset = (address - instructionTableState.activeAddress) / instructionSize;
                     updateInstructionList();
                 });

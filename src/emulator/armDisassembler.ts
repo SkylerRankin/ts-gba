@@ -321,7 +321,6 @@ const parseLoadStoreAddress = (cpu: CPU, i: number) : string => {
             } else if (p === 0 && w === 0) {
                 // Register post-indexed
                 address = rnValue;
-                if (conditionPassed) cpu.setGeneralRegister(rn, ((rnValue + sign * index) & 0xFFFFFFFF) >>> 0);
                 if (shiftImmediate === 0) {
                     return `[R${rn}], ${signText}R${rm}`;
                 } else {
@@ -353,12 +352,10 @@ const parseLoadStoreAddress = (cpu: CPU, i: number) : string => {
         } else if (p === 1 && w === 1) {
             // Pre-indexed
             address = ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0;
-            if (conditionPassed) cpu.setGeneralRegister(rn, address);
             return `[R${rn}, ${offsetText}]!`;
         } else if (p === 0 && w === 0) {
             // Post-indexed
             address = rnValue;
-            if (conditionPassed) cpu.setGeneralRegister(rn, ((rnValue + sign * offset) & 0xFFFFFFFF) >>> 0);
             return `[R${rn}], ${offsetText}`;
         }
     }

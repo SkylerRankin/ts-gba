@@ -12,9 +12,9 @@ SET R15=0x108
 
 # --- BL ---
 SET R14=0, R15=0x10B08
-0xebffbd7e BL #0x100 Updates=[R15=0x108, R14=0x10B0c]       # Backwards branch
+0xebffbd7e BL #0x100 Updates=[R15=0x108, R14=0x10B04]       # Backwards branch
 SET R14=0, R15=0x108
-0xeb004280 BL #0x10B08 Updates=[R15=0x10B10, R14=0x10c]     # Forward branch
+0xeb004280 BL #0x10B08 Updates=[R15=0x10B10, R14=0x104]     # Forward branch
 
 # --- BX ---
 SET R0=0x124, R1=0x123, R15=0, T=0

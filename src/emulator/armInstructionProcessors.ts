@@ -150,7 +150,15 @@ const processDataProcessing = (cpu: CPU, i: number) : ProcessedInstructionOption
     if (processingFunction) {
         processingFunction({cpu, value1, value2, rd, sFlag, shiftCarry});
     }
-    return { incrementPC: true };
+
+    if (rd === Reg.PC) {
+        // Add PC offset if the instruction edited PC. unless the value comes from LR?
+        const adjustedPC = cpu.getGeneralRegister(Reg.PC) + 8;
+        cpu.setGeneralRegister(Reg.PC, adjustedPC);
+        return { incrementPC: false };
+    } else {
+        return { incrementPC: true };
+    }
 }
 
 /**
@@ -853,7 +861,7 @@ const processBBL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const newPC = pc + (imm << 2) + (instructionSize * 2);
     cpu.setGeneralRegister(Reg.PC, newPC);
     if (lFlag === 1) {
-        cpu.setGeneralRegister(Reg.LR, pc + instructionSize);
+        cpu.setGeneralRegister(Reg.LR, pc - (instructionSize * 2) + instructionSize);
     }
     return { incrementPC: false };
 }

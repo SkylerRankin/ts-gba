@@ -175,12 +175,14 @@ const processBX = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('BX');
     // #REMOVE_IN_BUILD_END
 
-    const instructionSize = 2;
     const h2 = (i >>> 6) & 0x1;
     const rm = ((i >>> 3) & 0x7) + (h2 << 3);
     const rmValue = cpu.getGeneralRegister(rm);
-    cpu.setStatusRegisterFlag('t', rmValue & 0x1);
-    cpu.setGeneralRegister(Reg.PC, (rmValue + instructionSize * 2) & (~0x1));
+    const tFlag = rmValue & 0x1;
+    cpu.setStatusRegisterFlag('t', tFlag);
+
+    const nextInstructionSize = tFlag === 1 ? 2 : 4;
+    cpu.setGeneralRegister(Reg.PC, (rmValue + (nextInstructionSize * 2)) & (~0x1));
 
     return { incrementPC: false };
 }

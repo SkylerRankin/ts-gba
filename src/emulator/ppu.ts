@@ -130,13 +130,20 @@ class PPU implements PPUType {
         }
 
         switch (this.displayState) {
-            case 'hDraw':
+            case 'hDraw': {
                 // V Draw completed
                 this.displayState = 'hBlank';
                 this.nextCycleTrigger = cpuCycles + DisplayConstants.hBlankCycles;
                 this.renderScanline(this.currentScanline);
+
+                // Set H-Blank flag in DISPSTAT
+                const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 1);
+                dispstat[0] = dispstat[0] | 0x2;
+                this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
+
                 break;
-            case 'hBlank':
+            }
+            case 'hBlank': {
                 // H Blank completed
                 if (this.currentScanline < DisplayConstants.vDrawPixels - 1) {
                     this.currentScanline += 1;
@@ -146,11 +153,24 @@ class PPU implements PPUType {
                 } else {
                     this.currentScanline += 1;
                     this.displayState = 'vBlank';
+
+                    // Set V-Blank flag in DISPSTAT
+                    const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 2);
+                    dispstat[0] = dispstat[0] | 0x1;
+                    this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
+
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
                     this.display.drawFrame();
                 }
+
+                // Clear H-Blank flag in DISPSTAT
+                const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 1);
+                dispstat[0] = dispstat[0] & 0xFD;
+                this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
+
                 break;
-            case 'vBlank':
+            }
+            case 'vBlank': {
                 if (this.currentScanline < (DisplayConstants.vDrawPixels + DisplayConstants.hBlankPixels - 1)) {
                     // Completed empty vdraw scanline
                     this.currentScanline += 1;
@@ -163,8 +183,14 @@ class PPU implements PPUType {
                     this.currentScanline = 0;
                     this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
+
+                    // Clear V-Blank flag in DISPSTAT
+                    const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 2);
+                    dispstat[0] = dispstat[0] & 0xFE;
+                    this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
                 }
                 break;
+            }
         }
     }
 
