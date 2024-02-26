@@ -120,7 +120,7 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // Data processing instructions
     if ((i & 0x0C000000) === 0) return processDataProcessing(cpu, i);
 
-    throw Error(`Failed to decode instruction: 0x${i.toString(16).padStart(8, '0')}.`);
+    throw Error(`Failed to decode instruction: 0x${(i >>> 0).toString(16).padStart(8, '0')}.`);
 }
 
 const processDataProcessing = (cpu: CPU, i: number) : ProcessedInstructionOptions => {

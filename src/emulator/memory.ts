@@ -43,7 +43,9 @@ class Memory implements MemoryType {
     }
 
     reset = (): void => {
-        this.memoryBlocks.BIOS.fill(0);
+        for (const block in this.memoryBlocks) {
+            this.memoryBlocks[block as MemorySegment].fill(0);
+        }
     }
 
     /**

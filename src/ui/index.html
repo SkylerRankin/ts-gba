@@ -12,7 +12,10 @@
 
             #container { width: 1000px; margin: 50px auto; }
             #canvas_container canvas { position: absolute; image-rendering: pixelated; background-color: #e1e1e1; }
+            #game_control_container { margin-bottom: 10px; }
             #game_control_container > div { margin-right: 20px; }
+            #key_container > div { margin-bottom: 10px; }
+            #key_container > table { width: 100%; border-collapse: collapse; }
             #title_link { color: #0398fc; text-decoration: none; font-size: 20px; font-weight: bold; }
             #tab_container { width: 480px; display: inline-block; min-height: 320px; font-size: 12px; }
             #tab_row { margin-bottom: 30px; display: flex; font-size: 16px; }
@@ -21,7 +24,7 @@
             #step_button_container > div + div { margin-left: 20px; }
             #instruction_table { width: 100%; }
             #instruction_table, #instruction_table > tr, #instruction_table > tr > td { border-collapse: collapse; }
-            #registers_table_container, #instruction_table_container {
+            #registers_table_container, #instruction_table_container, #key_container {
                 padding: 5px;
                 border: solid 1px #969696;
                 border-radius: 3px;
@@ -76,6 +79,23 @@
                 lastClickedRowAddress: 0,
                 lastClickedRowTime: 0,
                 doubleClickMs: 400,
+            };
+
+            const keyCodeToKey = {
+                219: "A",
+                221: "B",
+                13: "Select",
+                16: "Start",
+                68: "Right",
+                39: "Right",
+                65: "Left",
+                37: "Left",
+                87: "Up",
+                38: "Up",
+                83: "Down",
+                40: "Down",
+                76: "L",
+                82: "R"
             };
 
             const onTabSelect = (tabIndex) => {
@@ -220,6 +240,14 @@
                 });
             }
 
+            const onKeyUpdate = (key, pressed) => {
+                const gbaKey = keyCodeToKey[key];
+                if (gbaKey) {
+                    if (pressed) gba.keypad.onKeyDown(gbaKey);
+                    else gba.keypad.onKeyUp(gbaKey);
+                }
+            }
+
             window.onload = () => {
                 gba = new window.GBA();
                 gba.reset();
@@ -262,6 +290,10 @@
                 gba.cpu.breakpointCallback = () => {
                     onPause();
                 }
+
+                document.addEventListener("keydown", (event) => { onKeyUpdate(event.keyCode, true); });
+                document.addEventListener("keyup", (event) => { onKeyUpdate(event.keyCode, false); });
+
             }
         </script>
     </head>
@@ -272,8 +304,8 @@
             </div>
             <div style="display: flex; justify-content: space-between;">
                 <div id="canvas_container">
-                    <canvas id="frame_0_canvas" width="480px" height="320px"></canvas>
-                    <canvas id="frame_1_canvas" width="480px" height="320px" class="hidden"></canvas>
+                    <canvas id="frame_0_canvas" width="480px" height="320px" tabindex="0"></canvas>
+                    <canvas id="frame_1_canvas" width="480px" height="320px" tabindex="0" class="hidden"></canvas>
                 </div>
                 <div id="tab_container">
                     <div id="tab_row">
@@ -287,6 +319,39 @@
                             <div class="button" id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</div>
                             <div class="button" id="startButton">Start</div>
                             <div class="button" id="resetButton">Reset</div>
+                        </div>
+                        <div id="key_container">
+                            <div>Controls</div>
+                            <table>
+                                <tr>
+                                    <td>A Button</td>
+                                    <td>[</td>
+                                    <td>Right Button</td>
+                                    <td>D / Right</td>
+                                    <td>L Button</td>
+                                    <td>L</td>
+                                </tr>
+                                <tr>
+                                    <td>B Button</td>
+                                    <td>]</td>
+                                    <td>Left Button</td>
+                                    <td>A / Left</td>
+                                    <td>R Button</td>
+                                    <td>R</td>
+                                </tr>
+                                <tr>
+                                    <td>Select</td>
+                                    <td>Enter</td>
+                                    <td>Up Button</td>
+                                    <td>W / Up</td>
+                                </tr>
+                                <tr>
+                                    <td>Start</td>
+                                    <td>Shift</td>
+                                    <td>Down Button</td>
+                                    <td>S / Down</td>
+                                </tr>
+                            </table>
                         </div>
                     </div>
                     <div id="tab1_container" class="hidden">

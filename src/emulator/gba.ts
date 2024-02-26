@@ -1,5 +1,6 @@
 import { CPU, Reg } from "./cpu";
 import { CanvasDisplay, Display } from "./display";
+import { Keypad } from "./keypad";
 import { Memory } from "./memory";
 import { PPU } from "./ppu";
 import { UI } from "./ui";
@@ -21,6 +22,7 @@ class GBA implements GBAType {
     display: Display;
     cpu: CPU;
     ppu: PPU;
+    keypad: Keypad;
     nextFrameTimer: number = 0;
     frameQueue: number[] = [];
 
@@ -29,6 +31,7 @@ class GBA implements GBAType {
         this.cpu = new CPU(this.memory);
         this.display = display;
         this.ppu = new PPU(this.memory, this.display);
+        this.keypad = new Keypad(this.memory);
         this.frameQueue = new Array<number>();
     }
 
@@ -92,6 +95,7 @@ class GBA implements GBAType {
         this.memory.reset();
         this.cpu.reset();
         this.ppu.reset();
+        this.keypad.reset();
         this.display.reset();
     }
 
