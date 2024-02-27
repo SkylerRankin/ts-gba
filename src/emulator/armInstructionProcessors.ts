@@ -49,7 +49,12 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     } else if (((i >>> 25) & 0x7) === 0x4) {
         if (b22 === 0 && b20 === 1) return processLDM(cpu, i, 1);
         if (((i >>> 20) & 0x7) === 0x5 && b15 === 0) return processLDM(cpu, i, 2);
-        if (b22 === 1 && b20 === 1 && b15 === 1) return processLDM(cpu, i, 3);
+        /**
+         * The specification states that bit 15 should be 1 for LDM (3), since PC is
+         * always included in the register load list. In practice, some ROMs seem to
+         * not have this bit set and thus do not load into PC.
+         */
+        if (b22 === 1 && b20 === 1 /*&& b15 === 1*/) return processLDM(cpu, i, 3);
     }
 
     // Coprocessor Load & Store
@@ -1078,6 +1083,11 @@ const processSTRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 // Load & Store Multiple Instructions
 
+/**
+ * The specification states that LDM (3) always includes PC in the register list, as bit
+ * 15 is set to 1. In practice, some ROMs do not include R15 in the register list, so
+ * this implementation treats the PC as optional for LDM (3).
+ */
 const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
     // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LDM (${type})`);
@@ -1129,13 +1139,15 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
                 }
             }
             cpu.spsrToCPSR();
-            const value = cpu.memory.getInt32(address);
-            const t = cpu.getStatusRegisterFlag('CPSR', 't');
-            const newPC = t === 1 ?
-                value & 0xFFFFFFFE :
-                value & 0xFFFFFFFC;
-            cpu.setGeneralRegister(Reg.PC, newPC);
-            address += 4;
+            if ((i >> 15) & 0x1) {
+                const value = cpu.memory.getInt32(address);
+                const t = cpu.getStatusRegisterFlag('CPSR', 't');
+                const newPC = t === 1 ?
+                    value & 0xFFFFFFFE :
+                    value & 0xFFFFFFFC;
+                cpu.setGeneralRegister(Reg.PC, newPC);
+                address += 4;
+            }
             break;
     }
 

@@ -48,6 +48,9 @@ class CanvasDisplay implements Display {
             this.contexts[0].createImageData(DisplaySize.width, DisplaySize.height),
             this.contexts[1].createImageData(DisplaySize.width, DisplaySize.height),
         ];
+
+        this.contexts[0].imageSmoothingEnabled = false;
+        this.contexts[1].imageSmoothingEnabled = false;
         
         this.currentContext = 0;
     }
