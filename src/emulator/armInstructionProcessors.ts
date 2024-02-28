@@ -14,6 +14,14 @@ type DataProcessingParameter = {
     shiftCarry: number
 }
 
+type LoadStoreMultipleAddressParameter = {
+    startAddress: number,
+    endAddress: number,
+    updateRn: boolean,
+    rn: number,
+    rnValue: number
+}
+
 /**
  * Takes a 32 bit ARM instruction in big-endian format, and executes that instruction
  * on the given CPU.
@@ -455,7 +463,7 @@ const getLoadStoreAddress = (cpu: CPU, i: number) : number => {
  * Returns an array [startAddress, endAddress], marking the start and end
  * addresses to read/set a series of values in memory.
  */
-const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
+const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : LoadStoreMultipleAddressParameter => {
     const condition = (i >>> 28) & 0xF;
     const conditionPassed = cpu.conditionIsMet(condition);
     const opcode = (i >>> 23) & 0x3;
@@ -473,7 +481,6 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
             endAddress = rnValue;
             if (conditionPassed && w === 1) {
                 rnValue -= (bitsSet * 4);
-                cpu.setGeneralRegister(rn, rnValue);
             }
             break;
         case 0b01:
@@ -482,7 +489,6 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
             endAddress = rnValue + (bitsSet * 4) - 4
             if (conditionPassed && w === 1) {
                 rnValue += (bitsSet * 4);
-                cpu.setGeneralRegister(rn, rnValue);
             }
             break;
         case 0b10:
@@ -491,7 +497,6 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
             endAddress = rnValue - 4;
             if (conditionPassed && w === 1) {
                 rnValue -= (bitsSet * 4);
-                cpu.setGeneralRegister(rn, rnValue);
             }
             break;
         case 0b11:
@@ -500,11 +505,17 @@ const getLoadStoreMultipleAddress = (cpu: CPU, i: number) : number[] => {
             endAddress = rnValue + (bitsSet * 4);
             if (conditionPassed && w === 1) {
                 rnValue += (bitsSet * 4);
-                cpu.setGeneralRegister(rn, rnValue);
             }
             break;
     }
-    return [startAddress, endAddress];
+
+    return {
+        startAddress: startAddress,
+        endAddress: endAddress,
+        updateRn: conditionPassed && w === 1,
+        rn: rn,
+        rnValue: rnValue
+    };
 }
 
 // Data Processing Functions
@@ -1089,9 +1100,14 @@ const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     cpu.history.setInstructionName(`LDM (${type})`);
     // #REMOVE_IN_BUILD_END
 
-    const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
+    const { startAddress, endAddress, updateRn, rn, rnValue } = getLoadStoreMultipleAddress(cpu, i);
     const regList = (i & 0xFFFF);
     let address = wordAlignAddress(startAddress);
+
+    // Update Rn before loads in case a loaded register overwrites Rn.
+    if (updateRn) {
+        cpu.setGeneralRegister(rn, rnValue);
+    }
 
     switch (type) {
         case 1:
@@ -1160,7 +1176,7 @@ const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     cpu.history.setInstructionName(`STM (${type})`);
     // #REMOVE_IN_BUILD_END
 
-    const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, i);
+    const { startAddress, endAddress, updateRn, rn, rnValue } = getLoadStoreMultipleAddress(cpu, i);
     const regList = i & 0xFFFF;
     let address = startAddress;
     for (let i = 0; i <= 15; i++) {
@@ -1172,6 +1188,10 @@ const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
             cpu.setBytesInMemory(address, bytes);
             address += 4;
         }
+    }
+
+    if (updateRn) {
+        cpu.setGeneralRegister(rn, rnValue);
     }
 
     if (endAddress !== address - 4) {

@@ -415,9 +415,24 @@ const executeLoadStoreAddressTestFile = (filePath: string, multipleAddress: bool
                     expectedRnUpdate = items.length === 4 ? parseNumericLiteral(items[3].substring(3)) : undefined;
 
                     previousRnValue = cpu.getGeneralRegister(rn);
-                    const [startAddress, endAddress] = getLoadStoreMultipleAddress(cpu, instruction);
+                    const result = getLoadStoreMultipleAddress(cpu, instruction);
+                    const { startAddress, endAddress, updateRn } = result;
+                    const actualRn = result.rn;
+                    const actualRnValue = result.rnValue;
+
                     expect(startAddress, `Line ${i.lineNumber}: Expected start address to be 0x${expectedStartAddress.toString(16)} but got 0x${startAddress.toString(16)}.`).toBe(expectedStartAddress);
                     expect(endAddress, `Line ${i.lineNumber}: Expected end address to be 0x${expectedEndAddress.toString(16)} but got 0x${endAddress.toString(16)}.`).toBe(expectedEndAddress);
+
+                    if (expectedRnUpdate !== undefined) {
+                        expect(updateRn).toBeTruthy();
+                        expect(actualRn).toBe(rn);
+                        expect(
+                            actualRnValue,
+                            `Line ${i.lineNumber}: Expected R1 to be updated to 0x${expectedRnUpdate.toString(16)} but got 0x${(actualRnValue >>> 0).toString(16)}.`
+                        ).toBe(expectedRnUpdate);
+                    } else {
+                        expect(updateRn).toBeFalsy();
+                    }
                 } else {
                     // Addressing modes 2 and 3
                     const expectedAddress = parseNumericLiteral(items[1].substring(8)) >>> 0;
@@ -426,19 +441,19 @@ const executeLoadStoreAddressTestFile = (filePath: string, multipleAddress: bool
                     previousRnValue = cpu.getGeneralRegister(rn);
                     const address = getLoadStoreAddress(cpu, instruction);
                     expect(address, `Line ${i.lineNumber}: Expected address to be 0x${expectedAddress.toString(16)} but got 0x${address.toString(16)}.`).toBe(expectedAddress);
-                }
 
-                const rnValue = cpu.getGeneralRegister(rn);
-                if (expectedRnUpdate !== undefined) {
-                    expect(
-                        rnValue,
-                        `Line ${i.lineNumber}: Expected R1 to be updated to 0x${expectedRnUpdate.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
-                    ).toBe(expectedRnUpdate);
-                } else {
-                    expect(
-                        rnValue,
-                        `Line ${i.lineNumber}: Expected R1 to be unchanged from 0x${previousRnValue.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
-                    ).toBe(previousRnValue);
+                    const rnValue = cpu.getGeneralRegister(rn);
+                    if (expectedRnUpdate !== undefined) {
+                        expect(
+                            rnValue,
+                            `Line ${i.lineNumber}: Expected R1 to be updated to 0x${expectedRnUpdate.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
+                        ).toBe(expectedRnUpdate);
+                    } else {
+                        expect(
+                            rnValue,
+                            `Line ${i.lineNumber}: Expected R1 to be unchanged from 0x${previousRnValue.toString(16)} but got 0x${(rnValue >>> 0).toString(16)}.`
+                        ).toBe(previousRnValue);
+                    }
                 }
             }
         });
