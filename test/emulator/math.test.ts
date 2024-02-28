@@ -14,6 +14,7 @@ test('rotateRight', () => {
     expect(rotateRight(9, 1, 8)).toBe(132);
     expect(rotateRight(73, 5, 7)).toBe(38);
     expect(rotateRight(4, 4, 32)).toBe(0x40000000);
+    expect(rotateRight(0xFF008F00, 8, 32)).toBe(0x00FF008F);
 });
 
 test('rotateLeft', () => {

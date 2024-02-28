@@ -1,7 +1,7 @@
 import Long from 'long';
 
 const rotateRight = (n: number, r: number, bits: number) : number => {
-    return ((n >> r) | (n << (bits - r))) & (Math.pow(2, bits) - 1);
+    return ((n >>> r) | (n << (bits - r))) & (Math.pow(2, bits) - 1);
 }
 
 const rotateLeft = (n: number, r: number, bits: number) : number => {
