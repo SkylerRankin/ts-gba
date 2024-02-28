@@ -127,10 +127,14 @@ const disassembleDataProcessing = (cpu: CPU, i: number) : string => {
         "ORR", "MOV", "BIC", "MVN"
     ][opcode];
 
-    const singleRegisterFunctions = ["TST", "TEQ", "CMP", "CMN", "MOV", "MVN"];
+    const singleRegisterRn = ["CMP", "CMN", "TEQ", "TST"];
+    const singleRegisterRd = ["MOV", "MVN"];
+
     const shiftOperand = parseShiftOperandValue(cpu, i);
 
-    if (singleRegisterFunctions.includes(functionName)) {
+    if (singleRegisterRn.includes(functionName)) {
+        return `${functionName}${parseCondition(i)}${sFlagText} R${rn}, ${shiftOperand}`;
+    } else if (singleRegisterRd.includes(functionName)) {
         return `${functionName}${parseCondition(i)}${sFlagText} R${rd}, ${shiftOperand}`;
     } else {
         return `${functionName}${parseCondition(i)}${sFlagText} R${rd}, R${rn}, ${shiftOperand}`;
@@ -156,7 +160,7 @@ const parseShiftOperandValue = (cpu: CPU, i: number) : string => {
         const rotate = (i >>> 8) & 0xF;
         const imm = i & 0xFF;
         value = rotateRight(imm, rotate * 2, 32);
-        return `#0x${value.toString(16)}`;
+        return `#0x${(value >>> 0).toString(16)}`;
     } else if (((i >>> 4) & 0xFF) === 0) {
         // Single register operand without shift
         const rm = i & 0xF;
@@ -181,7 +185,7 @@ const parseShiftOperandValue = (cpu: CPU, i: number) : string => {
         if (immediateShift) {
             // Rm shifted by immediate value
             const imm = (i >>> 7) & 0x1F;
-            shiftValueText = `#0x${imm.toString(16)}`;
+            shiftValueText = `#0x${(imm >>> 0).toString(16)}`;
         } else {
             // Rm shifted by register value
             const rs = (i >>> 8) & 0xF;

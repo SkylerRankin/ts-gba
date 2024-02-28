@@ -2,6 +2,7 @@
 # Each line consists of the following space-separated components:
 #   <big-endian instruction> <expected value> <expected carry>
 # In cases where the value of the CPSR C flag should be present, the "CFlag" string is used.
+# Register values are set in the test function running this file.
 
 # Immediate with non-zero rotation
 # Instruction: ADD R0, R1, #0x8000000E
@@ -17,11 +18,16 @@
 
 # Register (R15)
 # Instruction: ADD R0, R1, R15
-0xe081000f 23 CFlag
+0xe081000f 15 CFlag
 
 # Logical shift left by immediate, non-zero shift
 # Instruction: ADD R0, R1, R6, LSL #30
 0xe0810f06 0x80000000 1
+
+# Logical shift left by immediate, non-zero shift, Rm = R15
+# Used value for R15 should be PC + 8, the normal value.
+# Instruction: ADD R0, R1, R15, LSL #30
+0xe0810f0f 0xC0000000 1
 
 # Logical shift left by immediate, zero shift
 # Instruction: ADD R0, R1, R2, LSL #0
@@ -34,6 +40,11 @@
 # Logical shift left by register, <32 bit shift
 # Instruction: ADD R0, R1, R2, LSL R8
 0xe0810812 0x800 0
+
+# Logical shift left by register, <32 bit shift, Rm = R15
+# Used value for R15 should be PC + 12, the normal value + 4.
+# Instruction: ADD R0, R1, R15, LSL R8
+0xe081081f 0x4C00 0
 
 # Logical shift left by register, 32 bit shift
 # Instruction: ADD R0, R1, R3, LSL R9

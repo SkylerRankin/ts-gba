@@ -134,7 +134,7 @@ const processDataProcessing = (cpu: CPU, i: number) : ProcessedInstructionOption
     const rn = (i >>> 16) & 0xF;
     const rd = (i >>> 12) & 0xF;
 
-    const value1 = cpu.getGeneralRegister(rn);
+    const value1 = cpu.getGeneralRegister(rn) >>> 0;
     const [value2, shiftCarry] = getShiftOperandValue(cpu, i);
     let processingFunction: DataProcessingFunction | undefined;
     switch(opcode) {
@@ -180,7 +180,6 @@ const processDataProcessing = (cpu: CPU, i: number) : ProcessedInstructionOption
 const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
     let value = 0;
     let carry = 0;
-    let valueOffset = 0;
     const iFlag = (i >> 25) & 0x1;
     const cFlag = cpu.getStatusRegisterFlag('CPSR', 'c');
 
@@ -195,24 +194,16 @@ const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
         // Single register operand without shift
         const rm = i & 0xF;
         value = cpu.getGeneralRegister(rm);
-        if (rm === 15) {
-            value += 8;
-        }
         carry = cFlag;
     } else {
         const rm = i & 0xF;
-
-        // If R15 is used for RM, value of register should be R15 + 8.
-        if (rm == 15) {
-            valueOffset = 8;
-        }
-
         const shiftType = (i >>> 5) & 0x3;
         // 4th bit is 0 for immediate shifts, 1 for register shifts.
         const shiftOpcode = (i >>> 4) & 0x1;
         const immediateShift = shiftOpcode === 0;
 
         let shiftAmount = 0;
+        let rmOffset = 0;
         if (immediateShift) {
             // Rm shifted by immediate value
             const imm = (i >>> 7) & 0x1F;
@@ -221,54 +212,61 @@ const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
             // Rm shifted by register value
             const rs = (i >>> 8) & 0xF;
             shiftAmount = cpu.getGeneralRegister(rs) & 0xFF;
+
+            // If Rm == R15 and the operand is a shift by register, Rm = PC + 12
+            if (rm === 15) {
+                rmOffset = 4;
+            }
         }
+
+        const rmValue = cpu.getGeneralRegister(rm) + rmOffset;
 
         switch (shiftType) {
             case 0x0:
                 // Logical shift left
                 if (shiftAmount === 0) {
-                    value = cpu.getGeneralRegister(rm);
+                    value = rmValue;
                     carry = cFlag;
                 } else if (shiftAmount == 32) {
                     value = 0;
-                    carry = cpu.getGeneralRegister(rm) & 0x1;
+                    carry = rmValue & 0x1;
                 } else {
-                    [value, carry] = logicalShiftLeft(cpu.getGeneralRegister(rm), shiftAmount);
+                    [value, carry] = logicalShiftLeft(rmValue, shiftAmount);
                 }
                 break;
             case 0x1:
                 // Logical shift right
                 if (immediateShift && shiftAmount === 0) {
                     value = 0;
-                    carry = cpu.getGeneralRegister(rm) >>> 31;
+                    carry = rmValue >>> 31;
                 } else if (shiftAmount === 0) {
-                    value = cpu.getGeneralRegister(rm);
+                    value = rmValue;
                     carry = cFlag;
                 } else {
-                    [value, carry] = logicalShiftRight(cpu.getGeneralRegister(rm), shiftAmount);
+                    [value, carry] = logicalShiftRight(rmValue, shiftAmount);
                 }
                 break;
             case 0x2:
                 // Arithmetic shift right
                 if (immediateShift) {
                     if (shiftAmount === 0) {
-                        const rmSignBit = (cpu.getGeneralRegister(rm) >>> 31) & 0x1;
+                        const rmSignBit = (rmValue >>> 31) & 0x1;
                         value = rmSignBit === 0 ? 0 : 0xFFFFFFFF;
                         carry = rmSignBit
                     } else {
-                        [value, carry] = arithmeticShiftRight(cpu.getGeneralRegister(rm), shiftAmount);
+                        [value, carry] = arithmeticShiftRight(rmValue, shiftAmount);
                     }
                 } else {
                     // Shifting by register value
                     if (shiftAmount === 0) {
-                        value = cpu.getGeneralRegister(rm);
+                        value = rmValue;
                         carry = cFlag;
                     } else if (shiftAmount >= 32) {
-                        const rmSignBit = (cpu.getGeneralRegister(rm) >>> 31) & 0x1;
+                        const rmSignBit = (rmValue >>> 31) & 0x1;
                         value = rmSignBit === 0 ? 0 : 0xFFFFFFFF;
                         carry = rmSignBit
                     } else {
-                        [value, carry] = arithmeticShiftRight(cpu.getGeneralRegister(rm), shiftAmount);
+                        [value, carry] = arithmeticShiftRight(rmValue, shiftAmount);
                     }
                 }
                 break;
@@ -276,25 +274,23 @@ const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
                 // Rotate right
                 if (immediateShift) {
                     if (shiftAmount === 0) {
-                        const rmValue = cpu.getGeneralRegister(rm);
                         value = (cFlag << 31) | (rmValue >> 1);
                         carry = rmValue & 0x1;
                     } else {
-                        value = rotateRight(cpu.getGeneralRegister(rm), shiftAmount, 32);
+                        value = rotateRight(rmValue, shiftAmount, 32);
                     }
                 } else {
                     if (shiftAmount === 0) {
                         // Bottom 8 bits are 0
-                        value = cpu.getGeneralRegister(rm);
+                        value = rmValue;
                         carry = cFlag;
                     } else if ((shiftAmount & 0x1F) === 0) {
                         // Bottom 5 bits are 0
-                        value = cpu.getGeneralRegister(rm);
+                        value = rmValue;
                         carry = (value >>> 31) & 0x1;
                     } else {
                         // Bottom 4 bits are >0
                         shiftAmount = shiftAmount & 0x1F;
-                        const rmValue = cpu.getGeneralRegister(rm)
                         value = rotateRight(rmValue, shiftAmount, 32);
                         carry = (rmValue >>> (shiftAmount - 1)) & 0x1;
                     }
@@ -305,7 +301,7 @@ const getShiftOperandValue = (cpu: CPU, i: number) : number[] => {
         }
     }
 
-    value += valueOffset;
+    value = value >>> 0;
     return [value, carry];
 }
 

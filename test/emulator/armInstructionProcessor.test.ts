@@ -55,21 +55,23 @@ test("Determine data processing shift operand values/carries (addressing mode 1)
 
     const test_cases = readFileSync("./test/emulator/data/addressing_mode_1_arm.txt").toString()
         .split(/\r?\n/)
-        .filter(line => !line.startsWith("#") && line.length > 0)
-        .map(line => {
+        .map((text, i) => ({line: text, lineNumber: i + 1}))
+        .filter(({line, lineNumber}) => !line.startsWith("#") && line.length > 0)
+        .map(({line, lineNumber}) => {
             const items = line.split(" ");
             return {
+                lineNumber,
                 instruction: Number.parseInt(items[0]),
                 expectedValue: Number.parseInt(items[1]),
                 expectedCarry: items[2] === "CFlag" ? mockCFlag : Number.parseInt(items[2])
             }
         });
 
-    expect(test_cases.length).toBe(29);
+    expect(test_cases.length).toBe(31);
     test_cases.forEach(t => {
         const [value, carry] = getShiftOperandValue(cpu, t.instruction);
-        expect(value >>> 0).toBe(t.expectedValue);
-        expect(carry).toBe(t.expectedCarry);
+        expect(value >>> 0, `Line ${t.lineNumber}: Expected value to be 0x${(t.expectedValue >>> 0).toString(16)}, but got 0x${(value >>> 0).toString(16)}.`).toBe(t.expectedValue);
+        expect(carry, `Line ${t.lineNumber}: Expected carry to be 0x${(t.expectedCarry >>> 0).toString(16)}, but got 0x${(carry >>> 0).toString(16)}.`).toBe(t.expectedCarry);
     });
 });
 
