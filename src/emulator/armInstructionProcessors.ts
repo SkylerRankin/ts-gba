@@ -1269,7 +1269,7 @@ const processUMULL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
     const rdHiValue = Math.floor(result / 0x100000000) & 0xFFFFFFFF;
     const rdLoValue = result & 0xFFFFFFFF;
-    
+
     cpu.setGeneralRegister(rdHi, rdHiValue);
     cpu.setGeneralRegister(rdLo, rdLoValue);
 
@@ -1512,7 +1512,7 @@ const processSWPB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const address = rnValue;
 
     const temp = cpu.memory.getInt8(address);
-    cpu.setBytesInMemory(address, int8ToByteArray(rmValue & 0xF, cpu.bigEndian));
+    cpu.setBytesInMemory(address, int8ToByteArray(rmValue & 0xFF, cpu.bigEndian));
     cpu.setGeneralRegister(rd, temp);
 
     return { incrementPC: true };

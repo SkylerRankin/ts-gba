@@ -118,7 +118,7 @@ class CPU implements CPUType {
             this.statusRegisters.push(new Array<number>(2).fill(0));
         }
         this.setGeneralRegister(Reg.PC, 0x00000008);
-        this.setModeBits(OperatingModeCodes.usr);
+        this.setModeBits(OperatingModeCodes.sys);
     }
 
     loadProgram(program: Uint8Array) : void {
@@ -164,7 +164,7 @@ class CPU implements CPUType {
         this.operatingState = 'ARM';
         this.instructionSize = 4;
         this.bigEndian = false;
-        this.setModeBits(OperatingModeCodes.usr);
+        this.setModeBits(OperatingModeCodes.sys);
         this.setStatusRegisterFlag('t', 0);
         this.bootBIOS = false;
         this.breakpoints.clear();
@@ -330,7 +330,7 @@ class CPU implements CPUType {
     }
 
     getGeneralRegister(reg: number): number {
-        return this.currentGeneralRegisters[reg];
+        return this.currentGeneralRegisters[reg] >>> 0;
     }
 
     getGeneralRegisterByMode(reg: number, mode: number) : number {
