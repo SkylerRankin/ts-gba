@@ -1,4 +1,4 @@
-import { CPU, OperatingModes, Reg } from './cpu';
+import { CPU, OperatingModeCodes, OperatingModes, Reg } from './cpu';
 import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray, halfWordAlignAddress, signedOverflowFromAddition } from './math';
 
 type ProcessedInstructionOptions = {
@@ -55,14 +55,11 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         if (((i >>> 4) & 0xF) === 0xD) return processLDRSB(cpu, i);
         if (((i >>> 4) & 0xF) === 0xF) return processLDRSH(cpu, i);
     } else if (((i >>> 25) & 0x7) === 0x4) {
-        if (b22 === 0 && b20 === 1) return processLDM(cpu, i, 1);
-        if (((i >>> 20) & 0x7) === 0x5 && b15 === 0) return processLDM(cpu, i, 2);
-        /**
-         * The specification states that bit 15 should be 1 for LDM (3), since PC is
-         * always included in the register load list. In practice, some ROMs seem to
-         * not have this bit set and thus do not load into PC.
-         */
-        if (b22 === 1 && b20 === 1 /*&& b15 === 1*/) return processLDM(cpu, i, 3);
+        if (((i >>> 20) & 0x1) === 1) {
+            return processLDM(cpu, i);
+        } else {
+            return processSTM(cpu, i);
+        }
     }
 
     // Coprocessor Load & Store
@@ -122,10 +119,6 @@ const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         if (((i >>> 20) & 0xFF) === 0b00010000 && ((i >>> 4) & 0xFF) === 0b00001001) return processSWP(cpu, i);
         if (((i >>> 20) & 0xFF) === 0b00010100 && ((i >>> 4) & 0xF) === 0b1001) return processSWPB(cpu, i);
     }
-
-    // Store Multiple
-    if (((i >>> 25) & 0x7) === 0x4 && b22 === 0 && b20 === 0) return processSTM(cpu, i, 1);
-    if (((i >>> 25) & 0x7) === 0x4 && b22 === 1 && b20 === 0) return processSTM(cpu, i, 2);
 
     // CLZ
     if (((i >>> 16) & 0xFFF) === 0b000101101111 && ((i >>> 4) & 0xFF) === 0b11110001) return processCLZ(cpu, i);
@@ -1090,104 +1083,97 @@ const processSTRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 // Load & Store Multiple Instructions
 
-/**
- * The specification states that LDM (3) always includes PC in the register list, as bit
- * 15 is set to 1. In practice, some ROMs do not include R15 in the register list, so
- * this implementation treats the PC as optional for LDM (3).
- */
-const processLDM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
-    // #REMOVE_IN_BUILD_START
-    cpu.history.setInstructionName(`LDM (${type})`);
-    // #REMOVE_IN_BUILD_END
-
+const processLDM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const { startAddress, endAddress, updateRn, rn, rnValue } = getLoadStoreMultipleAddress(cpu, i);
     const regList = (i & 0xFFFF);
+    const s = (i >> 22) & 0x1;
+    const loadPC = ((regList >> 15) & 0x1) === 1;
+    const loadUserModeRegisters = s === 1 && !loadPC;
     let address = wordAlignAddress(startAddress);
+
+    // #REMOVE_IN_BUILD_START
+    let type = 0;
+    if (s === 0) {
+        type = 1;
+    } else if (loadPC) {
+        type = 3;
+    } else {
+        type = 2;
+    }
+
+    cpu.history.setInstructionName(`LDM (${type})`);
+    // #REMOVE_IN_BUILD_END
 
     // Update Rn before loads in case a loaded register overwrites Rn.
     if (updateRn) {
         cpu.setGeneralRegister(rn, rnValue);
     }
 
-    switch (type) {
-        case 1:
-            for (let i = 0; i <= 14; i++) {
-                if (((regList >>> i) & 0x1) === 1) {
-                    const riValue = cpu.memory.getInt32(address);
-                    cpu.setGeneralRegister(i, riValue);
-                    address += 4;
-                }
-            }
-            if (((regList >>> 15) & 0x1) === 1) {
-                const value = cpu.memory.getInt32(address);
-                const newPC = value & 0xFFFFFFFC;
-                cpu.setGeneralRegister(Reg.PC, newPC);
-                address += 4;
-            }
-            break;
-        case 2:
-            for (let i = 0; i <= 14; i++) {
-                if (((regList >>> i) & 0x1) === 1) {
-                    const riValue = cpu.memory.getInt32(address);
-                    if (cpu.operatingMode === OperatingModes.usr || i <= 7) {
-                        cpu.setGeneralRegister(i, riValue);
-                    } else {
-                        cpu.generalRegisters[OperatingModes.usr][i] = riValue;
-                    }
-                    address += 4;
-                }
-            }
-            break;
-        case 3:
-            for (let i = 0; i <= 14; i++) {
-                if (((regList >>> i) & 0x1) === 1) {
-                    const riValue = cpu.memory.getInt32(address);
-                    if (cpu.operatingMode === OperatingModes.usr || i <= 7) {
-                        cpu.setGeneralRegister(i, riValue);
-                    } else {
-                        cpu.generalRegisters[OperatingModes.usr][i] = riValue;
-                    }
-                    address += 4;
-                }
-            }
-            cpu.spsrToCPSR();
-            if ((i >> 15) & 0x1) {
-                const value = cpu.memory.getInt32(address);
-                const t = cpu.getStatusRegisterFlag('CPSR', 't');
-                const newPC = t === 1 ?
-                    value & 0xFFFFFFFE :
-                    value & 0xFFFFFFFC;
-                cpu.setGeneralRegister(Reg.PC, newPC);
-                address += 4;
-            }
-            break;
+    const previousMode = cpu.currentStatusRegisters[0] & 0x1F;
+    if (loadUserModeRegisters) {
+        cpu.setModeBits(OperatingModeCodes.usr);
     }
+
+    for (let i = 0; i <= 14; i++) {
+        if (((regList >>> i) & 0x1) === 1) {
+            const riValue = cpu.memory.getInt32(address);
+            cpu.setGeneralRegister(i, riValue);
+            address += 4;
+        }
+    }
+
+    if (loadUserModeRegisters) {
+        cpu.setModeBits(previousMode);
+    }
+
+    if (s === 1 && loadPC) {
+        cpu.spsrToCPSR();
+    }
+
+    if (loadPC) {
+        const value = cpu.memory.getInt32(address);
+        const mask = cpu.getStatusRegisterFlag('CPSR', 't') === 1 ? 0xFFFFFFFE : 0xFFFFFFFC;
+        const newPC = value & mask;
+        cpu.setGeneralRegister(Reg.PC, newPC);
+        address += 4;
+    }
+
 
     if (address - 4 !== endAddress) {
-        throw Error(`LDM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
+        throw Error(`LDM failure: address ${address - 4} does not match expected end address ${endAddress}`);
     }
 
-    // TODO: LDM can modify PC, in which case increment PC should be false
-    return { incrementPC: true };
+    return { incrementPC: !loadPC };
 }
 
-const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOptions => {
+const processSTM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    const { startAddress, endAddress, updateRn, rn, rnValue } = getLoadStoreMultipleAddress(cpu, i);
+    const regList = i & 0xFFFF;
+    const s = (i >> 22) & 0x1;
+    const storeUserModeRegisters = s === 1;
+
     // #REMOVE_IN_BUILD_START
+    const type = s === 1 ? "2" : "1";
     cpu.history.setInstructionName(`STM (${type})`);
     // #REMOVE_IN_BUILD_END
 
-    const { startAddress, endAddress, updateRn, rn, rnValue } = getLoadStoreMultipleAddress(cpu, i);
-    const regList = i & 0xFFFF;
+    const previousMode = cpu.currentStatusRegisters[0] & 0x1F;
+    if (storeUserModeRegisters) {
+        cpu.setModeBits(OperatingModeCodes.usr);
+    }
+
     let address = startAddress;
     for (let i = 0; i <= 15; i++) {
         if (((regList >> i) & 0x1) === 1) {
-            const riValue = type === 1 ?
-                cpu.getGeneralRegister(i) :
-                cpu.getGeneralRegisterByMode(i, OperatingModes.usr);
+            const riValue = cpu.getGeneralRegister(i);
             const bytes = int32ToByteArray(riValue, cpu.bigEndian);
             cpu.setBytesInMemory(address, bytes);
             address += 4;
         }
+    }
+
+    if (storeUserModeRegisters) {
+        cpu.setModeBits(previousMode);
     }
 
     if (updateRn) {
@@ -1195,7 +1181,7 @@ const processSTM = (cpu: CPU, i: number, type: number) : ProcessedInstructionOpt
     }
 
     if (endAddress !== address - 4) {
-        throw Error(`STM (${type}) failure: address ${address - 4} does not match expected end address ${endAddress}`);
+        throw Error(`STM failure: address ${address - 4} does not match expected end address ${endAddress}`);
     }
     return { incrementPC: true };
 }

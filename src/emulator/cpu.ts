@@ -224,7 +224,7 @@ class CPU implements CPUType {
 
     setModeBits(value: number) : void {
         const previousMode = this.currentStatusRegisters[0] & 0x1F;
-        this.currentStatusRegisters[0] &= ~0x1F;
+        this.currentStatusRegisters[0] &= 0xFFFFFFE0;
         this.currentStatusRegisters[0] |= value;
         this.operatingMode = OperatingModeCodeToIndex[value & 0xF];
         this.updateCurrentRegisters(OperatingModeCodeToIndex[previousMode & 0xF], OperatingModeCodeToIndex[value & 0xF]);
