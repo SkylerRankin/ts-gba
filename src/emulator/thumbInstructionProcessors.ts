@@ -941,6 +941,11 @@ const processTST = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 // load / Store Instructions
 
+/**
+ * LDR 1-4 all rotate the loaded value when the address is not word-aligned. This behavior
+ * is specified in the manual for ARM instructions and not for THUMB instructions, but seems
+ * to be the expected behavior based on test ROMs.
+ */
 const processLDR1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // #REMOVE_IN_BUILD_START
     cpu.history.setInstructionName(`LDR (1)`);
