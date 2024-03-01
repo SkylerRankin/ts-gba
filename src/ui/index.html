@@ -24,7 +24,8 @@
             #step_button_container > div + div { margin-left: 20px; }
             #instruction_table { width: 100%; }
             #instruction_table, #instruction_table > tr, #instruction_table > tr > td { border-collapse: collapse; }
-            #registers_table_container, #instruction_table_container, #key_container {
+            #fps_container td { padding-right: 20px; }
+            #registers_table_container, #instruction_table_container, #key_container, #fps_container {
                 padding: 5px;
                 border: solid 1px #969696;
                 border-radius: 3px;
@@ -71,6 +72,7 @@
             let gba = null;
             let romLoaded = false;
             let running = false;
+            let fpsTimer = null;
 
             let instructionTableState = {
                 pcOffset: 0,
@@ -125,7 +127,6 @@
                         gba.reset();
                         gba.loadROM(buffer);
                         romLoaded = true;
-                        console.log(`ROM loaded`);
                         onPause();
                     }
                 };
@@ -138,6 +139,7 @@
                 document.getElementById("cpu_info_container").classList.add("hidden");
                 romLoaded = true;
                 gba.run();
+                fpsTimer = setTimeout(() => { onFPSUpdate(); }, 250);
             }
 
             const onPause = () => {
@@ -149,6 +151,7 @@
                 instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
                 updateInstructionList();
                 updateRegisters();
+                clearTimeout(fpsTimer);
             }
 
             const onReset = () => {
@@ -156,6 +159,7 @@
                 document.getElementById("cpu_info_warning").classList.add("hidden");
                 document.getElementById("cpu_info_container").classList.remove("hidden");
                 romLoaded = false;
+                clearTimeout(fpsTimer);
             }
 
             const onStep = () => {
@@ -246,6 +250,14 @@
                     if (pressed) gba.keypad.onKeyDown(gbaKey);
                     else gba.keypad.onKeyUp(gbaKey);
                 }
+            }
+
+            const onFPSUpdate = () => {
+                const { fps, frameTime, cycles } = window.UI.getFrameInfo(gba);
+                document.getElementById("fps_value").innerHTML = fps.toFixed(2);
+                document.getElementById("frame_time_value").innerHTML = frameTime.toFixed(2);
+                document.getElementById("cycles_value").innerHTML = cycles;
+                fpsTimer = setTimeout(() => { onFPSUpdate(); }, 250);
             }
 
             window.onload = () => {
@@ -350,6 +362,22 @@
                                     <td>Shift</td>
                                     <td>Down Button</td>
                                     <td>S / Down</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div id="fps_container">
+                            <table>
+                                <tr>
+                                    <td>Mean frames per second</td>
+                                    <td id="fps_value">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Mean frame time (ms)</td>
+                                    <td id="frame_time_value">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Elapsed cycles</td>
+                                    <td id="cycles_value">0</td>
                                 </tr>
                             </table>
                         </div>

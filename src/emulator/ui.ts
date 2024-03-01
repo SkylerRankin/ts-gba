@@ -45,9 +45,22 @@ const getRegisterText = (gba: GBA) => {
     return text;
 }
 
+const getFrameInfo = (gba: GBA) => {
+    let fps = 0, frameTime = 0, cycles = 0;
+
+    if (gba.status === 'running') {
+        frameTime = gba.frameQueue.reduce((a, b) => a + b, 0) / gba.frameQueue.length;
+        fps = 1000 / frameTime;
+        cycles = gba.cycles;
+    }
+
+    return { fps, frameTime, cycles };
+}
+
 const UI = {
     getInstructionTableLines,
-    getRegisterText
+    getRegisterText,
+    getFrameInfo
 };
 
 export { UI }

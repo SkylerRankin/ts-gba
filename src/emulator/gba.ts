@@ -1,4 +1,4 @@
-import { CPU, Reg } from "./cpu";
+import { CPU } from "./cpu";
 import { CanvasDisplay, Display } from "./display";
 import { Keypad } from "./keypad";
 import { Memory } from "./memory";
@@ -24,6 +24,7 @@ class GBA implements GBAType {
     ppu: PPU;
     keypad: Keypad;
     nextFrameTimer: number = 0;
+    previousFrameStart: number = 0;
     frameQueue: number[] = [];
 
     constructor(display: Display = new CanvasDisplay()) {
@@ -52,7 +53,9 @@ class GBA implements GBAType {
 
     runFrame() {
         const frameStart = performance.now();
-        const cyclesStart = this.cycles;
+        const frameTime = frameStart - this.previousFrameStart;
+        this.previousFrameStart = frameStart;
+
         while (true) {
             this.runStep();
             if (this.cpu.atBreakpoint()) {
@@ -65,19 +68,14 @@ class GBA implements GBAType {
                 break;
             }
         }
-        const frameTime = performance.now() - frameStart;
         this.frameQueue.push(frameTime);
 
         if (this.frameQueue.length > 100) {
             this.frameQueue.splice(0, 1);
         }
 
-        const average = this.frameQueue.reduce((a, b) => a + b, 0) / this.frameQueue.length;
-        console.log(`Average frame time: ${average.toFixed(2)} ms, fps = ${(1000 / average).toFixed(2)}, cycles = ${this.cycles - cyclesStart}`);
-
         if (this.status === 'running') {
-            // Doesn't seem to work in a node environment
-            const frameDelay = Math.max(16 - frameTime, 16); // TODO: reduce the max delay to 1?
+            const frameDelay = Math.max(16 - frameTime, 5);
             this.nextFrameTimer = window.setTimeout(() => { this.runFrame(); }, frameDelay);
         }
     }
