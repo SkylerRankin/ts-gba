@@ -629,13 +629,12 @@ const processLSR1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rm = (i >>> 3) & 0x7;
     const rmValue = cpu.getGeneralRegister(rm);
     const rd = i & 0x7;
-    const rdValue = cpu.getGeneralRegister(rd);
     let result;
     if (imm === 0) {
-        cpu.setStatusRegisterFlag('c', isNegative32(rdValue));
+        cpu.setStatusRegisterFlag('c', isNegative32(rmValue));
         result = 0;
     } else {
-        cpu.setStatusRegisterFlag('c', ((rdValue >>> (imm - 1)) & 0x1) === 1);
+        cpu.setStatusRegisterFlag('c', ((rmValue >>> (imm - 1)) & 0x1) === 1);
         const [shift, carry] = logicalShiftRight(rmValue, imm);
         result = shift;
     }
@@ -951,8 +950,14 @@ const processLDR1 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rn = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const address = cpu.getGeneralRegister(rn) + (imm * 4);
-    cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
 
+    let value = cpu.memory.getInt32(wordAlignAddress(address));
+    switch (address & 0x3) {
+        case 0b01: value = rotateRight(value, 8, 32); break;
+        case 0b10: value = rotateRight(value, 16, 32); break;
+        case 0b11: value = rotateRight(value, 24, 32); break;
+    }
+    cpu.setGeneralRegister(rd, value);
     return { incrementPC: true };
 }
 
@@ -965,7 +970,13 @@ const processLDR2 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rn = (i >>> 3) & 0x7;
     const rd = i & 0x7;
     const address = cpu.getGeneralRegister(rn) + cpu.getGeneralRegister(rm);
-    cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
+    let value = cpu.memory.getInt32(wordAlignAddress(address));
+    switch (address & 0x3) {
+        case 0b01: value = rotateRight(value, 8, 32); break;
+        case 0b10: value = rotateRight(value, 16, 32); break;
+        case 0b11: value = rotateRight(value, 24, 32); break;
+    }
+    cpu.setGeneralRegister(rd, value);
 
     return { incrementPC: true };
 }
@@ -979,7 +990,13 @@ const processLDR3 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const imm = i & 0xFF;
     const pc = cpu.getGeneralRegister(Reg.PC);
     const address = (((pc >> 2)) << 2) + (imm * 4);
-    cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
+    let value = cpu.memory.getInt32(wordAlignAddress(address));
+    switch (address & 0x3) {
+        case 0b01: value = rotateRight(value, 8, 32); break;
+        case 0b10: value = rotateRight(value, 16, 32); break;
+        case 0b11: value = rotateRight(value, 24, 32); break;
+    }
+    cpu.setGeneralRegister(rd, value);
 
     return { incrementPC: true };
 }
@@ -993,7 +1010,14 @@ const processLDR4 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const imm = i & 0xFF;
     const sp = cpu.getGeneralRegister(Reg.SP);
     const address = sp + (imm * 4);
-    cpu.setGeneralRegister(rd, cpu.memory.getInt32(wordAlignAddress(address)));
+
+    let value = cpu.memory.getInt32(wordAlignAddress(address));
+    switch (address & 0x3) {
+        case 0b01: value = rotateRight(value, 8, 32); break;
+        case 0b10: value = rotateRight(value, 16, 32); break;
+        case 0b11: value = rotateRight(value, 24, 32); break;
+    }
+    cpu.setGeneralRegister(rd, value);
 
     return { incrementPC: true };
 }
@@ -1236,7 +1260,7 @@ const processPOP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     }
 
     if (r === 1) {
-        cpu.setGeneralRegister(Reg.PC, cpu.memory.getInt32(address) & 0xFFFFFFFE);
+        cpu.setGeneralRegister(Reg.PC, (cpu.memory.getInt32(address) & 0xFFFFFFFE) + 4);
         address += 4;
     }
 
