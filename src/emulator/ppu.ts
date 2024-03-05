@@ -295,9 +295,9 @@ class PPU implements PPUType {
                     case 0x3:
                         // 64x64, 4 screen blocks in clockwise square arrangement
                         if (adjustedX < screenSize.x / 2) {
-                            screenBlockOffset = (adjustedY < screenSize.y) ? 0 : 2;
+                            screenBlockOffset = (adjustedY < screenSize.y / 2) ? 0 : 2;
                         } else {
-                            screenBlockOffset = (adjustedY < screenSize.y) ? 1 : 3;
+                            screenBlockOffset = (adjustedY < screenSize.y / 2) ? 1 : 3;
                         }
                         break;
                 }
