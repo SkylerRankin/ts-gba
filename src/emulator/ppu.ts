@@ -87,6 +87,7 @@ const BackgroundConstants = {
     screenBlockBytes: 0x800,
     screenBlockTileSize: 32,
     tilePixelSize: 8,
+    backgroundCount: 4,
 };
 
 class PPU implements PPUType {
@@ -244,7 +245,10 @@ class PPU implements PPUType {
             if ((displayControl >> (i + 8)) & 0x1) backgrounds.push(i);
         }
 
-        for (let backgroundIndex = 0; backgroundIndex < 4; backgroundIndex++) {
+        const setPixels = new Array(DisplayConstants.hDrawPixels).fill(false);
+        const backgroundColor = this.get15BitColorFromAddress(MemorySegments.PALETTE.start);
+
+        for (let backgroundIndex = 0; backgroundIndex < BackgroundConstants.backgroundCount; backgroundIndex++) {
             // Check if background is disabled
             if (((displayControl >> (backgroundIndex + 8)) & 0x1) === 0) {
                 continue;
@@ -330,17 +334,30 @@ class PPU implements PPUType {
                         tileBytes[mirroredXTileOffset / 2] & 0xF :
                         (tileBytes[Math.floor(mirroredXTileOffset / 2)] >> 4) & 0xF;
 
-                    tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                    if (colorIndex === 0 && palette === 0) {
+                        // Transparent
+                    } else {
+                        tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                    }
                 } else {
                     // 256/1 palette mode
                     const bytesPerTile = 64;
                     const bytesPerRow = 8;
                     const tileBytes = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow), bytesPerTile);
                     const colorIndex = tileBytes[mirroredXTileOffset] & 0xFF;
-                    tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                    if (colorIndex === 0) {
+                        // Transparent
+                    } else {
+                        tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                    }
                 }
 
-                this.display.setPixel(x, y, tileColor);
+                if (tileColor) {
+                    setPixels[x] = true;
+                    this.display.setPixel(x, y, tileColor);
+                } else if (!setPixels[x]) {
+                    this.display.setPixel(x, y, backgroundColor);
+                }
             }
         }
 
