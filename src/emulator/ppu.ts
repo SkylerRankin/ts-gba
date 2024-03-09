@@ -1,5 +1,5 @@
 import { Display, RGBColor } from "./display";
-import { byteArrayToInt32 } from "./math";
+import { byteArrayToInt32, signExtend } from "./math";
 import { Memory, MemorySegments } from "./memory";
 
 interface PPUType {
@@ -88,6 +88,23 @@ const BackgroundConstants = {
     screenBlockTileSize: 32,
     tilePixelSize: 8,
     backgroundCount: 4,
+};
+
+const SpriteConstants = {
+    maxObjectAttributes: 128,
+    maxAffineAttributes: 32,
+    objectAttributeSize: 8,
+    size: [ // First index is shape value (attr0), second is size value (attr1)
+        [ {x: 8, y: 8}, {x: 16, y: 16}, {x: 32, y: 32}, {x: 64, y: 64} ],
+        [ {x: 16, y: 8}, {x: 32, y: 8}, {x: 32, y: 16}, {x: 64, y: 32} ],
+        [ {x: 8, y: 16}, {x: 8, y: 32}, {x: 16, y: 32}, {x: 32, y: 64} ],
+    ],
+    tileSize: 8,
+    charBlock4Address: 0x06010000,
+    charBlock5Address: 0x06014000,
+    spritePaletteAddress: 0x05000200,
+    spritePaletteBytes: 32,
+    maxVRAMTiles: 1024,
 };
 
 class PPU implements PPUType {
@@ -240,127 +257,17 @@ class PPU implements PPUType {
     }
 
     renderDisplayMode0Scanline(y: number, displayControl: number) {
-        const backgrounds = [];
-        for (let i = 0; i <= 4; i++) {
-            if ((displayControl >> (i + 8)) & 0x1) backgrounds.push(i);
-        }
+        this.fillBackgroundColor(y);
 
-        const setPixels = new Array(DisplayConstants.hDrawPixels).fill(false);
-        const backgroundColor = this.get15BitColorFromAddress(MemorySegments.PALETTE.start);
-
-        for (let backgroundIndex = 0; backgroundIndex < BackgroundConstants.backgroundCount; backgroundIndex++) {
-            // Check if background is disabled
-            if (((displayControl >> (backgroundIndex + 8)) & 0x1) === 0) {
-                continue;
-            }
-
-            const backgroundControl = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}CNT` as DisplayRegister]).value;
-            const priority = backgroundControl & 0x3;
-            const characterBaseBlock = (backgroundControl >> 2) & 0x3;
-            const mosaic = (backgroundControl >> 6) & 0x1;
-            const paletteMode = (backgroundControl >> 7) & 0x1;
-            const screenBaseBlock = (backgroundControl >> 8) & 0x1F;
-            const screenSizeMode = (backgroundControl >> 14) & 0x3;
-            const screenSize = BackgroundMapScreenSizes.TEXT[screenSizeMode];
-
-            const scrolling = {
-                x: this.memory.getInt16(displayRegisters[`BG${backgroundIndex}HOFS` as DisplayRegister]).value & 0x1FF,
-                y: this.memory.getInt16(displayRegisters[`BG${backgroundIndex}VOFS` as DisplayRegister]).value & 0x1FF,
-            };
-
-            const charBlockStart = MemorySegments.VRAM.start + BackgroundConstants.charBlockBytes * characterBaseBlock;
-            const screenBlockBaseStart = MemorySegments.VRAM.start + BackgroundConstants.screenBlockBytes * screenBaseBlock;
-
-            const adjustedY = (y + scrolling.y) % screenSize.y;
-            const tileY = Math.floor(adjustedY / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
-            const yTileOffset = adjustedY % BackgroundConstants.tilePixelSize;
-
-            for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
-                const adjustedX = (x + scrolling.x) % screenSize.x;
-                const tileX = Math.floor(adjustedX / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
-                const xTileOffset = adjustedX % BackgroundConstants.tilePixelSize;
-
-                // Determine which screen block contains this pixel.
-                // TODO: refactor this to remove branches, can probably achieve the same thing with division/floor.
-                let screenBlockOffset = 0;
-                switch (screenSizeMode) {
-                    case 0x0:
-                        // 32x32 tiles, 1 screen block
-                        screenBlockOffset = 0;
-                        break;
-                    case 0x1:
-                        // 64x32, 2 screen blocks in horizontal arrangement
-                        screenBlockOffset = (adjustedX < screenSize.x / 2) ? 0 : 1;
-                        break;
-                    case 0x2:
-                        // 32x64, 2 screen blocks in vertical arrangement
-                        screenBlockOffset = (adjustedY < screenSize.y / 2) ? 0 : 1;
-                        break;
-                    case 0x3:
-                        // 64x64, 4 screen blocks in clockwise square arrangement
-                        if (adjustedX < screenSize.x / 2) {
-                            screenBlockOffset = (adjustedY < screenSize.y / 2) ? 0 : 2;
-                        } else {
-                            screenBlockOffset = (adjustedY < screenSize.y / 2) ? 1 : 3;
-                        }
-                        break;
-                }
-                const screenBlockStart = screenBlockBaseStart + BackgroundConstants.screenBlockBytes * screenBlockOffset;
-
-                // Find and decompose the screen entry. It occupies 2 bytes.
-                const screenEntry = this.memory.getInt16(screenBlockStart + 2 * (tileY * 32 + tileX)).value;
-                const tileIndex = screenEntry & 0x3FF;
-                const horizontalFlip = (screenEntry >> 10) & 0x1;
-                const verticalFlip = (screenEntry >> 11) & 0x1;
-                const palette = (screenEntry >> 12) & 0xF;
-
-                const mirroredXTileOffset = horizontalFlip ? (BackgroundConstants.tilePixelSize - xTileOffset - 1) : xTileOffset;
-                const mirroredYTileOffset = verticalFlip ? (BackgroundConstants.tilePixelSize - yTileOffset - 1) : yTileOffset;
-
-                // Start of this particular palette within palette RAM. Each uses 32 bytes in 16/16 mode.
-                const paletteAddress = MemorySegments.PALETTE.start + (palette * 32);
-
-                // Find and decompose the corresponding tile.
-                let tileColor;
-                if (paletteMode === 0) {
-                    // 16/16 palette mode
-                    const bytesPerTile = 32;
-                    const bytesPerRow = 4;
-
-                    // Get all bytes for the row
-                    const tileBytes = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow), bytesPerRow);
-                    // Select the specific 4 bit palette index value for this pixel
-                    const colorIndex = mirroredXTileOffset % 2 === 0 ?
-                        tileBytes[mirroredXTileOffset / 2] & 0xF :
-                        (tileBytes[Math.floor(mirroredXTileOffset / 2)] >> 4) & 0xF;
-
-                    if (colorIndex === 0 && palette === 0) {
-                        // Transparent
-                    } else {
-                        tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
-                    }
-                } else {
-                    // 256/1 palette mode
-                    const bytesPerTile = 64;
-                    const bytesPerRow = 8;
-                    const tileBytes = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow), bytesPerTile);
-                    const colorIndex = tileBytes[mirroredXTileOffset] & 0xFF;
-                    if (colorIndex === 0) {
-                        // Transparent
-                    } else {
-                        tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
-                    }
-                }
-
-                if (tileColor) {
-                    setPixels[x] = true;
-                    this.display.setPixel(x, y, tileColor);
-                } else if (!setPixels[x]) {
-                    this.display.setPixel(x, y, backgroundColor);
-                }
+        // Render backgrounds
+        for (let backgroundIndex = 0; backgroundIndex < 4; backgroundIndex++) {
+            if (((displayControl >> (backgroundIndex + 8)) & 0x1) === 1) {
+                this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex);
             }
         }
 
+        // Render sprites
+        this.renderSpritesScanline(y, displayControl);
     }
 
     renderDisplayMode3Scanline(y: number, displayControl: number) {
@@ -446,6 +353,229 @@ class PPU implements PPUType {
             green: 255 * ((colorData >>> 5) & 0x1F) / 32,
             blue: 255 * ((colorData >>> 10) & 0x1F) / 32,
         };
+    }
+
+    fillBackgroundColor(y: number) {
+        const backgroundColor = this.get15BitColorFromAddress(MemorySegments.PALETTE.start);
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            this.display.setPixel(x, y, backgroundColor);
+        }
+    }
+
+    renderTiledBackgroundScanline(y: number, displayControl: number, backgroundIndex: number) {
+        // Check if background is disabled
+        if (((displayControl >> (backgroundIndex + 8)) & 0x1) === 0) {
+            return;
+        }
+
+        const backgroundControl = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}CNT` as DisplayRegister]).value;
+        const priority = backgroundControl & 0x3;
+        const characterBaseBlock = (backgroundControl >> 2) & 0x3;
+        const mosaic = (backgroundControl >> 6) & 0x1;
+        const paletteMode = (backgroundControl >> 7) & 0x1;
+        const screenBaseBlock = (backgroundControl >> 8) & 0x1F;
+        const screenSizeMode = (backgroundControl >> 14) & 0x3;
+        const screenSize = BackgroundMapScreenSizes.TEXT[screenSizeMode];
+
+        const scrolling = {
+            x: this.memory.getInt16(displayRegisters[`BG${backgroundIndex}HOFS` as DisplayRegister]).value & 0x1FF,
+            y: this.memory.getInt16(displayRegisters[`BG${backgroundIndex}VOFS` as DisplayRegister]).value & 0x1FF,
+        };
+
+        const charBlockStart = MemorySegments.VRAM.start + BackgroundConstants.charBlockBytes * characterBaseBlock;
+        const screenBlockBaseStart = MemorySegments.VRAM.start + BackgroundConstants.screenBlockBytes * screenBaseBlock;
+
+        const adjustedY = (y + scrolling.y) % screenSize.y;
+        const tileY = Math.floor(adjustedY / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
+        const yTileOffset = adjustedY % BackgroundConstants.tilePixelSize;
+
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            const adjustedX = (x + scrolling.x) % screenSize.x;
+            const tileX = Math.floor(adjustedX / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
+            const xTileOffset = adjustedX % BackgroundConstants.tilePixelSize;
+
+            // Determine which screen block contains this pixel.
+            // TODO: refactor this to remove branches, can probably achieve the same thing with division/floor.
+            let screenBlockOffset = 0;
+            switch (screenSizeMode) {
+                case 0x0:
+                    // 32x32 tiles, 1 screen block
+                    screenBlockOffset = 0;
+                    break;
+                case 0x1:
+                    // 64x32, 2 screen blocks in horizontal arrangement
+                    screenBlockOffset = (adjustedX < screenSize.x / 2) ? 0 : 1;
+                    break;
+                case 0x2:
+                    // 32x64, 2 screen blocks in vertical arrangement
+                    screenBlockOffset = (adjustedY < screenSize.y / 2) ? 0 : 1;
+                    break;
+                case 0x3:
+                    // 64x64, 4 screen blocks in clockwise square arrangement
+                    if (adjustedX < screenSize.x / 2) {
+                        screenBlockOffset = (adjustedY < screenSize.y / 2) ? 0 : 2;
+                    } else {
+                        screenBlockOffset = (adjustedY < screenSize.y / 2) ? 1 : 3;
+                    }
+                    break;
+            }
+            const screenBlockStart = screenBlockBaseStart + BackgroundConstants.screenBlockBytes * screenBlockOffset;
+
+            // Find and decompose the screen entry. It occupies 2 bytes.
+            const screenEntry = this.memory.getInt16(screenBlockStart + 2 * (tileY * 32 + tileX)).value;
+            const tileIndex = screenEntry & 0x3FF;
+            const horizontalFlip = (screenEntry >> 10) & 0x1;
+            const verticalFlip = (screenEntry >> 11) & 0x1;
+            const palette = (screenEntry >> 12) & 0xF;
+
+            const mirroredXTileOffset = horizontalFlip ? (BackgroundConstants.tilePixelSize - xTileOffset - 1) : xTileOffset;
+            const mirroredYTileOffset = verticalFlip ? (BackgroundConstants.tilePixelSize - yTileOffset - 1) : yTileOffset;
+
+            // Start of this particular palette within palette RAM. Each uses 32 bytes in 16/16 mode.
+            const paletteAddress = MemorySegments.PALETTE.start + (palette * 32);
+
+            // Find and decompose the corresponding tile.
+            let tileColor;
+            if (paletteMode === 0) {
+                // 16/16 palette mode
+                const bytesPerTile = 32;
+                const bytesPerRow = 4;
+
+                // Get all bytes for the row
+                const tileBytes = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow), bytesPerRow);
+                // Select the specific 4 bit palette index value for this pixel
+                const colorIndex = mirroredXTileOffset % 2 === 0 ?
+                    tileBytes[mirroredXTileOffset / 2] & 0xF :
+                    (tileBytes[Math.floor(mirroredXTileOffset / 2)] >> 4) & 0xF;
+
+                if (colorIndex === 0 && palette === 0) {
+                    // Transparent
+                } else {
+                    tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                }
+            } else {
+                // 256/1 palette mode
+                const bytesPerTile = 64;
+                const bytesPerRow = 8;
+                const tileBytes = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow), bytesPerRow);
+                const colorIndex = tileBytes[mirroredXTileOffset] & 0xFF;
+                if (colorIndex === 0) {
+                    // Transparent
+                } else {
+                    tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                }
+            }
+
+            if (tileColor) {
+                this.display.setPixel(x, y, tileColor);
+            }
+        }
+    }
+
+    renderSpritesScanline(y: number, displayControl: number) {
+        // 0 = 2D object tile mapping, 1 = 1D object tile mapping
+        const objDimension = (displayControl >> 6) & 0x1;
+
+        for (let i = 0; i < SpriteConstants.maxObjectAttributes; i++) {
+            const attr0 = this.memory.getInt16(MemorySegments.OAM.start + i * SpriteConstants.objectAttributeSize + 0).value;
+            const attr1 = this.memory.getInt16(MemorySegments.OAM.start + i * SpriteConstants.objectAttributeSize + 2).value;
+            const attr2 = this.memory.getInt16(MemorySegments.OAM.start + i * SpriteConstants.objectAttributeSize + 4).value;
+
+            // Attribute 0 components
+            const unsignedSpriteY = attr0 & 0xFF;
+            const affineMode = (attr0 >> 8) & 0x3;
+            const gfxMode = (attr0 >> 10) & 0x3;
+            const mosaic = (attr0 >> 12) & 0x1;
+            const colorMode = (attr0 >> 13) & 0x1; // 0 = 16/16, 1 = 256/1
+            const spriteShape = (attr0 >> 14) & 0x1;
+
+            // Attribute 1 components
+            const spriteX = signExtend(attr1 & 0x1FF, 9);
+            const affineIndex = (attr1 >> 9) & 0x1F;
+            const horizontalFlip = (attr1 >> 12) & 0x1;
+            const verticalFlip = (attr1 >> 13) & 0x1;
+            const spriteSize = (attr1 >> 14) & 0x3;
+
+            // Attribute 2 components
+            const tileIndex = attr2 & 0x3FF;
+            const priority = (attr2 >> 10) & 0x3;
+            const palette = (attr2 >> 12) & 0xF;
+
+            // To support wrapping y values, use the negative y once the sprite is fully off screen.
+            // The y value has 8 bits, so 2^7=128 is the max signed value, plus the max sprite height
+            // of 64 gives a threshold of 192. After this y value, the negative y can be used, allowing
+            // the sprite to move down from the top of the screen. The x coordinate doesn't require this
+            // since it uses 9 bits, and the signed value fully spans the screen width of 240 px.
+            const spriteY = unsignedSpriteY > 192 ? signExtend(unsignedSpriteY, 8) : unsignedSpriteY;
+            const size = SpriteConstants.size[spriteShape][spriteSize];
+            const tilesPerRow = size.x / SpriteConstants.tileSize;
+            const bytesPerTileRow = colorMode === 1 ? 8 : 4;
+            const bytesPerTile = colorMode === 1 ? 64 : 32;
+
+            // Sprite is not overlapping this scanline
+            if (y < spriteY || y >= spriteY + size.y) {
+                continue;
+            }
+
+            const tileY = verticalFlip ?
+                (size.y / SpriteConstants.tileSize) - 1 - Math.floor((y - spriteY) / SpriteConstants.tileSize) :
+                Math.floor((y - spriteY) / SpriteConstants.tileSize);
+
+            for (let tileX = 0; tileX < tilesPerRow; tileX++) {
+                let tileRowStartAddress;
+                const tileYOffset = verticalFlip ?
+                    7 - ((y - spriteY) % SpriteConstants.tileSize) :
+                    (y - spriteY) % SpriteConstants.tileSize;
+                if (objDimension === 1) {
+                    // 1D tile arrangement
+                    tileRowStartAddress =
+                        SpriteConstants.charBlock4Address +
+                        (tileIndex + tileY * tilesPerRow + tileX) % SpriteConstants.maxVRAMTiles * bytesPerTile +
+                        tileYOffset * bytesPerTileRow;
+                } else {
+                    // 2D tile arrangement
+                    tileRowStartAddress =
+                        SpriteConstants.charBlock4Address +
+                        (tileIndex + tileY * 32 + tileX) % SpriteConstants.maxVRAMTiles * bytesPerTile +
+                        tileYOffset * bytesPerTileRow;
+                }
+
+                const tileBytes = this.memory.getBytes(tileRowStartAddress, bytesPerTileRow);
+
+                // Set each pixel in this row of the tile
+                for (let i = 0; i < 8; i++) {
+                    const x = horizontalFlip ?
+                        spriteX + (tilesPerRow - tileX - 1) * 8 + (7 - i) :
+                        spriteX + (tileX * 8) + i;
+
+                    if (x < 0) continue;
+
+                    let tileColor;
+                    if (colorMode === 0) {
+                        // 16/16 palette mode
+                        const colorIndex = i % 2 === 0 ?
+                            tileBytes[i / 2] & 0xF :
+                            (tileBytes[(i - 1) / 2] >> 4) & 0xF;
+                        // Color 0 in any object palette is transparent
+                        if (colorIndex > 0) {
+                            tileColor = this.get15BitColorFromAddress(SpriteConstants.spritePaletteAddress + (palette * SpriteConstants.spritePaletteBytes) + colorIndex * 2);
+                        }
+                    } else {
+                        // 256/1 palette mode
+                        const colorIndex = tileBytes[i];
+                        // Color 0 in any object palette is transparent
+                        if (colorIndex > 0) {
+                            tileColor = this.get15BitColorFromAddress(SpriteConstants.spritePaletteAddress + colorIndex * 2);
+                        }
+                    }
+
+                    if (tileColor) {
+                        this.display.setPixel(x, y, tileColor);
+                    }
+                }
+            }
+
+        }
     }
 
 }
