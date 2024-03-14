@@ -39,6 +39,10 @@ class GBA implements GBAType {
         this.memory.loadROM(rom);
     }
 
+    loadBIOS(bios: Uint8Array) {
+        this.memory.loadBIOS(bios);
+    }
+
     run() {
         this.status = 'running';
         this.runFrame();

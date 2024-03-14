@@ -1155,7 +1155,7 @@ const processLDM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 
     if (address - 4 !== endAddress) {
-        throw Error(`LDM failure: address ${address - 4} does not match expected end address ${endAddress}`);
+        throw Error(`LDM failure: address 0x${(address - 4).toString(16)} does not match expected end address 0x${endAddress.toString(16)}.`);
     }
 
     return { incrementPC: !loadPC };

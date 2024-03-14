@@ -1,5 +1,5 @@
 import { disassembleARM } from "./armDisassembler";
-import { statusRegisterFlags } from "./cpu";
+import { OperatingModeNames, statusRegisterFlags } from "./cpu";
 import { GBA } from "./gba";
 import { disassembleTHUMB } from "./thumbDisassembler";
 
@@ -38,6 +38,11 @@ const getRegisterText = (gba: GBA) => {
         text[`r${i}`] = (gba.cpu.getGeneralRegister(i) >>> 0).toString(16).padStart(8, '0');
     }
     text["cpsr"] = (gba.cpu.getStatusRegister("CPSR") >>> 0).toString(16).padStart(8, "0");
+    if (gba.cpu.currentModeHasSPSR()) {
+        text["spsr"] = (gba.cpu.getStatusRegister("SPSR") >>> 0).toString(16).padStart(8, "0");
+    } else {
+        text["spsr"] = `no spsr in ${OperatingModeNames[gba.cpu.operatingMode]} mode`;
+    }
 
     statusRegisterFlags.forEach(flag => {
         text[`flag_${flag}`] = gba.cpu.getStatusRegisterFlag("CPSR", flag) === 0 ? "false" : "true";

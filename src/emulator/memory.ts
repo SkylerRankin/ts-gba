@@ -149,6 +149,12 @@ class Memory implements MemoryType {
         }
     }
 
+    loadBIOS = (bios: Uint8Array): void => {
+        for (let i = 0; i < bios.length; i++) {
+            this.memoryBlocks.BIOS[i] = bios[i];
+        }
+    }
+
 }
 
 export { Memory, segments as MemorySegments, MemorySegment }

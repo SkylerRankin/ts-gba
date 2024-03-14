@@ -1,4 +1,4 @@
-import { CPU, Reg } from './cpu';
+import { CPU, OperatingModeCodes, OperatingModes, Reg } from './cpu';
 import { ProcessedInstructionOptions } from './armInstructionProcessors';
 import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
     signExtend, byteArrayToInt32, int32ToByteArray, int16ToByteArray,
@@ -1379,8 +1379,36 @@ const processBKPT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
 const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SWI');
-    cpu.history.addError(`BKPT not implemented: 0x${i.toString(16).padStart(8, '0')}.`);
-    return { incrementPC: true };
+
+    const nextInstructionAddress = cpu.getGeneralRegister(Reg.PC) - 4 + 2;
+    const cpsr = cpu.getStatusRegister('CPSR');
+
+    // Set supervisor mode SPSR to CPSR
+    if (cpu.operatingMode === OperatingModes.svc) {
+        cpu.currentStatusRegisters[1] = cpsr;
+        cpu.currentGeneralRegisters[Reg.LR] = nextInstructionAddress;
+    } else {
+        cpu.statusRegisters[OperatingModes.svc][1] = cpsr;
+        cpu.generalRegisters[OperatingModes.svc][Reg.LR] = nextInstructionAddress;
+    }
+
+    let newCPSR = cpsr;
+
+    // Enter supervisor mode
+    newCPSR &= 0xFFFFFFE0;
+    newCPSR |= OperatingModeCodes.svc;
+
+    // Use ARM state
+    newCPSR &= 0xFFFFFFDF;
+
+    // Disable normal interrupts
+    newCPSR |= 0x80;
+
+    cpu.setStatusRegister('CPSR', newCPSR);
+
+    cpu.setGeneralRegister(Reg.PC, 0x000000010);
+
+    return { incrementPC: false };
 }
 
 

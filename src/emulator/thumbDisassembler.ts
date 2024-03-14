@@ -584,7 +584,7 @@ const disassembleBKPT = (cpu: CPU, i: number) : string => {
 }
 
 const disassembleSWI = (cpu: CPU, i: number) : string => {
-    return `Not implemented`;
+    return `SWI 0x${(i & 0xFF).toString(16)}`;
 }
 
 

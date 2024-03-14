@@ -133,6 +133,21 @@
                 fileReader.readAsArrayBuffer(event.files[0]);
             }
 
+            const onBIOSUpload = (event) => {
+                if (!event.files || !event.files[0]) {
+                    console.error(`No BIOS file uploaded.`);
+                    return;
+                }
+                const fileReader = new FileReader();
+                fileReader.onloadend = event => {
+                    if (fileReader.result !== null) {
+                        const buffer = new Uint8Array(fileReader.result);
+                        gba.loadBIOS(buffer);
+                    }
+                };
+                fileReader.readAsArrayBuffer(event.files[0]);
+            }
+
             const onRun = () => {
                 instructionTableState.pcOffset = 0;
                 document.getElementById("cpu_info_warning").classList.remove("hidden");
@@ -188,6 +203,8 @@
                         document.getElementById(`${key}_value`).innerHTML = text;
                     } else if (key === "cpsr") {
                         document.getElementById("cpsr_value").innerHTML = text;
+                    } else if (key === "spsr") {
+                        document.getElementById("spsr_value").innerHTML = text;
                     } else if (key.startsWith("flag_")) {
                         if (text === "true") {
                             document.getElementById(key).classList.add("cpsr_flag_active");
@@ -328,7 +345,9 @@
                     <div id="tab0_container" class="">
                         <div id="game_control_container">
                             <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
+                            <input id="biosInput" type="file" style="display: none !important;" onChange="onBIOSUpload(this)">
                             <div class="button" id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</div>
+                            <div class="button" id='uploadBiosButton' onClick="document.getElementById('biosInput').click()"}>Upload BIOS</div>
                             <div class="button" id="startButton">Start</div>
                             <div class="button" id="resetButton">Reset</div>
                         </div>
@@ -405,6 +424,14 @@
                                         <td id="r1_value">00000000</td>
                                         <td>R9</td>
                                         <td id="r9_value">00000000</td>
+                                        <td>SPSR</td>
+                                        <td id="spsr_value">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>R2</td>
+                                        <td id="r2_value">00000000</td>
+                                        <td>R10</td>
+                                        <td id="r10_value">00000000</td>
                                         <td>Flags</td>
                                         <td>
                                             <span id="flag_n" class="cpsr_flag">n</span>
@@ -416,12 +443,6 @@
                                             <span id="flag_t" class="cpsr_flag">t</span>
                                             <span id="flag_q" class="cpsr_flag">q</span>
                                         </td>
-                                    </tr>
-                                    <tr>
-                                        <td>R2</td>
-                                        <td id="r2_value">00000000</td>
-                                        <td>R10</td>
-                                        <td id="r10_value">00000000</td>
                                     </tr>
                                     <tr>
                                         <td>R3</td>

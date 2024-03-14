@@ -236,7 +236,7 @@ class CPU implements CPUType {
         if (this.operatingMode === OperatingModes.usr || this.operatingMode === OperatingModes.sys) {
             // No SPSR in User or System mode, so nothing to copy.
         } else {
-            this.currentStatusRegisters[0] = this.currentStatusRegisters[1];
+            this.setStatusRegister("CPSR", this.currentStatusRegisters[1]);
         }
     }
 
@@ -311,6 +311,8 @@ class CPU implements CPUType {
     setStatusRegister(reg: StatusRegister, value: number): void {
         switch (reg) {
             case 'CPSR': {
+                const previousCPSR = this.getStatusRegister("CPSR");
+
                 const mode = value & 0x1F;
                 this.setModeBits(mode);
 
@@ -318,6 +320,9 @@ class CPU implements CPUType {
                 this.setStatusRegisterFlag('t', tFlag);
 
                 this.currentStatusRegisters[0] = value;
+                if (this.currentModeHasSPSR()) {
+                    this.currentStatusRegisters[1] = previousCPSR;
+                }
                 break;
             };
             case 'SPSR': {
@@ -341,48 +346,6 @@ class CPU implements CPUType {
         } else {
             return this.generalRegisters[mode][reg];
         }
-    }
-
-    getStateSummary() : {[key: string] : string | number | number[]} {
-        const modeBits = this.getStatusRegister('CPSR') & 0x1F;
-        const modeName = Object.values(OperatingModeCodes).includes(modeBits) ?
-            OperatingModeNames[Object.values(OperatingModeCodes).indexOf(modeBits)].toUpperCase() :
-            'ERR';
-
-        const state = (this.getStatusRegister('CPSR') & 0x20) === 0 ? 'ARM' : 'THB';
-
-        let registers = [];
-        if (this.operatingState === 'ARM') {
-            for (let i = 0; i < 16; i++) {
-                registers.push((this.getGeneralRegister(i) >>> 0));
-            }
-        } else {
-            [0, 1, 2, 3, 4, 5, 6, 7, 13, 14, 15].forEach(i => {
-                registers.push((this.getGeneralRegister(i) >>> 0));
-            });
-        }
-
-        const cpsr = this.getStatusRegister('CPSR');
-
-        const flags =
-            (this.getStatusRegisterFlag('CPSR', 'n') === 1 ? 'N' : '-') +
-            (this.getStatusRegisterFlag('CPSR', 'z') === 1 ? 'Z' : '-') +
-            (this.getStatusRegisterFlag('CPSR', 'c') === 1 ? 'C' : '-') +
-            (this.getStatusRegisterFlag('CPSR', 'v') === 1 ? 'V' : '-') +
-            ' ' +
-            (this.getStatusRegisterFlag('CPSR', 'i') === 1 ? 'I' : '-') +
-            (this.getStatusRegisterFlag('CPSR', 'f') === 1 ? 'F' : '-') +
-            (this.getStatusRegisterFlag('CPSR', 't') === 1 ? 'Y' : '-');
-
-        let summary = {
-            mode: modeName,
-            state: state,
-            registers: registers,
-            cpsr: cpsr,
-            flags: flags
-        };
-
-        return summary;
     }
 
     inAPrivilegedMode() : boolean {
