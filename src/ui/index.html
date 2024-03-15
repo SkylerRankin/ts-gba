@@ -24,7 +24,6 @@
             #step_button_container > div + div { margin-left: 20px; }
             #instruction_table { width: 100%; }
             #instruction_table, #instruction_table > tr, #instruction_table > tr > td { border-collapse: collapse; }
-            #fps_container td { padding-right: 20px; }
             #registers_table_container, #instruction_table_container, #key_container, #fps_container {
                 padding: 5px;
                 border: solid 1px #969696;
@@ -36,6 +35,9 @@
             #instruction_jump_container { display: flex; margin-bottom: 10px; }
             #instruction_jump_container > div { flex-grow: 1; margin-left: 20px; text-align: center; }
             #instruction_jump_container > input { border: solid 1px #969696; border-radius: 3px; }
+            #fps_container td { padding-right: 20px; }
+            #palette_canvas { margin: auto; display: block; }
+            #charblock_canvas { margin: auto; display: block; }
 
             .hidden { display: none; }
             .tab {
@@ -65,6 +67,63 @@
             .instruction_table_breakpoint_row { font-weight: bold; color: #942b2b; }
             .cpsr_flag { color: #e1e1e1; }
             .cpsr_flag_active { color: black; font-weight: bold; }
+            .outline_container {
+                padding: 5px;
+                border: solid 1px #969696;
+                border-radius: 3px;
+                margin-bottom: 10px;
+            }
+            .number_selector {
+                width: 69px;
+                display: flex;
+            }
+            .number_selector div {
+                width: 20px;
+                text-align: center;
+            }
+            .number_selector > :first-child:hover, .number_selector > :last-child:hover {
+                cursor: pointer;
+                background-color: #e8e8e8;
+            }
+            .number_selector > :first-child {
+                border: solid 1px #969696;
+                border-radius: 3px 0px 0px 3px;
+            }
+            .number_selector > :nth-child(2) {
+                border-top: solid 1px #969696;
+                border-bottom: solid 1px #969696;
+                width: 40px !important;
+            }
+            .number_selector > :last-child {
+                border: solid 1px #969696;
+                border-radius: 0px 3px 3px 0px;
+            }
+            .dropdown {
+                background-color: white;
+                border: solid 1px #969696;
+                border-radius: 3px;
+                font-size: 12px;
+            }
+            .page_selector {
+                width: 50px;
+                display: flex;
+            }
+            .page_selector div {
+                flex-grow: 1;
+            }
+            .page_selector div:hover {
+                cursor: pointer;
+                background-color: #e8e8e8;
+            }
+            .page_selector > :first-child {
+                border: solid 1px #969696;
+                border-radius: 3px 0px 0px 3px;
+            }
+            .page_selector > :last-child {
+                border: solid 1px #969696;
+                border-radius: 0px 3px 3px 0px;
+            }
+
 
         </style>
 
@@ -81,6 +140,18 @@
                 lastClickedRowAddress: 0,
                 lastClickedRowTime: 0,
                 doubleClickMs: 400,
+            };
+
+            const tileState = {
+                charblock: 1,
+                paletteMode16: true,
+                paletteIndex: 0,
+                tilePage: 0,
+                tilesPerPage: 12 * 8
+            };
+
+            const paletteState = {
+                showBackgroundPalette: true
             };
 
             const keyCodeToKey = {
@@ -152,6 +223,8 @@
                 instructionTableState.pcOffset = 0;
                 document.getElementById("cpu_info_warning").classList.remove("hidden");
                 document.getElementById("cpu_info_container").classList.add("hidden");
+                document.getElementById("ppu_info_warning").classList.remove("hidden");
+                document.getElementById("ppu_info_container").classList.add("hidden");
                 romLoaded = true;
                 gba.run();
                 fpsTimer = setTimeout(() => { onFPSUpdate(); }, 250);
@@ -161,11 +234,16 @@
                 gba.pause();
                 document.getElementById("cpu_info_warning").classList.add("hidden");
                 document.getElementById("cpu_info_container").classList.remove("hidden");
+                document.getElementById("ppu_info_warning").classList.add("hidden");
+                document.getElementById("ppu_info_container").classList.remove("hidden");
 
                 // Focus instruction list on PC on pause
                 instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
                 updateInstructionList();
                 updateRegisters();
+                updateColorPalettes();
+                updateTiles();
+                updateDisplayControl();
                 clearTimeout(fpsTimer);
             }
 
@@ -173,6 +251,8 @@
                 gba.reset();
                 document.getElementById("cpu_info_warning").classList.add("hidden");
                 document.getElementById("cpu_info_container").classList.remove("hidden");
+                document.getElementById("ppu_info_warning").classList.add("hidden");
+                document.getElementById("ppu_info_container").classList.remove("hidden");
                 romLoaded = false;
                 clearTimeout(fpsTimer);
             }
@@ -183,6 +263,9 @@
                 instructionTableState.pcOffset = 0;
                 updateInstructionList();
                 updateRegisters();
+                updateColorPalettes();
+                updateTiles();
+                updateDisplayControl();
             }
 
             const onSelectRow = () => {
@@ -261,6 +344,123 @@
                 });
             }
 
+            const updateDisplayControl = () => {
+                const {
+                    displayMode,
+                    frameSelect,
+                    hblankIntervalFree,
+                    objVRAMMapping,
+                    forcedBlank,
+                    enabledBackgrounds,
+                    displayObj
+                } = window.UI.getDisplayControl(gba);
+
+                document.getElementById("display_mode_text").innerHTML = displayMode;
+                document.getElementById("frame_select_text").innerHTML = frameSelect;
+                document.getElementById("hblank_interval_text").innerHTML = hblankIntervalFree;
+                document.getElementById("obj_vram_mapping_text").innerHTML = objVRAMMapping;
+                document.getElementById("forced_blank_text").innerHTML = forcedBlank;
+                document.getElementById("enabled_backgrounds_text").innerHTML = enabledBackgrounds;
+                document.getElementById("display_obj_text").innerHTML = displayObj;
+            }
+
+            const updateColorPalettes = () => {
+                const spacing = 4;
+                const tileWidth = 20;
+                const tileHeight = 10;
+                const { bgPalette, spritePalette } = window.UI.getPaletteColors(gba);
+                const context = document.getElementById("palette_canvas").getContext("2d");
+                if (paletteState.showBackgroundPalette) {
+                    bgPalette.forEach((color, i) => {
+                        const x = i % 16;
+                        const y = Math.floor(i / 16);
+                        context.fillStyle = color;
+                        context.fillRect(x * (tileWidth + spacing), y * (tileHeight + spacing), tileWidth, tileHeight);
+                    });
+                } else {
+                    spritePalette.forEach((color, i) => {
+                        const x = i % 16;
+                        const y = Math.floor(i / 16);
+                        context.fillStyle = color;
+                        context.fillRect(x * (tileWidth + spacing), y * (tileHeight + spacing), tileWidth, tileHeight);
+                    });
+                }
+            }
+
+            const updateTiles = () => {
+                const canvas = document.getElementById(`charblock_canvas`);
+                const context = canvas.getContext("2d");
+
+                const tiles = window.UI.getTiles(gba, tileState.charblock - 1, tileState.paletteMode16, tileState.paletteIndex);
+
+                const tileSpacing = 2;
+                const tilePixelSize = 32;
+                const totalWidth = canvas.width;
+                const maxTiles = tileState.paletteMode16 ? 512 : 256;
+                const startTile = tileState.tilePage * tileState.tilesPerPage;
+
+                document.getElementById("charblock_value").innerHTML = tileState.charblock;
+                document.getElementById("palette_index_value").innerHTML = tileState.paletteIndex;
+                document.getElementById("tile_range_text").innerHTML = `Tiles ${tileState.tilePage * tileState.tilesPerPage} - ${Math.min((tileState.tilePage + 1) * tileState.tilesPerPage, maxTiles - 1)}`;
+
+                let currentX = 0;
+                let currentY = 0;
+
+                for (let i = startTile; i < startTile + tileState.tilesPerPage && i < tiles.length; i++) {
+                    const tile = tiles[i];
+                    for (let x = 0; x < 8; x++) {
+                        for (let y = 0; y < 8; y++) {
+                            const color = tile[y * 8 + x];
+                            context.fillStyle = `rgb(${color.red}, ${color.green}, ${color.blue})`;
+                            context.fillRect(currentX + x * 4, currentY + y * 4, 4, 4);
+                        }
+                    }
+
+                    currentX += tilePixelSize + tileSpacing;
+                    if (currentX + tilePixelSize > totalWidth) {
+                        currentX = 0;
+                        currentY += tilePixelSize + tileSpacing;
+                    }
+                }
+            }
+
+            const setPPUListeners = () => {
+                document.getElementById("charblock_decrease").onclick = () => {
+                    tileState.charblock = Math.max(1, tileState.charblock - 1);
+                    updateTiles();
+                };
+                document.getElementById("charblock_increase").onclick = () => {
+                    tileState.charblock = Math.min(6, tileState.charblock + 1);
+                    updateTiles();
+                };
+                document.getElementById("palette_mode_dropdown").onchange = (event) => {
+                    tileState.paletteMode16 = event.target.value === "16";
+                    updateTiles();
+                };
+                document.getElementById("palette_index_decrease").onclick = () => {
+                    tileState.paletteIndex = Math.max(0, tileState.paletteIndex - 1);
+                    updateTiles();
+                };
+                document.getElementById("palette_index_increase").onclick = () => {
+                    tileState.paletteIndex = Math.min(15, tileState.paletteIndex + 1);
+                    updateTiles();
+                };
+                document.getElementById("tile_page_decrease").onclick = () => {
+                    tileState.tilePage = Math.max(0, tileState.tilePage - 1);
+                    updateTiles();
+                };
+                document.getElementById("tile_page_increase").onclick = () => {
+                    const maxTiles = tileState.paletteMode16 ? 512 : 256;
+                    const maxPage = Math.floor(maxTiles / tileState.tilesPerPage);
+                    tileState.tilePage = Math.min(maxPage, tileState.tilePage + 1);
+                    updateTiles();
+                };
+                document.getElementById("palette_dropdown").onchange = (event) => {
+                    paletteState.showBackgroundPalette = event.target.value === "background";
+                    updateColorPalettes();
+                };
+            }
+
             const onKeyUpdate = (key, pressed) => {
                 const gbaKey = keyCodeToKey[key];
                 if (gbaKey) {
@@ -315,6 +515,8 @@
                     instructionTableState.pcOffset = 0;
                     updateInstructionList();
                 });
+
+                setPPUListeners();
 
                 gba.cpu.breakpointCallback = () => {
                     onPause();
@@ -496,7 +698,68 @@
                         <div id="cpu_info_warning" class="hidden">Not updated while emulator is running</div>
                     </div>
                     <div id="tab2_container" class="hidden">
-                        tab 2, empty
+                        <div id="ppu_info_container" class="hidden">
+                            <div class="outline_container">
+                                <div style="margin-bottom: 10px;">Display Control Register</div>
+                                <table style="width: 100%;">
+                                    <tr>
+                                        <td>Display mode</td>
+                                        <td id="display_mode_text" style="padding-right: 35px;">0</td>
+                                        <td>Frame select</td>
+                                        <td id="frame_select_text" style="padding-right: 35px;">0</td>
+                                        <td>HBlank interval free</td>
+                                        <td id="hblank_interval_text">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td>OBJ VRAM Mapping</td>
+                                        <td id="obj_vram_mapping_text">2D</td>
+                                        <td>Forced blank</td>
+                                        <td id="forced_blank_text">1</td>
+                                        <td>Enabled backgrounds</td>
+                                        <td id="enabled_backgrounds_text">1234</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Display OBJ</td>
+                                        <td id="display_obj_text">On</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="outline_container" style="height: 390px; overflow-y: scroll;">
+                                <div style="margin-bottom: 10px;">Tiles</div>
+                                <div style="display: flex; margin-bottom: 10px; justify-content: center;">
+                                    <div style="margin-right: 5px;">Charblock</div>
+                                    <div class="number_selector" style="margin-right: 10px;"><div id="charblock_decrease">-</div><div id="charblock_value">1</div><div id="charblock_increase">+</div></div>
+                                    <div style="margin-right: 5px;">Palette mode</div>
+                                    <div style="margin-right: 10px;">
+                                        <select class="dropdown" id="palette_mode_dropdown">
+                                            <option value="16">16/16</option>
+                                            <option value="256">256/1</option>
+                                        </select>
+                                    </div>
+                                    <div style="margin-right: 5px;">Palette index</div>
+                                    <div class="number_selector"><div id="palette_index_decrease">-</div><div id="palette_index_value">0</div><div id="palette_index_increase">+</div></div>
+                                </div>
+                                <canvas id="charblock_canvas" width="406" height="270"></canvas>
+                                <div style="text-align: center;">
+                                    <div class="page_selector" style="margin: auto; margin-bottom: 10px; margin-top: 10px;">
+                                        <div id="tile_page_decrease">&lt;</div>
+                                        <div id="tile_page_increase">&gt;</div>
+                                    </div>
+                                    <div id="tile_range_text">Tiles 0 - 23</div>
+                                </div>
+                            </div>
+                            <div class="outline_container">
+                                <div style="margin-bottom: 10px;">Color palettes</div>
+                                <div style="margin-bottom: 10px;">
+                                    <select class="dropdown" id="palette_dropdown">
+                                        <option value="background">Background</option>
+                                        <option value="object">Object</option>
+                                    </select>
+                                </div>
+                                <canvas id="palette_canvas" width="380px" height="220px" style="margin-bottom: 10px;"></canvas>
+                            </div>
+                        </div>
+                        <div id="ppu_info_warning" class="hidden">Not updated with emulator is running</div>
                     </div>
                 </div>
             </div>
