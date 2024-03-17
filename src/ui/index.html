@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <title>ts-gba</title>
         <script src="./tsgba.js"></script>
         <style>
             * {
@@ -401,7 +402,7 @@
 
                 document.getElementById("charblock_value").innerHTML = tileState.charblock;
                 document.getElementById("palette_index_value").innerHTML = tileState.paletteIndex;
-                document.getElementById("tile_range_text").innerHTML = `Tiles ${tileState.tilePage * tileState.tilesPerPage} - ${Math.min((tileState.tilePage + 1) * tileState.tilesPerPage, maxTiles - 1)}`;
+                document.getElementById("tile_range_text").innerHTML = `Tiles ${tileState.tilePage * tileState.tilesPerPage} - ${Math.min((tileState.tilePage + 1) * tileState.tilesPerPage - 1, maxTiles - 1)}`;
 
                 let currentX = 0;
                 let currentY = 0;

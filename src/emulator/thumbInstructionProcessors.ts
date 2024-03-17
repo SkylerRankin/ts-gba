@@ -713,13 +713,19 @@ const processMOV3 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
     const h1 = (i >>> 7) & 0x1;
     const h2 = (i >>> 6) & 0x1;
-    const rmLow = (i >>> 3) & 0x7;
+    const rmLow = (i >> 3) & 0x7;
     const rdLow = i & 0x7;
     const rm = (h2 << 3) | rmLow;
     const rd = (h1 << 3) | rdLow;
-    cpu.setGeneralRegister(rd, cpu.getGeneralRegister(rm));
 
-    return { incrementPC: true };
+    let result = cpu.getGeneralRegister(rm);
+    if (rd === Reg.PC) {
+        result += 4;
+    }
+
+    cpu.setGeneralRegister(rd, result);
+
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processMUL = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
