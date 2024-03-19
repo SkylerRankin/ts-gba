@@ -3,6 +3,7 @@ import { processTHUMB } from './thumbInstructionProcessors';
 import { Memory } from './memory';
 import { StateHistory } from './stateHistory';
 import { CPUProfiler } from './cpuProfiler';
+import { handleInterrupts } from './interrupt';
 
 /**
  * A simulator for a CPU that implements the ARMv4T ISA.
@@ -102,7 +103,7 @@ class CPU implements CPUType {
     history = new StateHistory();
     profiler = new CPUProfiler();
     bigEndian = false;
-    bootBIOS = true;
+    bootBIOS = false;
     historyEnabled = false;
     instructionSize = 4;
     breakpoints = new Set<number>();
@@ -110,6 +111,7 @@ class CPU implements CPUType {
 
     constructor(memory: Memory) {
         this.memory = memory;
+        this.memory.cpu = this;
         this.cycles = 0;
         this.currentGeneralRegisters = new Array<number>(16).fill(0);
         this.currentStatusRegisters = new Array<number>(2).fill(0);
@@ -131,12 +133,13 @@ class CPU implements CPUType {
 
     step() : void {
         const pc = this.getGeneralRegister(Reg.PC);
+
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
         const instruction = this.operatingState === 'ARM' ?
             this.memory.getInt32(pc - 8).value :
             this.memory.getInt16(pc - 4).value;
 
-        let options: ProcessedInstructionOptions | undefined;
+        let options: ProcessedInstructionOptions = { incrementPC: true };
         if (this.operatingState === 'ARM' && this.conditionIsMet(instruction >>> 28)) {
             options = processARM(this, instruction);
         } else if (this.operatingState === 'THUMB') {
@@ -145,9 +148,12 @@ class CPU implements CPUType {
 
         this.cycles += 1;
 
-        if (!options || options.incrementPC) {
+        const executedInterrupt = handleInterrupts(this, options);
+
+        if (!executedInterrupt && options.incrementPC) {
             this.setGeneralRegister(Reg.PC, pc + this.instructionSize);
         }
+
     }
 
     /**
@@ -281,7 +287,8 @@ class CPU implements CPUType {
         }
 
         // Update SPSR registers
-        if (previousMode >= OperatingModes.fiq && previousMode <= OperatingModes.und) {
+        if ((previousMode >= OperatingModes.fiq && previousMode <= OperatingModes.und) ||
+            (newMode >= OperatingModes.fiq && newMode <= OperatingModes.und)) {
             this.statusRegisters[previousMode][1] = this.currentStatusRegisters[1];
             this.currentStatusRegisters[1] = this.statusRegisters[newMode][1];
         }
@@ -308,7 +315,7 @@ class CPU implements CPUType {
         this.currentGeneralRegisters[reg] = value;
     }
 
-    setStatusRegister(reg: StatusRegister, value: number): void {
+    setStatusRegister(reg: StatusRegister, value: number, saveCPSR: boolean = false): void {
         switch (reg) {
             case 'CPSR': {
                 const previousCPSR = this.getStatusRegister("CPSR");
@@ -320,7 +327,7 @@ class CPU implements CPUType {
                 this.setStatusRegisterFlag('t', tFlag);
 
                 this.currentStatusRegisters[0] = value;
-                if (this.currentModeHasSPSR()) {
+                if (saveCPSR && this.currentModeHasSPSR()) {
                     this.currentStatusRegisters[1] = previousCPSR;
                 }
                 break;

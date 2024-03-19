@@ -30,8 +30,8 @@ class GBA implements GBAType {
         this.memory = new Memory();
         this.cpu = new CPU(this.memory);
         this.display = display;
-        this.ppu = new PPU(this.memory, this.display);
-        this.keypad = new Keypad(this.memory);
+        this.ppu = new PPU(this.cpu, this.display);
+        this.keypad = new Keypad(this.cpu);
         this.frameQueue = new Array<number>();
     }
 

@@ -160,14 +160,7 @@ const processDataProcessing = (cpu: CPU, i: number) : ProcessedInstructionOption
         processingFunction({cpu, value1, value2, rd, sFlag, shiftCarry});
     }
 
-    if (rd === Reg.PC) {
-        // Add PC offset if the instruction edited PC. unless the value comes from LR?
-        const adjustedPC = cpu.getGeneralRegister(Reg.PC) + 8;
-        cpu.setGeneralRegister(Reg.PC, adjustedPC);
-        return { incrementPC: false };
-    } else {
-        return { incrementPC: true };
-    }
+    return { incrementPC: rd !== Reg.PC };
 }
 
 /**
@@ -523,16 +516,19 @@ const processAnd = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('AND');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry === 1);
         }
     }
+
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result32;
 }
 
@@ -544,16 +540,19 @@ const processEor = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     const result = value1 ^ value2;
-    cpu.setGeneralRegister(rd, value1 ^ value2);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result));
             cpu.setStatusRegisterFlag('z', result === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry === 1);
         }
     }
+
+    cpu.setGeneralRegister(rd, value1 ^ value2 + offset);
     return result;
 }
 
@@ -566,10 +565,11 @@ const processSub = (data: DataProcessingParameter) : number => {
 
     const result = value1 - value2;
     const result32 = result & 0xFFFFFFFF;
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -577,6 +577,7 @@ const processSub = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value1, value2, result32) === 1);
         }
     }
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
 
@@ -589,10 +590,11 @@ const processRsb = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('RSB');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -600,6 +602,8 @@ const processRsb = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value2, value1, result32));
         }
     }
+
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
 
@@ -612,10 +616,11 @@ const processAdd = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('ADD');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -623,6 +628,7 @@ const processAdd = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromAddition(value1, value2, result32));
         }
     }
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
 
@@ -636,10 +642,11 @@ const processAdc = (data: DataProcessingParameter) : number => {
 
     const result = value1 + value2 + cFlag;
     const result32 = result & 0xFFFFFFFF;
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -647,6 +654,7 @@ const processAdc = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromAddition(value1, value2 + cFlag, result32));
         }
     }
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
 
@@ -661,10 +669,11 @@ const processSbc = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('SBC');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -672,6 +681,7 @@ const processSbc = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value1, value2 + notCarry, result32));
         }
     }
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
 
@@ -686,10 +696,11 @@ const processRsc = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('RSC');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -697,6 +708,7 @@ const processRsc = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value2, value1 + notCarry, result32));
         }
     }
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
 
@@ -776,16 +788,18 @@ const processOrr = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('ORR');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result32;
 }
 
@@ -797,17 +811,20 @@ const processMov = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('MOV');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
-    return result32;
+    cpu.setGeneralRegister(rd, result32 + offset);
+
+    return result32 - offset;
 }
 
 const processBic = (data: DataProcessingParameter) : number => {
@@ -818,16 +835,18 @@ const processBic = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('BIC');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result));
             cpu.setStatusRegisterFlag('z', result === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
+    cpu.setGeneralRegister(rd, result + offset);
     return result;
 }
 
@@ -839,16 +858,18 @@ const processMvn = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('MVN');
     // #REMOVE_IN_BUILD_END
 
-    cpu.setGeneralRegister(rd, result32);
+    let offset = 0;
     if (sFlag) {
         if (rd === 15) {
             cpu.spsrToCPSR();
+            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
+    cpu.setGeneralRegister(rd, result32 + offset);
     return result32;
 }
 
@@ -920,7 +941,7 @@ const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         cpu.setGeneralRegister(rd, value);
     }
     cpu.cycles += cycles;
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processLDRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -933,7 +954,7 @@ const processLDRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const {value, cycles} = cpu.memory.getInt8(address);
     cpu.setGeneralRegister(rd, value);
     cpu.cycles += cycles;
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processLDRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -951,7 +972,7 @@ const processLDRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const {value, cycles} = cpu.memory.getInt8(address);
     cpu.setGeneralRegister(rd, value);
     cpu.cycles += cycles;
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processLDRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -964,7 +985,7 @@ const processLDRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const { value, cycles } = cpu.memory.getInt16(halfWordAlignAddress(address));
     cpu.setGeneralRegister(rd, value);
     cpu.cycles += cycles;
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -977,7 +998,7 @@ const processLDRSB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const {value, cycles} = cpu.memory.getInt8(address);
     cpu.setGeneralRegister(rd, signExtend(value, 8));
     cpu.cycles += cycles;
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -991,7 +1012,7 @@ const processLDRSH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     value = signExtend(value, 16);
     cpu.setGeneralRegister(rd, value);
     cpu.cycles += cycles;
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processLDRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -1014,7 +1035,7 @@ const processLDRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     }
     cpu.setGeneralRegister(rd, value);
     cpu.cycles += cycles;
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processSTR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -1555,6 +1576,7 @@ const processBKPT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SWI');
     cpu.history.addError(`SWI not implemented: 0x${i.toString(16).padStart(8, '0')}.`);
+    throw Error("ARM SWI not implemented");
     return { incrementPC: true };
 }
 

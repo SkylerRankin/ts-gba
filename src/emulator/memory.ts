@@ -1,3 +1,6 @@
+import { CPU } from "./cpu";
+import { handleInterruptAcknowledge, handleInterruptStore } from "./interrupt";
+
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'PALETTE' | 'VRAM' | 'OAM' | 'ROM_WS0' | 'ROM_WS1' | 'ROM_WS2' | 'SRAM';
 type MemoryAccess = { nSeq16: number, seq16: number, nSeq32: number, seq32: number };
 const segmentsByIndex: MemorySegment[] = ['BIOS', 'WRAM_O', 'WRAM_I', 'IO', 'PALETTE', 'VRAM', 'OAM', 'ROM_WS0', 'ROM_WS0', 'ROM_WS1', 'ROM_WS1', 'ROM_WS2', 'ROM_WS2', 'SRAM'];
@@ -62,9 +65,11 @@ class Memory implements MemoryType {
         'ROM_WS2': new Uint8Array(segments.ROM_WS2.end - segments.ROM_WS2.start + 1),
         'SRAM': new Uint8Array(segments.SRAM.end - segments.SRAM.start + 1),
     };
+    cpu: any;
 
     constructor() {
         this.reset();
+        this.cpu = null;
     }
 
     reset = (): void => {
@@ -83,6 +88,7 @@ class Memory implements MemoryType {
     }
 
     getBytes = (address: number, bytes: number): Uint8Array => {
+        address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
         address = address - segments[segment].start;
 
@@ -94,6 +100,7 @@ class Memory implements MemoryType {
     }
 
     getInt32 = (address: number): MemoryReadResult => {
+        address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
         address = address - segments[segment].start;
 
@@ -107,6 +114,7 @@ class Memory implements MemoryType {
     }
 
     getInt16 = (address: number): MemoryReadResult => {
+        address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
         address = address - segments[segment].start;
         let result = 0;
@@ -118,6 +126,7 @@ class Memory implements MemoryType {
     }
 
     getInt8 = (address: number): MemoryReadResult => {
+        address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
         address = address - segments[segment].start;
         let result = this.memoryBlocks[segment][address];
@@ -128,14 +137,37 @@ class Memory implements MemoryType {
      * Sets a sequential number of bytes in memory at the given address. The
      * number of CPU cycles used for the memory access is returned.
      */
-    setBytes = (address: number, bytes: Uint8Array): MemoryWriteResult => {
+    setBytes = (address: number, bytes: Uint8Array, checkForInterruptAck: boolean = true): MemoryWriteResult => {
+        address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
-        address = address - segments[segment].start;
-        for (let i = 0; i < bytes.length; i++) {
-            this.memoryBlocks[segment][address + i] = bytes[i];
+
+        // Return early since interrupt acknowledgements don't actual write these
+        // bytes to memory.
+        if (checkForInterruptAck && handleInterruptAcknowledge(this.cpu, address, bytes)) {
+            return waitStateCycles[segment].nSeq32;
+        }
+
+        const segmentAddress = address - segments[segment].start;
+        for (let j = 0; j < bytes.length; j++) {
+            this.memoryBlocks[segment][segmentAddress + j] = bytes[j];
         }
 
         return waitStateCycles[segment].nSeq32;
+    }
+
+    setBytesForInterrupt = (address: number, bytes: Uint8Array): void => {
+        this.setBytes(address, bytes, false);
+    }
+
+    /**
+     * If the given address is "mirrored" in memory, the smaller
+     * of the equivalent addresses is returned.
+     */
+    resolveMirroredAddress = (address: number): number => {
+        if ((address & 0xFFFFFF00) === 0x03FFFF00) {
+            return 0x03007F00 | (address & 0xFF);
+        }
+        return address;
     }
 
     loadROM = (rom: Uint8Array): void => {

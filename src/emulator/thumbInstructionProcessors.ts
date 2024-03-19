@@ -1410,7 +1410,7 @@ const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // Disable normal interrupts
     newCPSR |= 0x80;
 
-    cpu.setStatusRegister('CPSR', newCPSR);
+    cpu.setStatusRegister('CPSR', newCPSR, true);
 
     cpu.setGeneralRegister(Reg.PC, 0x000000010);
 

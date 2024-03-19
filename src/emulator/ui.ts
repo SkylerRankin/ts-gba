@@ -149,6 +149,53 @@ const getDisplayControl = (gba: GBA) => {
     };
 }
 
+const getInterruptInfo = (gba: GBA) => {
+    const imeAddress = 0x04000208;
+    const ieAdderss = 0x04000200;
+    const ifAddress = 0x4000202;
+    const checkFlagAddresses = [ 0x03007FF8, 0x03FFFFF8 ];
+    const ime = gba.memory.getInt16(imeAddress).value;
+    const ie = gba.memory.getInt16(ieAdderss).value;
+    const ifValue = gba.memory.getInt16(ifAddress).value;
+    const cpsrIFlag = gba.cpu.getStatusRegisterFlag("CPSR", "i");
+
+    let checkFlagValue0 = gba.memory.getInt16(checkFlagAddresses[0]).value;
+    let checkFlagValue1 = gba.memory.getInt16(checkFlagAddresses[1]).value;
+    let checkFlag;
+    if (checkFlagValue0 === checkFlagValue1) {
+        checkFlag = checkFlagValue0.toString(16).padStart(8, '0');
+    } else {
+        checkFlag = `! ${checkFlagValue0.toString(16).padStart(8, '0')} / ${checkFlagValue1.toString(16).padStart(8, '0')}`;
+    }
+
+    return {
+        values: {
+            imeValue: ime.toString(16).padStart(8, '0'),
+            ieValue: ie.toString(16).padStart(8, '0'),
+            ifValue: ifValue.toString(16).padStart(8, '0'),
+            checkFlag: checkFlag,
+        },
+        flags: {
+            cpsr: cpsrIFlag === 0,
+            ime: (ime & 0x1) === 1,
+            vBlank: ((ie >> 0) & 0x1) === 1,
+            hBlank: ((ie >> 1) & 0x1) === 1,
+            vBlankCount: ((ie >> 2) & 0x1) === 1,
+            timer0: ((ie >> 3) & 0x1) === 1,
+            timer1: ((ie >> 4) & 0x1) === 1,
+            timer2: ((ie >> 5) & 0x1) === 1,
+            timer3: ((ie >> 6) & 0x1) === 1,
+            serial: ((ie >> 7) & 0x1) === 1,
+            dma0: ((ie >> 8) & 0x1) === 1,
+            dma1: ((ie >> 9) & 0x1) === 1,
+            dma2: ((ie >> 10) & 0x1) === 1,
+            dma3: ((ie >> 11) & 0x1) === 1,
+            keypad: ((ie >> 12) & 0x1) === 1,
+            gamePak: ((ie >> 13) & 0x1) === 1,
+        }
+    };
+}
+
 const get15BitColorFromAddress = (gba: GBA, address: number) : any => {
     const colorData = gba.memory.getInt16(address).value;
     return {
@@ -165,6 +212,7 @@ const UI = {
     getPaletteColors,
     getTiles,
     getDisplayControl,
+    getInterruptInfo,
 };
 
 export { UI }

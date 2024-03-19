@@ -39,6 +39,8 @@
             #fps_container td { padding-right: 20px; }
             #palette_canvas { margin: auto; display: block; }
             #charblock_canvas { margin: auto; display: block; }
+            #interrupt_table { width: 100%; }
+            #interrupt_table > tbody > tr > td:nth-child(odd) { width: 20%; }
 
             .hidden { display: none; }
             .tab {
@@ -123,6 +125,14 @@
             .page_selector > :last-child {
                 border: solid 1px #969696;
                 border-radius: 0px 3px 3px 0px;
+            }
+            .interrupt_disabled {
+                color: #e8e8e8;
+                font-weight: normal;
+            }
+            .interrupt_enabled {
+                color: black;
+                font-weight: bold;
             }
 
 
@@ -245,6 +255,7 @@
                 updateColorPalettes();
                 updateTiles();
                 updateDisplayControl();
+                updateInterrupts();
                 clearTimeout(fpsTimer);
             }
 
@@ -267,6 +278,7 @@
                 updateColorPalettes();
                 updateTiles();
                 updateDisplayControl();
+                updateInterrupts();
             }
 
             const onSelectRow = () => {
@@ -423,6 +435,25 @@
                         currentY += tilePixelSize + tileSpacing;
                     }
                 }
+            }
+
+            const updateInterrupts = () => {
+                const interrupts = window.UI.getInterruptInfo(gba);
+                Object.entries(interrupts.values).forEach(([k, value]) => {
+                    document.getElementById(`interrupt_${k}`).innerHTML = value;
+                });
+                Object.entries(interrupts.flags).forEach(([k, enabled]) => {
+                    const element = document.getElementById(`interrupt_${k}`);
+                    if (enabled) {
+                        element.innerHTML = "Enabled";
+                        element.classList.remove("interrupt_disabled");
+                        element.classList.add("interrupt_enabled");
+                    } else {
+                        element.innerHTML = "Disabled";
+                        element.classList.add("interrupt_disabled");
+                        element.classList.remove("interrupt_enabled");
+                    }
+                });
             }
 
             const setPPUListeners = () => {
@@ -687,13 +718,86 @@
                                 <div class="button" id="instruction_jump_button">Jump</div>
                                 <div class="button" id="instruction_pc_button">Return to PC</div>
                             </div>
-                            <div style>
+                            <div>
                                 <div>Debugger notes:</div>
                                 <ul style="margin-top: 0px;">
                                     <li>Double click instruction to set breakpoint, will be highlighted in red</li>
                                     <li>Current PC is highlighted in blue</li>
                                     <li>All instructions in table are decoded according to current operating state, may not be correct</li>
                                 </ul>
+                            </div>
+                            <div class="outline_container">
+                                <div style="margin-bottom: 10px;">Interrupts</div>
+                                <table style="margin-bottom: 10px;">
+                                    <tr>
+                                        <td>IME Register</td>
+                                        <td id="interrupt_imeValue">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>IE Register</td>
+                                        <td id="interrupt_ieValue">00000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>IF Register</td>
+                                        <td id="interrupt_ifValue">0000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Interrupt Check Flag</td>
+                                        <td id="interrupt_checkFlag">00000000</td>
+                                    </tr>
+                                </table>
+                                <table id="interrupt_table">
+                                    <tbody>
+                                        <tr>
+                                            <td>CPSR I Flag</td>
+                                            <td id="interrupt_cpsr"></td>
+                                            <td>Timer 3</td>
+                                            <td id="interrupt_timer3"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Master</td>
+                                            <td id="interrupt_ime"></td>
+                                            <td>Serial</td>
+                                            <td id="interrupt_serial"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>V-Blank</td>
+                                            <td id="interrupt_vBlank"></td>
+                                            <td>DMA 0</td>
+                                            <td id="interrupt_dma0"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>H-Blank</td>
+                                            <td id="interrupt_hBlank"></td>
+                                            <td>DMA 1</td>
+                                            <td id="interrupt_dma1"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>V-Blank Count</td>
+                                            <td id="interrupt_vBlankCount"></td>
+                                            <td>DMA 2</td>
+                                            <td id="interrupt_dma2"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Timer 0</td>
+                                            <td id="interrupt_timer0"></td>
+                                            <td>DMA 3</td>
+                                            <td id="interrupt_dma3"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Timer 1</td>
+                                            <td id="interrupt_timer1"></td>
+                                            <td>Keypad</td>
+                                            <td id="interrupt_keypad"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Timer 2</td>
+                                            <td id="interrupt_timer2"></td>
+                                            <td>Game Pak</td>
+                                            <td id="interrupt_gamePak"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                         <div id="cpu_info_warning" class="hidden">Not updated while emulator is running</div>
