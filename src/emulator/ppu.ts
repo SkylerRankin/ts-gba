@@ -94,6 +94,7 @@ const SpriteConstants = {
     maxObjectAttributes: 128,
     maxAffineAttributes: 32,
     objectAttributeSize: 8,
+    affineObjectAttritubeSize: 32,
     size: [ // First index is shape value (attr0), second is size value (attr1)
         [ {x: 8, y: 8}, {x: 16, y: 16}, {x: 32, y: 32}, {x: 64, y: 64} ],
         [ {x: 16, y: 8}, {x: 32, y: 8}, {x: 32, y: 16}, {x: 64, y: 32} ],
@@ -476,7 +477,7 @@ class PPU implements PPUType {
         // 0 = 2D object tile mapping, 1 = 1D object tile mapping
         const objDimension = (displayControl >> 6) & 0x1;
 
-        for (let i = 0; i < SpriteConstants.maxObjectAttributes; i++) {
+        for (let i = SpriteConstants.maxObjectAttributes - 1; i >= 0; i--) {
             const attr0 = this.memory.getInt16(MemorySegments.OAM.start + i * SpriteConstants.objectAttributeSize + 0).value;
             const attr1 = this.memory.getInt16(MemorySegments.OAM.start + i * SpriteConstants.objectAttributeSize + 2).value;
             const attr2 = this.memory.getInt16(MemorySegments.OAM.start + i * SpriteConstants.objectAttributeSize + 4).value;
@@ -490,10 +491,10 @@ class PPU implements PPUType {
             const spriteShape = (attr0 >> 14) & 0x1;
 
             // Attribute 1 components
-            const spriteX = signExtend(attr1 & 0x1FF, 9);
+            let spriteX = signExtend(attr1 & 0x1FF, 9);
             const affineIndex = (attr1 >> 9) & 0x1F;
-            const horizontalFlip = (attr1 >> 12) & 0x1;
-            const verticalFlip = (attr1 >> 13) & 0x1;
+            const horizontalFlip = ((attr1 >> 12) & 0x1) && affineMode === 0;
+            const verticalFlip = ((attr1 >> 13) & 0x1) && affineMode === 0;
             const spriteSize = (attr1 >> 14) & 0x3;
 
             // Attribute 2 components
@@ -501,80 +502,144 @@ class PPU implements PPUType {
             const priority = (attr2 >> 10) & 0x3;
             const palette = (attr2 >> 12) & 0xF;
 
+            if (affineMode === 0x2) {
+                // Sprite rendering is disabled
+                continue;
+            }
+
             // To support wrapping y values, use the negative y once the sprite is fully off screen.
             // The y value has 8 bits, so 2^7=128 is the max signed value, plus the max sprite height
             // of 64 gives a threshold of 192. After this y value, the negative y can be used, allowing
             // the sprite to move down from the top of the screen. The x coordinate doesn't require this
             // since it uses 9 bits, and the signed value fully spans the screen width of 240 px.
-            const spriteY = unsignedSpriteY > 192 ? signExtend(unsignedSpriteY, 8) : unsignedSpriteY;
-            const size = SpriteConstants.size[spriteShape][spriteSize];
+            let spriteY = unsignedSpriteY > 192 ? signExtend(unsignedSpriteY, 8) : unsignedSpriteY;
+            const size = { x: SpriteConstants.size[spriteShape][spriteSize].x, y: SpriteConstants.size[spriteShape][spriteSize].y };
+            const tileSize = { x: size.x / SpriteConstants.tileSize, y: size.y / SpriteConstants.tileSize };
             const tilesPerRow = size.x / SpriteConstants.tileSize;
             const bytesPerTileRow = colorMode === 1 ? 8 : 4;
             const bytesPerTile = colorMode === 1 ? 64 : 32;
+
+            const affineSprite = affineMode !== 0;
+            const doubleAffineSize = affineMode === 0x3;
+            let pa = 1, pb = 0, pc = 0, pd = 1;
+            if (affineSprite) {
+                const pa16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 6).value;
+                const pb16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 14).value;
+                const pc16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 22).value;
+                const pd16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 30).value;
+
+                pa = signExtend(pa16 >> 8, 8);
+                pb = signExtend(pb16 >> 8, 8);
+                pc = signExtend(pc16 >> 8, 8);
+                pd = signExtend(pd16 >> 8, 8);
+
+                const fractionStep = 0.00390625; // Matrix values are fixed point numbers with 8 bit fractional part, each step is 1 / 256
+                pa += (pa16 & 0xFF) * fractionStep;
+                pb += (pb16 & 0xFF) * fractionStep;
+                pc += (pc16 & 0xFF) * fractionStep;
+                pd += (pd16 & 0xFF) * fractionStep;
+            }
+            const rotationCenter = { x: size.x >> 1, y: size.y >> 1, };
+
+            // Make adjustments for double sized affine sprites
+            if (doubleAffineSize) {
+                rotationCenter.x * 1.5;
+                rotationCenter.y * 1.5;
+                size.x <<= 1;
+                size.y <<= 1;
+            }
 
             // Sprite is not overlapping this scanline
             if (y < spriteY || y >= spriteY + size.y) {
                 continue;
             }
 
-            const tileY = verticalFlip ?
-                (size.y / SpriteConstants.tileSize) - 1 - Math.floor((y - spriteY) / SpriteConstants.tileSize) :
-                Math.floor((y - spriteY) / SpriteConstants.tileSize);
+            let xStart = spriteX;
+            let xEnd = spriteX + size.x;
 
-            for (let tileX = 0; tileX < tilesPerRow; tileX++) {
-                let tileRowStartAddress;
-                const tileYOffset = verticalFlip ?
-                    7 - ((y - spriteY) % SpriteConstants.tileSize) :
-                    (y - spriteY) % SpriteConstants.tileSize;
+            for (let x = xStart; x < xEnd; x++) {
+                if (x < 0 || x >= DisplayConstants.hDrawPixels) {
+                    continue;
+                }
+
+                // Coordinates local to the sprite, (0, 0) = sprite top left
+                let localX = x - xStart - (doubleAffineSize ? size.x >> 2 : 0);
+                let localY = y - spriteY - (doubleAffineSize ? size.y >> 2 : 0);
+
+                if (affineSprite) {
+                    const prevLocalX = localX;
+                    const prevLocalY = localY;
+
+                    // Apply affine transformation
+                    localX = Math.floor(pa * (prevLocalX - rotationCenter.x) + pb * (prevLocalY - rotationCenter.y) + rotationCenter.x);
+                    localY = Math.floor(pc * (prevLocalX - rotationCenter.x) + pd * (prevLocalY - rotationCenter.y) + rotationCenter.y);
+
+                    // Transformed position is not within sprite bounds
+                    if (localX < 0 || localX >= size.x || localY < 0 || localY >= size.y) {
+                        continue;
+                    }
+
+                } else {
+                    if (verticalFlip) {
+                        localY = size.y - localY - 1;
+                    }
+
+                    if (horizontalFlip) {
+                        localX = size.x - localX - 1;
+                    }
+                }
+
+                const tileX = Math.floor(localX / SpriteConstants.tileSize);
+                const tileY = Math.floor(localY / SpriteConstants.tileSize);
+
+                // Local position is not within the bounds of the sprite
+                if (tileX < 0 || tileX >= tileSize.x || tileY < 0 || tileY >= tileSize.y) {
+                    continue;
+                }
+
+                // The address containing the first byte of the relevant tile's color data.
+                let tileRowAddress;
                 if (objDimension === 1) {
                     // 1D tile arrangement
-                    tileRowStartAddress =
+                    tileRowAddress =
                         SpriteConstants.charBlock4Address +
                         (tileIndex + tileY * tilesPerRow + tileX) % SpriteConstants.maxVRAMTiles * bytesPerTile +
-                        tileYOffset * bytesPerTileRow;
+                        (localY % SpriteConstants.tileSize) * bytesPerTileRow;
                 } else {
                     // 2D tile arrangement
-                    tileRowStartAddress =
+                    tileRowAddress =
                         SpriteConstants.charBlock4Address +
                         (tileIndex + tileY * 32 + tileX) % SpriteConstants.maxVRAMTiles * bytesPerTile +
-                        tileYOffset * bytesPerTileRow;
+                        (localY % SpriteConstants.tileSize) * bytesPerTileRow;
                 }
 
-                const tileBytes = this.memory.getBytes(tileRowStartAddress, bytesPerTileRow);
-
-                // Set each pixel in this row of the tile
-                for (let i = 0; i < 8; i++) {
-                    const x = horizontalFlip ?
-                        spriteX + (tilesPerRow - tileX - 1) * 8 + (7 - i) :
-                        spriteX + (tileX * 8) + i;
-
-                    if (x < 0) continue;
-
-                    let tileColor;
-                    if (colorMode === 0) {
-                        // 16/16 palette mode
-                        const colorIndex = i % 2 === 0 ?
-                            tileBytes[i / 2] & 0xF :
-                            (tileBytes[(i - 1) / 2] >> 4) & 0xF;
-                        // Color 0 in any object palette is transparent
-                        if (colorIndex > 0) {
-                            tileColor = this.get15BitColorFromAddress(SpriteConstants.spritePaletteAddress + (palette * SpriteConstants.spritePaletteBytes) + colorIndex * 2);
-                        }
-                    } else {
-                        // 256/1 palette mode
-                        const colorIndex = tileBytes[i];
-                        // Color 0 in any object palette is transparent
-                        if (colorIndex > 0) {
-                            tileColor = this.get15BitColorFromAddress(SpriteConstants.spritePaletteAddress + colorIndex * 2);
-                        }
+                let pixelColor;
+                if (colorMode === 0) {
+                    // 4 bit color index in 16/16 palettes
+                    const tilePixelAddress = tileRowAddress + Math.floor((localX % SpriteConstants.tileSize) >> 1);
+                    const pixelData = this.memory.getInt8(tilePixelAddress).value;
+                    const paletteIndex = (localX % SpriteConstants.tileSize) % 2 === 0 ?
+                        pixelData & 0xF :
+                        (pixelData >> 4) & 0xF;
+                    if (paletteIndex > 0) {
+                        const colorAddress = SpriteConstants.spritePaletteAddress + (palette * SpriteConstants.spritePaletteBytes) + paletteIndex * 2;
+                        pixelColor = this.get15BitColorFromAddress(colorAddress);
                     }
-
-                    if (tileColor) {
-                        this.display.setPixel(x, y, tileColor);
+                } else {
+                    // 8 bit color index in 256/1 palette
+                    const tilePixelAddress = tileRowAddress + (localX % SpriteConstants.tileSize)
+                    const paletteIndex = this.memory.getInt8(tilePixelAddress).value;
+                    if (palette > 0) {
+                        const colorAddress = SpriteConstants.spritePaletteAddress + paletteIndex * 2;
+                        pixelColor = this.get15BitColorFromAddress(colorAddress);
                     }
                 }
+
+                if (pixelColor) {
+                    this.display.setPixel(x, y, pixelColor);
+                }
+
             }
-
         }
     }
 
