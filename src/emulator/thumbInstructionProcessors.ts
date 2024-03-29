@@ -312,11 +312,17 @@ const processADD4 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const op1 = cpu.getGeneralRegister(rd);
     const op2 = cpu.getGeneralRegister(rm);
 
-    const result = op1 + op2;
+    let result = op1 + op2;
+
+    if (rd === Reg.PC) {
+        result += cpu.instructionSize * 2;
+        result &= 0xFFFFFFFE;
+    }
+
     const result32 = result & 0xFFFFFFFF;
     cpu.setGeneralRegister(rd, result32);
 
-    return { incrementPC: true };
+    return { incrementPC: rd !== Reg.PC };
 }
 
 const processADD5 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
@@ -526,10 +532,10 @@ const processCMP3 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName(`CMP (3)`);
     // #REMOVE_IN_BUILD_END
 
-    const h1 = (i >>> 7) & 0x1;
-    const h2 = (i >>> 6) & 0x1;
-    const rmLow = (i >>> 3) & 0x7;
-    const rnLow = i && 0x7;
+    const h1 = (i >> 7) & 0x1;
+    const h2 = (i >> 6) & 0x1;
+    const rmLow = (i >> 3) & 0x7;
+    const rnLow = i & 0x7;
     const rn = (h1 << 3) | rnLow;
     const rm = (h2 << 3) | rmLow;
     const operand1 = cpu.getGeneralRegister(rn);
@@ -719,8 +725,10 @@ const processMOV3 = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rd = (h1 << 3) | rdLow;
 
     let result = cpu.getGeneralRegister(rm);
+
     if (rd === Reg.PC) {
-        result += 4;
+        result += cpu.instructionSize * 2;
+        result &= 0xFFFFFFFE;
     }
 
     cpu.setGeneralRegister(rd, result);
