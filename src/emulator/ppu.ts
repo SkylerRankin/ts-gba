@@ -476,7 +476,7 @@ class PPU implements PPUType {
                     tileBytes[mirroredXTileOffset / 2] & 0xF :
                     (tileBytes[Math.floor(mirroredXTileOffset / 2)] >> 4) & 0xF;
 
-                if (colorIndex === 0 && palette === 0) {
+                if (colorIndex === 0) {
                     // Transparent
                 } else {
                     tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);

@@ -935,7 +935,7 @@ const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     }
 
     if (rd === 15) {
-        const newPC = value & 0xFFFFFFFC;
+        const newPC = (value + 8) & 0xFFFFFFFC;
         cpu.setGeneralRegister(Reg.PC, newPC);
     } else {
         cpu.setGeneralRegister(rd, value);

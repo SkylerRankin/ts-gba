@@ -1,5 +1,4 @@
-import { CPU } from "./cpu";
-import { handleInterruptAcknowledge, handleInterruptStore } from "./interrupt";
+import { handleInterruptAcknowledge } from "./interrupt";
 
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'PALETTE' | 'VRAM' | 'OAM' | 'ROM_WS0' | 'ROM_WS1' | 'ROM_WS2' | 'SRAM';
 type MemoryAccess = { nSeq16: number, seq16: number, nSeq32: number, seq32: number };
@@ -137,9 +136,14 @@ class Memory implements MemoryType {
      * Sets a sequential number of bytes in memory at the given address. The
      * number of CPU cycles used for the memory access is returned.
      */
-    setBytes = (address: number, bytes: Uint8Array, checkForInterruptAck: boolean = true): MemoryWriteResult => {
+    setBytes = (address: number, bytes: Uint8Array, checkForInterruptAck: boolean = true, ioRegisterWrite: boolean = false): MemoryWriteResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
+
+        if (address === 0x04000130 && !ioRegisterWrite) {
+            console.log(`attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt`);
+            return 0;
+        }
 
         // Return early since interrupt acknowledgements don't actual write these
         // bytes to memory.

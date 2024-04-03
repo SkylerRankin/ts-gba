@@ -34,7 +34,7 @@ class Keypad {
         let keyInput = this.cpu.memory.getInt16(KeyInputRegister).value;
         const offset = KeyOffset[key];
         keyInput &= ~(1 << offset);
-        this.cpu.memory.setBytes(KeyInputRegister, int16ToByteArray(keyInput, false));
+        this.cpu.memory.setBytes(KeyInputRegister, int16ToByteArray(keyInput, false), false, true);
         this.pressedKeys.add(offset);
 
         const interruptControl = this.cpu.memory.getInt16(keyInterruptRegister).value;
@@ -67,13 +67,13 @@ class Keypad {
     onKeyUp(key: Key) {
         let keyInput = this.cpu.memory.getInt16(KeyInputRegister).value;
         keyInput |= (1 << KeyOffset[key]);
-        this.cpu.memory.setBytes(KeyInputRegister, int16ToByteArray(keyInput, false));
+        this.cpu.memory.setBytes(KeyInputRegister, int16ToByteArray(keyInput, false), false, true);
         this.pressedKeys.delete(KeyOffset[key]);
     }
 
     reset() {
         // Sets all keys to released, KEYINPUT = 0x03FF
-        this.cpu.memory.setBytes(KeyInputRegister, new Uint8Array([0xFF, 0x03]));
+        this.cpu.memory.setBytes(KeyInputRegister, new Uint8Array([0xFF, 0x03]), false, true);
     }
 
 }

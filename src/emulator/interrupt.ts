@@ -55,7 +55,8 @@ const handleInterrupts = (cpu: CPU, instructionOptions: ProcessedInstructionOpti
     const requestFlags = cpu.memory.getInt16(InterruptRegisters.RequestAckFlags).value;
     if (requestFlags === 0x0) return false;
 
-    for (let i = 0; i <= 13; i++) {
+    const maxInterruptIndex = 13;
+    for (let i = 0; i <= maxInterruptIndex; i++) {
         if (((interruptEnable >> i) & 0x1) === 0) {
             continue;
         }
@@ -67,7 +68,7 @@ const handleInterrupts = (cpu: CPU, instructionOptions: ProcessedInstructionOpti
             const nextInstructionAddress = cpu.getGeneralRegister(Reg.PC) -
                 cpu.instructionSize * 2 +
                 (instructionOptions.incrementPC ? cpu.instructionSize : 0);
-            cpu.generalRegisters[OperatingModes.irq][Reg.LR] = nextInstructionAddress;
+            cpu.generalRegisters[OperatingModes.irq][Reg.LR] = nextInstructionAddress + 4;
 
             // Save CPSR into SPSR_irq
             cpu.statusRegisters[OperatingModes.irq][1] = cpu.currentStatusRegisters[0];
