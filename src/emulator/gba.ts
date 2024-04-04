@@ -1,5 +1,6 @@
 import { CPU } from "./cpu";
 import { CanvasDisplay, Display } from "./display";
+import { executeDMAs } from "./dma";
 import { Keypad } from "./keypad";
 import { Memory } from "./memory";
 import { PPU } from "./ppu";
@@ -51,6 +52,7 @@ class GBA implements GBAType {
     runStep() {
         this.cpu.step();
         this.ppu.step(this.cpu.cycles);
+        executeDMAs(this.cpu, this.ppu.stepFlags);
     }
 
     runFrame() {

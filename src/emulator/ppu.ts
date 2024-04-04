@@ -35,6 +35,8 @@ type DisplayRegister =
 
 type DisplayState = 'hDraw' | 'hBlank' | 'vBlank';
 
+type PPUStepFlags = { hBlank: boolean, vBlank: boolean };
+
 const DisplayConstants = {
     cyclesPerPixel: 4,
     hDrawPixels: 240,
@@ -110,7 +112,7 @@ const SpriteConstants = {
     maxObjectAttributes: 128,
     maxAffineAttributes: 32,
     objectAttributeSize: 8,
-    affineObjectAttritubeSize: 32,
+    affineObjectAttributeSize: 32,
     size: [ // First index is shape value (attr0), second is size value (attr1)
         [ {x: 8, y: 8}, {x: 16, y: 16}, {x: 32, y: 32}, {x: 64, y: 64} ],
         [ {x: 16, y: 8}, {x: 32, y: 8}, {x: 32, y: 16}, {x: 64, y: 32} ],
@@ -134,6 +136,8 @@ class PPU implements PPUType {
     // A flag read and modified by core GBA to know when a frame has completed rendering.
     vBlankAck: boolean;
     displayModeState: {[key: string]: DisplayMode4Config | undefined};
+    // Flags used by DMA to check when an HBlank or VBlank has occurred.
+    stepFlags: PPUStepFlags;
 
     constructor(cpu: CPU, display: Display) {
         this.cpu = cpu;
@@ -155,6 +159,7 @@ class PPU implements PPUType {
                 currentFrame: 0,
             } as DisplayMode5Config,
         };
+        this.stepFlags = { hBlank: false, vBlank: false };
     }
 
     /**
@@ -167,6 +172,9 @@ class PPU implements PPUType {
      * @param cpuCycles The number of cycles completed by the CPU.
      */
     step(cpuCycles: number) {
+        this.stepFlags.hBlank = false;
+        this.stepFlags.vBlank = false;
+
         // Not enough cycles have passed to enter next PPU stage.
         if (cpuCycles < this.nextCycleTrigger) {
             return;
@@ -181,6 +189,7 @@ class PPU implements PPUType {
         switch (this.displayState) {
             case 'hDraw': {
                 // V Draw completed
+                this.stepFlags.vBlank = true;
                 this.displayState = 'hBlank';
                 this.nextCycleTrigger = cpuCycles + DisplayConstants.hBlankCycles;
                 this.renderScanline(this.currentScanline);
@@ -194,6 +203,8 @@ class PPU implements PPUType {
             }
             case 'hBlank': {
                 // H Blank completed
+                this.stepFlags.hBlank = true;
+
                 if (this.currentScanline < DisplayConstants.vDrawPixels - 1) {
                     this.currentScanline += 1;
                     this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
@@ -585,10 +596,10 @@ class PPU implements PPUType {
             const doubleAffineSize = affineMode === 0x3;
             let pa = 1, pb = 0, pc = 0, pd = 1;
             if (affineSprite) {
-                const pa16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 6).value;
-                const pb16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 14).value;
-                const pc16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 22).value;
-                const pd16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttritubeSize + 30).value;
+                const pa16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttributeSize + 6).value;
+                const pb16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttributeSize + 14).value;
+                const pc16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttributeSize + 22).value;
+                const pd16 = this.memory.getInt16(MemorySegments.OAM.start + affineIndex * SpriteConstants.affineObjectAttributeSize + 30).value;
 
                 pa = signExtend(pa16 >> 8, 8);
                 pb = signExtend(pb16 >> 8, 8);
@@ -768,4 +779,4 @@ class PPU implements PPUType {
 
 
 export { PPU }
-export type { PPUType }
+export type { PPUType, PPUStepFlags }
