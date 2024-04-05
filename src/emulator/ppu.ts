@@ -24,7 +24,13 @@ type DisplayRegister =
     'BG2HOFS' |     // Background 2 Horizontal Offset
     'BG2VOFS' |     // Background 2 Vertical Offset
     'BG3HOFS' |     // Background 3 Horizontal Offset
-    'BG3VOFS'       // Background 3 Vertical Offset
+    'BG3VOFS' |     // Background 3 Vertical Offset
+    'WIN0H' |       // Window 0 Horizontal Dimensions
+    'WIN1H' |       // Window 1 Horizontal Dimensions
+    'WIN0V' |       // Window 0 Vertical Dimensions
+    'WIN1V' |       // Window 1 Vertical Dimensions
+    'WININ' |       // Control of Inside of Windows
+    'WINOUT'        // Control of Outside of Windows and Inside OBJ Window
 ;
 
 type DisplayState = 'hDraw' | 'hBlank' | 'vBlank';
@@ -51,6 +57,8 @@ type DisplayMode5Config = {
     currentFrame: number,
 };
 
+type ScanlineSegment = { min: number, max: number, controls: number };
+
 const displayRegisters: {[key in DisplayRegister]: number} = {
     DISPCNT: 0x04000000,
     DISPSTAT: 0x04000004,
@@ -67,6 +75,12 @@ const displayRegisters: {[key in DisplayRegister]: number} = {
     BG2VOFS: 0x0400001A,
     BG3HOFS: 0x0400001C,
     BG3VOFS: 0x0400001E,
+    WIN0H: 0x04000040,
+    WIN1H: 0x04000042,
+    WIN0V: 0x04000044,
+    WIN1V: 0x04000046,
+    WININ: 0x04000048,
+    WINOUT: 0x0400004A,
 };
 
 const BackgroundMapScreenSizes = {
@@ -287,15 +301,31 @@ class PPU implements PPUType {
     renderDisplayMode0Scanline(y: number, displayControl: number) {
         this.fillBackgroundColor(y);
 
+        // For every x pixel in the scanline, find the configuration bytes controlling
+        // what layer should be drawn, and which backgrounds or object are enabled for
+        // that layer. This only really applies when using multiple windows, otherwise
+        // there is just one segment with all backgrounds and objects available.
+        const scanlineSegments = this.getScanlineSegments(y, displayControl);
+        const scanlineControls = new Array(DisplayConstants.hDrawPixels).fill(scanlineSegments.length - 1);
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            for (let i = 0; i < scanlineSegments.length; i++) {
+                if (x >= scanlineSegments[i].min && x <= scanlineSegments[i].max) {
+                    scanlineControls[x] = scanlineSegments[i].controls;
+                    break;
+                }
+            }
+        }
+
         // Render backgrounds
         for (let backgroundIndex = 0; backgroundIndex < 4; backgroundIndex++) {
-            if (((displayControl >> (backgroundIndex + 8)) & 0x1) === 1) {
-                this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex);
+            const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
+            if (backgroundEnabled) {
+                this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
             }
         }
 
         // Render sprites
-        this.renderSpritesScanline(y, displayControl);
+        this.renderSpritesScanline(y, displayControl, scanlineControls);
     }
 
     renderDisplayMode3Scanline(y: number, displayControl: number) {
@@ -390,7 +420,7 @@ class PPU implements PPUType {
         }
     }
 
-    renderTiledBackgroundScanline(y: number, displayControl: number, backgroundIndex: number) {
+    renderTiledBackgroundScanline(y: number, displayControl: number, backgroundIndex: number, scanlineControls: number[]) {
         // Check if background is disabled
         if (((displayControl >> (backgroundIndex + 8)) & 0x1) === 0) {
             return;
@@ -418,6 +448,11 @@ class PPU implements PPUType {
         const yTileOffset = adjustedY % BackgroundConstants.tilePixelSize;
 
         for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            if (((scanlineControls[x] >> backgroundIndex) & 0x1) === 0) {
+                // This background is enabled in DISPCNT, but not in the corresponding window control value.
+                continue;
+            }
+
             const adjustedX = (x + scrolling.x) % screenSize.x;
             const tileX = Math.floor(adjustedX / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
             const xTileOffset = adjustedX % BackgroundConstants.tilePixelSize;
@@ -500,7 +535,7 @@ class PPU implements PPUType {
         }
     }
 
-    renderSpritesScanline(y: number, displayControl: number) {
+    renderSpritesScanline(y: number, displayControl: number, scanlineControls: number[]) {
         // 0 = 2D object tile mapping, 1 = 1D object tile mapping
         const objDimension = (displayControl >> 6) & 0x1;
 
@@ -585,7 +620,13 @@ class PPU implements PPUType {
             let xEnd = spriteX + size.x;
 
             for (let x = xStart; x < xEnd; x++) {
+                // Check if pixel is off screen
                 if (x < 0 || x >= DisplayConstants.hDrawPixels) {
+                    continue;
+                }
+
+                // Skip pixels that do not have objects enabled for the window being drawn
+                if (((scanlineControls[x] >> 4) & 0x1) === 0) {
                     continue;
                 }
 
@@ -667,6 +708,59 @@ class PPU implements PPUType {
                 }
 
             }
+        }
+    }
+
+    getScanlineSegments(y: number, displayControl: number) : ScanlineSegment[] {
+        const window0Enabled = (displayControl >> 13) & 0x1;
+        const window1Enabled = (displayControl >> 14) & 0x1;
+        const windowObjEnabled = (displayControl >> 15) & 0x1;
+        const windowEnabled = window0Enabled | window1Enabled | windowObjEnabled;
+
+        if (windowEnabled) {
+            const win0Horizontal = this.cpu.memory.getInt16(displayRegisters.WIN0H).value;
+            const win1Horizontal = this.cpu.memory.getInt16(displayRegisters.WIN1H).value;
+            const win0Vertical = this.cpu.memory.getInt16(displayRegisters.WIN0V).value;
+            const win1Vertical = this.cpu.memory.getInt16(displayRegisters.WIN1V).value;
+            const winIn = this.cpu.memory.getInt16(displayRegisters.WININ).value;
+            const winOut = this.cpu.memory.getInt16(displayRegisters.WINOUT).value;
+
+            const window0Edges = {
+                right: Math.min(win0Horizontal & 0xFF, DisplayConstants.hDrawPixels) - 1,
+                left: (win0Horizontal >> 8) & 0xFF,
+                bottom: Math.min(win0Vertical & 0xFF, DisplayConstants.vDrawPixels) - 1,
+                top: (win0Vertical >> 8) & 0xFF,
+            };
+
+            const window1Edges = {
+                right: Math.min(win1Horizontal & 0xFF, DisplayConstants.hDrawPixels) - 1,
+                left: (win1Horizontal >> 8) & 0xFF,
+                bottom: Math.min(win1Vertical & 0xFF, DisplayConstants.vDrawPixels) - 1,
+                top: (win1Vertical >> 8) & 0xFF,
+            };
+
+            const ranges = [];
+
+            if (window0Enabled && window0Edges.top <= y && window0Edges.bottom >= y) {
+                ranges.push({ min: window0Edges.left, max: window0Edges.right, controls: winIn & 0x3F });
+            }
+
+            if (window1Enabled && window1Edges.top <= y && window1Edges.bottom >= y) {
+                ranges.push({ min: window1Edges.left, max: window1Edges.right, controls: (winIn >> 8) & 0x3F });
+            }
+
+            if (windowObjEnabled) {
+                // TODO: implement OBJ window. Sprites should act as mask for other layers?
+                console.warn(`OBJ window not implemented, ignoring.`);
+            }
+
+            // Full range covering the scanline for the background
+            ranges.push({ min: 0, max: DisplayConstants.hDrawPixels - 1, controls: winOut & 0x3F });
+
+            return ranges;
+        } else {
+            // Range that covers full screen width and enables all controls.
+            return [ {min: 0, max: DisplayConstants.hDrawPixels - 1, controls: 0x3F} ];
         }
     }
 
