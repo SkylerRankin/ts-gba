@@ -191,6 +191,22 @@ class Memory implements MemoryType {
         }
     }
 
+    get16BitSeqWaitCycles = (address: number): number => {
+        return 1 + waitStateCycles[this.getSegment(address)].seq16;
+    }
+
+    get16BitNonSeqWaitCycles = (address: number): number => {
+        return 1 + waitStateCycles[this.getSegment(address)].nSeq16;
+    }
+
+    get32BitSeqWaitCycles = (address: number): number => {
+        return 1 + waitStateCycles[this.getSegment(address)].seq32;
+    }
+
+    get32BitNonSeqWaitCycles = (address: number): number => {
+        return 1 + waitStateCycles[this.getSegment(address)].nSeq32;
+    }
+
 }
 
 export { Memory, segments as MemorySegments, MemorySegment }

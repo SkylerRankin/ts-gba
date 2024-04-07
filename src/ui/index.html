@@ -502,10 +502,11 @@
             }
 
             const onFPSUpdate = () => {
-                const { fps, frameTime, cycles } = window.UI.getFrameInfo(gba);
+                const { fps, frameTime, cycles, steps } = window.UI.getFrameInfo(gba);
                 document.getElementById("fps_value").innerHTML = fps.toFixed(2);
                 document.getElementById("frame_time_value").innerHTML = frameTime.toFixed(2);
-                document.getElementById("cycles_value").innerHTML = cycles;
+                document.getElementById("cycles_value").innerHTML = Math.floor(cycles);
+                document.getElementById("steps_value").innerHTML = Math.floor(steps);
                 fpsTimer = setTimeout(() => { onFPSUpdate(); }, 250);
             }
 
@@ -629,8 +630,12 @@
                                     <td id="frame_time_value">0</td>
                                 </tr>
                                 <tr>
-                                    <td>Elapsed cycles</td>
+                                    <td>Elapsed cycles per frame</td>
                                     <td id="cycles_value">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Elapsed steps per frame</td>
+                                    <td id="steps_value">0</td>
                                 </tr>
                             </table>
                         </div>

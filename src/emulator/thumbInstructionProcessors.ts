@@ -14,6 +14,7 @@ import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight,
     halfWordAlignAddress} from './math';
 
 const processTHUMB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.cycles += cpu.memory.get16BitSeqWaitCycles(cpu.getGeneralRegister(Reg.PC));
 
     // Exception Generating Instructions
     if (i >>> 8 === 0b10111110) return processBKPT(cpu, i);

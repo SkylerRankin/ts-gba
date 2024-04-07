@@ -26,6 +26,8 @@ class GBA implements GBAType {
     nextFrameTimer: number = 0;
     previousFrameStart: number = 0;
     frameQueue: number[] = [];
+    cyclesQueue: number[] = [];
+    stepsQueue: number[] = [];
 
     constructor(display: Display = new CanvasDisplay()) {
         this.memory = new Memory();
@@ -34,6 +36,8 @@ class GBA implements GBAType {
         this.ppu = new PPU(this.cpu, this.display);
         this.keypad = new Keypad(this.cpu);
         this.frameQueue = new Array<number>();
+        this.cyclesQueue = new Array<number>();
+        this.stepsQueue = new Array<number>();
     }
 
     loadROM(rom: Uint8Array) {
@@ -58,10 +62,13 @@ class GBA implements GBAType {
     runFrame() {
         const frameStart = performance.now();
         const frameTime = frameStart - this.previousFrameStart;
+        const cyclesStart = this.cpu.cycles;
         this.previousFrameStart = frameStart;
+        let steps = 0;
 
         while (true) {
             this.runStep();
+            steps++;
             if (this.cpu.atBreakpoint()) {
                 this.pause();
                 this.cpu.breakpointCallback();
@@ -73,9 +80,17 @@ class GBA implements GBAType {
             }
         }
         this.frameQueue.push(frameTime);
+        this.cyclesQueue.push(this.cpu.cycles - cyclesStart);
+        this.stepsQueue.push(steps);
 
-        if (this.frameQueue.length > 100) {
-            this.frameQueue.splice(0, 1);
+        if (this.frameQueue.length > 200) {
+            this.frameQueue.splice(0, 100);
+        }
+        if (this.cyclesQueue.length > 200) {
+            this.cyclesQueue.splice(0, 100);
+        }
+        if (this.stepsQueue.length > 200) {
+            this.stepsQueue.splice(0, 100);
         }
 
         if (this.status === 'running') {

@@ -51,15 +51,16 @@ const getRegisterText = (gba: GBA) => {
 }
 
 const getFrameInfo = (gba: GBA) => {
-    let fps = 0, frameTime = 0, cycles = 0;
+    let fps = 0, frameTime = 0, cycles = 0, steps = 0;
 
     if (gba.status === 'running') {
         frameTime = gba.frameQueue.reduce((a, b) => a + b, 0) / gba.frameQueue.length;
         fps = 1000 / frameTime;
-        cycles = gba.cpu.cycles;
+        cycles = gba.cyclesQueue.reduce((a, b) => a + b, 0) / gba.cyclesQueue.length;
+        steps = gba.stepsQueue.reduce((a, b) => a + b, 0) / gba.stepsQueue.length;
     }
 
-    return { fps, frameTime, cycles };
+    return { fps, frameTime, cycles, steps };
 }
 
 const getPaletteColors = (gba: GBA) => {

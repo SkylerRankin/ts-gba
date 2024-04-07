@@ -142,11 +142,19 @@ class CPU implements CPUType {
         let options: ProcessedInstructionOptions = { incrementPC: true };
         if (this.operatingState === 'ARM' && this.conditionIsMet(instruction >>> 28)) {
             options = processARM(this, instruction);
+            if (!options.incrementPC) {
+                // Instruction updated PC, add wait state cycles for new PC
+                this.cycles += this.memory.get32BitNonSeqWaitCycles(this.getGeneralRegister(Reg.PC));
+                this.cycles += this.memory.get32BitSeqWaitCycles(this.getGeneralRegister(Reg.PC));
+            }
         } else if (this.operatingState === 'THUMB') {
             options = processTHUMB(this, instruction);
+            if (!options.incrementPC) {
+                // Instruction updated PC, add wait state cycles for new PC
+                this.cycles += this.memory.get16BitNonSeqWaitCycles(this.getGeneralRegister(Reg.PC));
+                this.cycles += this.memory.get16BitSeqWaitCycles(this.getGeneralRegister(Reg.PC));
+            }
         }
-
-        this.cycles += 1;
 
         const executedInterrupt = handleInterrupts(this, options);
 

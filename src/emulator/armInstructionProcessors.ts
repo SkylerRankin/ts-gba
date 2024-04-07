@@ -27,6 +27,8 @@ type LoadStoreMultipleAddressParameter = {
  * on the given CPU.
  */
 const processARM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
+    cpu.cycles += cpu.memory.get32BitSeqWaitCycles(cpu.getGeneralRegister(Reg.PC));
+
     // Branch instructions
     if (((i >>> 4) & 0xFFFFFF) === 0x12FFF1) return processBX(cpu, i);
     if (((i >>> 25) & 0x7F) === 0x7D) return processBLX(cpu, i, 1);
