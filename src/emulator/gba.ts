@@ -94,7 +94,7 @@ class GBA implements GBAType {
         }
 
         if (this.status === 'running') {
-            const frameDelay = Math.max(16 - frameTime, 5);
+            const frameDelay = Math.max(16 - frameTime, 1);
             this.nextFrameTimer = window.setTimeout(() => { this.runFrame(); }, frameDelay);
         }
     }

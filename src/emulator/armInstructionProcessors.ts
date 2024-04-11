@@ -814,10 +814,13 @@ const processMov = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
