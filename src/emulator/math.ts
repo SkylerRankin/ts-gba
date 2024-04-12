@@ -174,10 +174,15 @@ const halfWordAlignAddress = (address: number) : number => {
     return address & 0xFFFFFFFE;
 }
 
+const mod = (n: number, max: number) : number => {
+    return ((n % max) + max) % max;
+}
+
 export { rotateRight, rotateLeft, logicalShiftRight,
     arithmeticShiftRight, logicalShiftLeft, signExtend, byteArrayToInt32,
     int32ToByteArray, int16ToByteArray, int8ToByteArray, numberOfSetBits,
     asHex, toBigEndianInt32, toBigEndianInt16, isNegative32, borrowFrom,
     signedOverflowFromSubtraction, signedOverflowFromAddition, twosComplementNegation,
-    isNegative, value32ToNative, parseNumericLiteral, wordAlignAddress, halfWordAlignAddress
+    isNegative, value32ToNative, parseNumericLiteral, wordAlignAddress, halfWordAlignAddress,
+    mod
 }

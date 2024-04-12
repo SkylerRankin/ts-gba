@@ -1,7 +1,7 @@
 import { CPU } from "./cpu";
 import { Display, RGBColor } from "./display";
 import { requestInterrupt } from "./interrupt";
-import { byteArrayToInt32, signExtend } from "./math";
+import { byteArrayToInt32, mod, signExtend } from "./math";
 import { Memory, MemorySegments } from "./memory";
 
 interface PPUType {
@@ -25,6 +25,18 @@ type DisplayRegister =
     'BG2VOFS' |     // Background 2 Vertical Offset
     'BG3HOFS' |     // Background 3 Horizontal Offset
     'BG3VOFS' |     // Background 3 Vertical Offset
+    'BG2PA' |       // Background 2 Transform Parameter A
+    'BG2PB' |       // Background 2 Transform Parameter B
+    'BG2PC' |       // Background 2 Transform Parameter C
+    'BG2PD' |       // Background 2 Transform Parameter D
+    'BG2X' |       // Background 2 Reference Point X
+    'BG2Y' |       // Background 2 Reference Point Y
+    'BG3PA' |       // Background 3 Transform Parameter A
+    'BG3PB' |       // Background 3 Transform Parameter B
+    'BG3PC' |       // Background 3 Transform Parameter C
+    'BG3PD' |       // Background 3 Transform Parameter D
+    'BG3X' |       // Background 3 Reference Point X
+    'BG3Y' |       // Background 3 Reference Point Y
     'WIN0H' |       // Window 0 Horizontal Dimensions
     'WIN1H' |       // Window 1 Horizontal Dimensions
     'WIN0V' |       // Window 0 Vertical Dimensions
@@ -34,8 +46,8 @@ type DisplayRegister =
 ;
 
 type DisplayState = 'hDraw' | 'hBlank' | 'vBlank';
-
 type PPUStepFlags = { hBlank: boolean, vBlank: boolean };
+type AffineReferencePoint = { x: number, y: number };
 
 const DisplayConstants = {
     cyclesPerPixel: 4,
@@ -77,6 +89,18 @@ const displayRegisters: {[key in DisplayRegister]: number} = {
     BG2VOFS: 0x0400001A,
     BG3HOFS: 0x0400001C,
     BG3VOFS: 0x0400001E,
+    BG2PA: 0x04000020,
+    BG2PB: 0x04000022,
+    BG2PC: 0x04000024,
+    BG2PD: 0x04000026,
+    BG2X: 0x04000028,
+    BG2Y: 0x0400002C,
+    BG3PA: 0x04000030,
+    BG3PB: 0x04000032,
+    BG3PC: 0x04000034,
+    BG3PD: 0x04000036,
+    BG3X: 0x04000038,
+    BG3Y: 0x0400003C,
     WIN0H: 0x04000040,
     WIN1H: 0x04000042,
     WIN0V: 0x04000044,
@@ -85,7 +109,7 @@ const displayRegisters: {[key in DisplayRegister]: number} = {
     WINOUT: 0x0400004A,
 };
 
-const BackgroundMapScreenSizes = {
+const BackgroundMapSizes = {
     TEXT: [
         { x: 256, y: 256 },
         { x: 512, y: 256 },
@@ -106,6 +130,8 @@ const BackgroundConstants = {
     screenBlockTileSize: 32,
     tilePixelSize: 8,
     backgroundCount: 4,
+    screenEntryBytes: 2,
+    affineScreenEntryBytes: 1,
 };
 
 const SpriteConstants = {
@@ -138,6 +164,7 @@ class PPU implements PPUType {
     displayModeState: {[key: string]: DisplayMode4Config | undefined};
     // Flags used by DMA to check when an HBlank or VBlank has occurred.
     stepFlags: PPUStepFlags;
+    affineReferencePoints: AffineReferencePoint[];
 
     constructor(cpu: CPU, display: Display) {
         this.cpu = cpu;
@@ -160,6 +187,14 @@ class PPU implements PPUType {
             } as DisplayMode5Config,
         };
         this.stepFlags = { hBlank: false, vBlank: false };
+        this.affineReferencePoints = [
+            { x: -1, y: -1 },
+            { x: -1, y: -1 },
+            { x: 0, y: 0 },
+            { x: 0, y: 0 },
+            { x: -1, y: -1 },
+            { x: -1, y: -1 },
+        ];
     }
 
     /**
@@ -258,6 +293,9 @@ class PPU implements PPUType {
                     dispstat[0] = dispstat[0] & 0xFE;
                     this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
 
+                    // The affine background reference points are loaded into internal registers on each VBlank.
+                    this.loadAffineBackgroundReferencePoints();
+
                     // Request V-Blank interrupt
                     if (vBlankIrqEnabled) {
                         requestInterrupt(this.cpu, "V_Blank");
@@ -289,10 +327,10 @@ class PPU implements PPUType {
                 this.renderDisplayMode0Scanline(y, displayControl);
                 break;
             case 0x1:
-                console.log('Display mode 1 not implemented.');
+                this.renderDisplayMode1Scanline(y, displayControl);
                 break;
             case 0x2:
-                console.log('Display mode 2 not implemented.');
+                this.renderDisplayMode2Scanline(y, displayControl);
                 break;
             case 0x3:
                 this.renderDisplayMode3Scanline(y, displayControl);
@@ -310,28 +348,60 @@ class PPU implements PPUType {
     }
 
     renderDisplayMode0Scanline(y: number, displayControl: number) {
-        this.fillBackgroundColor(y);
+        // Display mode 0 allows for backgrounds 0 - 3 with no transformations on any background.
 
-        // For every x pixel in the scanline, find the configuration bytes controlling
-        // what layer should be drawn, and which backgrounds or object are enabled for
-        // that layer. This only really applies when using multiple windows, otherwise
-        // there is just one segment with all backgrounds and objects available.
-        const scanlineSegments = this.getScanlineSegments(y, displayControl);
-        const scanlineControls = new Array(DisplayConstants.hDrawPixels).fill(scanlineSegments.length - 1);
-        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
-            for (let i = 0; i < scanlineSegments.length; i++) {
-                if (x >= scanlineSegments[i].min && x <= scanlineSegments[i].max) {
-                    scanlineControls[x] = scanlineSegments[i].controls;
-                    break;
-                }
-            }
-        }
+        this.fillBackgroundColor(y);
+        const scanlineControls = this.getScanlineControls(y, displayControl);
 
         // Render backgrounds
-        for (let backgroundIndex = 0; backgroundIndex < 4; backgroundIndex++) {
+        for (let backgroundIndex = 0; backgroundIndex <= 3; backgroundIndex++) {
             const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
             if (backgroundEnabled) {
                 this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
+            }
+        }
+
+        // Render sprites
+        this.renderSpritesScanline(y, displayControl, scanlineControls);
+    }
+
+    renderDisplayMode1Scanline(y: number, displayControl: number) {
+        // Display mode 1 allows for backgrounds 0 - 2 with transformations allowed
+        // only on background 2.
+
+        this.fillBackgroundColor(y);
+        const scanlineControls = this.getScanlineControls(y, displayControl);
+
+        // Render backgrounds
+        for (let backgroundIndex = 0; backgroundIndex <= 1; backgroundIndex++) {
+            const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
+            if (backgroundEnabled) {
+                this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
+            }
+        }
+
+        const background2Index = 2;
+        const background2Enabled = ((displayControl >> (background2Index + 8)) & 0x1) === 1;
+        if (background2Enabled) {
+            this.renderAffineTiledBackgroundScanline(y, displayControl, background2Index, scanlineControls);
+        }
+
+        // Render sprites
+        this.renderSpritesScanline(y, displayControl, scanlineControls);
+    }
+
+    renderDisplayMode2Scanline(y: number, displayControl: number) {
+        // Display mode 2 allows for backgrounds 2 - 3, with transformations allowed
+        // on both background.
+
+        this.fillBackgroundColor(y);
+        const scanlineControls = this.getScanlineControls(y, displayControl);
+
+        // Render backgrounds
+        for (let backgroundIndex = 2; backgroundIndex <= 3; backgroundIndex++) {
+            const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
+            if (backgroundEnabled) {
+                this.renderAffineTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
             }
         }
 
@@ -443,8 +513,8 @@ class PPU implements PPUType {
         const mosaic = (backgroundControl >> 6) & 0x1;
         const paletteMode = (backgroundControl >> 7) & 0x1;
         const screenBaseBlock = (backgroundControl >> 8) & 0x1F;
-        const screenSizeMode = (backgroundControl >> 14) & 0x3;
-        const screenSize = BackgroundMapScreenSizes.TEXT[screenSizeMode];
+        const backgroundSizeMode = (backgroundControl >> 14) & 0x3;
+        const backgroundSize = BackgroundMapSizes.TEXT[backgroundSizeMode];
 
         const scrolling = {
             x: this.memory.getInt16(displayRegisters[`BG${backgroundIndex}HOFS` as DisplayRegister]).value & 0x1FF,
@@ -454,7 +524,7 @@ class PPU implements PPUType {
         const charBlockStart = MemorySegments.VRAM.start + BackgroundConstants.charBlockBytes * characterBaseBlock;
         const screenBlockBaseStart = MemorySegments.VRAM.start + BackgroundConstants.screenBlockBytes * screenBaseBlock;
 
-        const adjustedY = (y + scrolling.y) % screenSize.y;
+        const adjustedY = (y + scrolling.y) % backgroundSize.y;
         const tileY = Math.floor(adjustedY / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
         const yTileOffset = adjustedY % BackgroundConstants.tilePixelSize;
 
@@ -464,39 +534,39 @@ class PPU implements PPUType {
                 continue;
             }
 
-            const adjustedX = (x + scrolling.x) % screenSize.x;
+            const adjustedX = (x + scrolling.x) % backgroundSize.x;
             const tileX = Math.floor(adjustedX / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
             const xTileOffset = adjustedX % BackgroundConstants.tilePixelSize;
 
             // Determine which screen block contains this pixel.
             // TODO: refactor this to remove branches, can probably achieve the same thing with division/floor.
             let screenBlockOffset = 0;
-            switch (screenSizeMode) {
+            switch (backgroundSizeMode) {
                 case 0x0:
                     // 32x32 tiles, 1 screen block
                     screenBlockOffset = 0;
                     break;
                 case 0x1:
                     // 64x32, 2 screen blocks in horizontal arrangement
-                    screenBlockOffset = (adjustedX < screenSize.x / 2) ? 0 : 1;
+                    screenBlockOffset = (adjustedX < backgroundSize.x / 2) ? 0 : 1;
                     break;
                 case 0x2:
                     // 32x64, 2 screen blocks in vertical arrangement
-                    screenBlockOffset = (adjustedY < screenSize.y / 2) ? 0 : 1;
+                    screenBlockOffset = (adjustedY < backgroundSize.y / 2) ? 0 : 1;
                     break;
                 case 0x3:
                     // 64x64, 4 screen blocks in clockwise square arrangement
-                    if (adjustedX < screenSize.x / 2) {
-                        screenBlockOffset = (adjustedY < screenSize.y / 2) ? 0 : 2;
+                    if (adjustedX < backgroundSize.x / 2) {
+                        screenBlockOffset = (adjustedY < backgroundSize.y / 2) ? 0 : 2;
                     } else {
-                        screenBlockOffset = (adjustedY < screenSize.y / 2) ? 1 : 3;
+                        screenBlockOffset = (adjustedY < backgroundSize.y / 2) ? 1 : 3;
                     }
                     break;
             }
             const screenBlockStart = screenBlockBaseStart + BackgroundConstants.screenBlockBytes * screenBlockOffset;
 
             // Find and decompose the screen entry. It occupies 2 bytes.
-            const screenEntry = this.memory.getInt16(screenBlockStart + 2 * (tileY * 32 + tileX)).value;
+            const screenEntry = this.memory.getInt16(screenBlockStart + BackgroundConstants.screenEntryBytes * (tileY * BackgroundConstants.screenBlockTileSize + tileX)).value;
             const tileIndex = screenEntry & 0x3FF;
             const horizontalFlip = (screenEntry >> 10) & 0x1;
             const verticalFlip = (screenEntry >> 11) & 0x1;
@@ -544,6 +614,91 @@ class PPU implements PPUType {
                 this.display.setPixel(x, y, tileColor);
             }
         }
+    }
+
+    renderAffineTiledBackgroundScanline(y: number, displayControl: number, backgroundIndex: number, scanlineControls: number[]) { 
+        // Check if background is disabled
+        if (((displayControl >> (backgroundIndex + 8)) & 0x1) === 0) {
+            return;
+        }
+
+        const backgroundControl = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}CNT` as DisplayRegister]).value;
+        const priority = backgroundControl & 0x3;
+        const characterBaseBlock = (backgroundControl >> 2) & 0x3;
+        const mosaic = (backgroundControl >> 6) & 0x1;
+        const paletteMode = (backgroundControl >> 7) & 0x1;
+        const screenBaseBlock = (backgroundControl >> 8) & 0x1F;
+        const overflowMode = (backgroundControl >> 13) & 0x1;
+        const useWrapping = overflowMode === 1;
+        const backgroundSizeMode = (backgroundControl >> 14) & 0x3;
+        const backgroundSize = BackgroundMapSizes.AFFINE[backgroundSizeMode];
+        const backgroundTileSize = { x: backgroundSize.x / 8, y: backgroundSize.y / 8 };
+
+        const referencePoint = this.affineReferencePoints[backgroundIndex];
+
+        const pa16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PA` as DisplayRegister]).value;
+        const pb16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PB` as DisplayRegister]).value;
+        const pc16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PC` as DisplayRegister]).value;
+        const pd16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PD` as DisplayRegister]).value;
+
+        const fractionStep = 0.00390625;
+        const pa = signExtend(pa16 >> 8, 8) + fractionStep * (pa16 & 0xFF);
+        const pb = signExtend(pb16 >> 8, 8) + fractionStep * (pb16 & 0xFF);
+        const pc = signExtend(pc16 >> 8, 8) + fractionStep * (pc16 & 0xFF);
+        const pd = signExtend(pd16 >> 8, 8) + fractionStep * (pd16 & 0xFF);
+
+        const charBlockStart = MemorySegments.VRAM.start + BackgroundConstants.charBlockBytes * characterBaseBlock;
+        const screenBlockStart = MemorySegments.VRAM.start + BackgroundConstants.screenBlockBytes * screenBaseBlock;
+        const paletteAddress = MemorySegments.PALETTE.start;
+
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            if (((scanlineControls[x] >> backgroundIndex) & 0x1) === 0) {
+                // This background is enabled in DISPCNT, but not in the corresponding window control value.
+                continue;
+            }
+
+            // This transform first adds the reference point offset to x and y, then applies the affine matrix transform.
+            // The resulting equation, simplified below, is localX = pa * (x1 + x0 - x0) + pb * (y1 + y0 - y0) + x0,
+            // where x1 is the global x position and x0 is the reference point position.
+            let localX = Math.floor(pa * x + pb * y + referencePoint.x);
+            if (useWrapping) {
+                localX = mod(localX, backgroundSize.x);
+            }
+            const tileX = Math.floor(localX / BackgroundConstants.tilePixelSize);
+            const tileXOffset = localX % BackgroundConstants.tilePixelSize;
+
+            let localY = Math.floor(pc * x + pd * y + referencePoint.y);
+            if (useWrapping) {
+                localY = mod(localY, backgroundSize.y);
+            }
+            const tileY = Math.floor(localY / BackgroundConstants.tilePixelSize);
+            const tileYOffset = localY % BackgroundConstants.tilePixelSize;
+
+            if (localX < 0 || localY < 0 || tileX >= backgroundTileSize.x || tileY >= backgroundTileSize.y) {
+                continue;
+            }
+
+            const screenEntryAddress = screenBlockStart + (tileX + tileY * backgroundTileSize.x) * BackgroundConstants.affineScreenEntryBytes;
+            const screenEntry = this.memory.getInt8(screenEntryAddress).value;
+
+            // Screen entry is just the tile number, 8 bits = 256 tiles to choose from
+            const tileIndex = screenEntry;
+
+            // Affine backgrounds can only use 256/1 palette mode
+            const bytesPerTile = 64;
+            const bytesPerRow = 8;
+            const colorIndex = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (tileYOffset * bytesPerRow) + tileXOffset, 1)[0];
+
+            if (colorIndex > 0) {
+                const tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                this.display.setPixel(x, y, tileColor);
+            }
+        }
+
+        // According to GBATEK, after each scanline, the internal copies of the background reference points are incremented by dmx (pb) and dmy (pa).
+        // This seems to break the transformations, is it being some implicitly already?
+        // this.affineReferencePoints[backgroundIndex].x += pb;
+        // this.affineReferencePoints[backgroundIndex].y += pd;
     }
 
     renderSpritesScanline(y: number, displayControl: number, scanlineControls: number[]) {
@@ -772,6 +927,55 @@ class PPU implements PPUType {
         } else {
             // Range that covers full screen width and enables all controls.
             return [ {min: 0, max: DisplayConstants.hDrawPixels - 1, controls: 0x3F} ];
+        }
+    }
+
+    /**
+     * Creates an array with an index for every x coordinate in a given scanline. The
+     * value at each index is a number containing the bits controlling which backgrounds
+     * and if objects are enabled for that pixel. This resolves any background/object
+     * overlapping that may occur when multiple windows are enabled.
+     *
+     * If no windows are enabled, each index will have bits allowing for all backgrounds
+     * and objects, although the logic specific to each display mode and the display control
+     * registers may further restrict what gets rendered.
+     */
+    getScanlineControls(y: number, displayControl: number): number[] {
+        const scanlineSegments = this.getScanlineSegments(y, displayControl);
+        const scanlineControls = new Array(DisplayConstants.hDrawPixels).fill(scanlineSegments.length - 1);
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            for (let i = 0; i < scanlineSegments.length; i++) {
+                if (x >= scanlineSegments[i].min && x <= scanlineSegments[i].max) {
+                    scanlineControls[x] = scanlineSegments[i].controls;
+                    break;
+                }
+            }
+        }
+
+        return scanlineControls;
+    }
+
+    loadAffineBackgroundReferencePoints() {
+        for (let backgroundIndex = 2; backgroundIndex <= 3; backgroundIndex++) {
+            const referencePointXControl = this.memory.getInt32(displayRegisters[`BG${backgroundIndex}X` as DisplayRegister]).value >>> 0;
+            const referencePointXSign = (referencePointXControl & 0x4000000) > 0 ? -1 : 1;
+            const referencePointXInteger = referencePointXSign === -1 ?
+                ~signExtend((referencePointXControl >> 8) & 0x7FFFF, 19) + 1 :
+                (referencePointXControl >> 8) & 0x7FFFF;
+            const referencePointXFraction = referencePointXControl & 0xFF;
+
+            const referencePointYControl = this.memory.getInt32(displayRegisters[`BG${backgroundIndex}Y` as DisplayRegister]).value >>> 0;
+            const referencePointYSign = (referencePointYControl & 0x4000000) > 0 ? -1 : 1;
+            const referencePointYInteger = referencePointYSign === -1 ?
+                ~signExtend((referencePointYControl >> 8) & 0x7FFFF, 19) + 1 :
+                (referencePointYControl >> 8) & 0x7FFFF;
+            const referencePointYFraction = referencePointYControl & 0xFF;
+
+            const fractionStep = 0.00390625;
+            this.affineReferencePoints[backgroundIndex] = {
+                x: referencePointXSign * (referencePointXInteger + referencePointXFraction * fractionStep),
+                y: referencePointYSign * (referencePointYInteger + referencePointYFraction * fractionStep),
+            };
         }
     }
 
