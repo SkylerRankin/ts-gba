@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "fs";
 import { CPU, OperatingModeCodes, OperatingModeNames, OperatingModes, StatusRegisterKey, cpsrBitOffsetMapping, statusRegisterFlags } from "../../src/emulator/cpu";
-import { parseNumericLiteral } from "../../src/emulator/math";
+import { byteArrayToInt32, parseNumericLiteral } from "../../src/emulator/math";
 import { getLoadStoreAddress, getLoadStoreMultipleAddress } from "../../src/emulator/armInstructionProcessors";
 import { Memory } from "../../src/emulator/memory";
 import { Display, DisplaySize, RGBColor } from "../../src/emulator/display";
@@ -220,7 +220,7 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
             // Manual memory updates
             if (t.memoryUpdates && t.setMemory) {
                 Object.entries(t.memoryUpdates).forEach(([address, bytes]) => {
-                    cpu.memory.setBytes(Number.parseInt(address), bytes);
+                    cpu.memory.setInt32(Number.parseInt(address), byteArrayToInt32(bytes, false));
                 });
             }
 

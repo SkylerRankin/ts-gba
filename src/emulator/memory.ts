@@ -38,7 +38,6 @@ interface MemoryType {
     getInt8: (address: number) => MemoryReadResult
     getInt16: (address: number) => MemoryReadResult
     getInt32: (address: number) => MemoryReadResult
-    setBytes: (address: number, data: Uint8Array) => MemoryWriteResult
     loadROM: (rom: Uint8Array) => void
 };
 
@@ -132,35 +131,63 @@ class Memory implements MemoryType {
         return { value: result, cycles: waitStateCycles[segment].nSeq16 };
     }
 
-    /**
-     * Sets a sequential number of bytes in memory at the given address. The
-     * number of CPU cycles used for the memory access is returned.
-     */
-    setBytes = (address: number, bytes: Uint8Array, checkForInterruptAck: boolean = true, ioRegisterWrite: boolean = false): MemoryWriteResult => {
+    setInt32 = (address: number, value: number, checkForInterruptAck: boolean = true, ioRegisterWrite: boolean = false): MemoryWriteResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
 
-        if (address === 0x04000130 && !ioRegisterWrite) {
-            console.log(`attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt`);
+        if (!ioRegisterWrite && this.ignoreWriteAttempt(address)) {
+            console.log(`Attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt.`);
+            return 0;
+        }
+
+        // TODO: should a 32 bit write handle acknowledging interrupts?
+
+        const segmentAddress = address - segments[segment].start;
+        this.memoryBlocks[segment][segmentAddress + 0] = (value >> 0) & 0xFF;
+        this.memoryBlocks[segment][segmentAddress + 1] = (value >> 8) & 0xFF;
+        this.memoryBlocks[segment][segmentAddress + 2] = (value >> 16) & 0xFF;
+        this.memoryBlocks[segment][segmentAddress + 3] = (value >> 24) & 0xFF;
+
+        return waitStateCycles[segment].nSeq32;
+    }
+
+    setInt16 = (address: number, value: number, checkForInterruptAck: boolean = true, ioRegisterWrite: boolean = false): MemoryWriteResult => {
+        address = this.resolveMirroredAddress(address);
+        const segment = this.getSegment(address);
+
+        if (!ioRegisterWrite && this.ignoreWriteAttempt(address)) {
+            console.log(`Attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt.`);
             return 0;
         }
 
         // Return early since interrupt acknowledgements don't actual write these
         // bytes to memory.
-        if (checkForInterruptAck && handleInterruptAcknowledge(this.cpu, address, bytes)) {
+        if (checkForInterruptAck && handleInterruptAcknowledge(this.cpu, address, value)) {
             return waitStateCycles[segment].nSeq32;
         }
 
         const segmentAddress = address - segments[segment].start;
-        for (let j = 0; j < bytes.length; j++) {
-            this.memoryBlocks[segment][segmentAddress + j] = bytes[j];
-        }
+        this.memoryBlocks[segment][segmentAddress + 0] = (value >> 0) & 0xFF;
+        this.memoryBlocks[segment][segmentAddress + 1] = (value >> 8) & 0xFF;
 
         return waitStateCycles[segment].nSeq32;
     }
 
-    setBytesForInterrupt = (address: number, bytes: Uint8Array): void => {
-        this.setBytes(address, bytes, false);
+    setInt8 = (address: number, value: number, checkForInterruptAck: boolean = true, ioRegisterWrite: boolean = false): MemoryWriteResult => {
+        address = this.resolveMirroredAddress(address);
+        const segment = this.getSegment(address);
+
+        if (!ioRegisterWrite && this.ignoreWriteAttempt(address)) {
+            console.log(`Attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt.`);
+            return 0;
+        }
+
+        // TODO: should a 32 bit write handle acknowledging interrupts?
+
+        const segmentAddress = address - segments[segment].start;
+        this.memoryBlocks[segment][segmentAddress] = value & 0xFF;
+
+        return waitStateCycles[segment].nSeq32;
     }
 
     /**
@@ -172,6 +199,13 @@ class Memory implements MemoryType {
             return 0x03007F00 | (address & 0xFF);
         }
         return address;
+    }
+
+    ignoreWriteAttempt = (address: number) : boolean => {
+        if (address === 0x04000130) {
+            return true;
+        }
+        return false;
     }
 
     loadROM = (rom: Uint8Array): void => {

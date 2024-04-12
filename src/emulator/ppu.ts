@@ -230,9 +230,9 @@ class PPU implements PPUType {
                 this.renderScanline(this.currentScanline);
 
                 // Set H-Blank flag in DISPSTAT
-                const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 1);
-                dispstat[0] = dispstat[0] | 0x2;
-                this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
+                let dispstat = this.memory.getInt8(displayRegisters.DISPSTAT).value;
+                dispstat |= 0x2;
+                this.memory.setInt8(displayRegisters.DISPSTAT, dispstat);
 
                 break;
             }
@@ -242,7 +242,7 @@ class PPU implements PPUType {
 
                 if (this.currentScanline < DisplayConstants.vDrawPixels - 1) {
                     this.currentScanline += 1;
-                    this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
+                    this.memory.setInt16(displayRegisters.VCOUNT, this.currentScanline);
                     this.displayState = 'hDraw';
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
                 } else {
@@ -250,18 +250,18 @@ class PPU implements PPUType {
                     this.displayState = 'vBlank';
 
                     // Set V-Blank flag in DISPSTAT
-                    const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 2);
-                    dispstat[0] = dispstat[0] | 0x1;
-                    this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
+                    let dispstat = this.memory.getInt16(displayRegisters.DISPSTAT).value;
+                    dispstat |= 1;
+                    this.memory.setInt16(displayRegisters.DISPSTAT, dispstat);
 
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
                     this.display.drawFrame();
                 }
 
                 // Clear H-Blank flag in DISPSTAT
-                const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 1);
-                dispstat[0] = dispstat[0] & 0xFD;
-                this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
+                let dispstat = this.memory.getInt8(displayRegisters.DISPSTAT).value;
+                dispstat &= 0xFD;
+                this.memory.setInt8(displayRegisters.DISPSTAT, dispstat);
 
                 // Request H-Blank interrupt
                 if (hBlankIrqEnabled) {
@@ -273,7 +273,7 @@ class PPU implements PPUType {
                 if (this.currentScanline < (DisplayConstants.vDrawPixels + DisplayConstants.hBlankPixels - 1)) {
                     // Completed empty V-Draw scanline
                     this.currentScanline += 1;
-                    this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
+                    this.memory.setInt16(displayRegisters.VCOUNT, this.currentScanline);
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
 
                     // Request hidden H-Blank interrupt
@@ -285,13 +285,13 @@ class PPU implements PPUType {
                     this.vBlankAck = true;
                     this.displayState = 'hDraw';
                     this.currentScanline = 0;
-                    this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([this.currentScanline, 0]));
+                    this.memory.setInt16(displayRegisters.VCOUNT, this.currentScanline);
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
 
                     // Clear V-Blank flag in DISPSTAT
-                    const dispstat = this.memory.getBytes(displayRegisters.DISPSTAT, 2);
-                    dispstat[0] = dispstat[0] & 0xFE;
-                    this.memory.setBytes(displayRegisters.DISPSTAT, dispstat);
+                    let dispstat = this.memory.getInt16(displayRegisters.DISPSTAT).value;
+                    dispstat &= 0xFE;
+                    this.memory.setInt16(displayRegisters.DISPSTAT, dispstat);
 
                     // The affine background reference points are loaded into internal registers on each VBlank.
                     this.loadAffineBackgroundReferencePoints();
@@ -312,7 +312,7 @@ class PPU implements PPUType {
 
     reset() {
         this.currentScanline = 0;
-        this.memory.setBytes(displayRegisters.VCOUNT, new Uint8Array([0, 0]));
+        this.memory.setInt16(displayRegisters.VCOUNT, 0);
         this.displayState = 'hDraw';
         this.nextCycleTrigger = DisplayConstants.hDrawCycles;
         this.vBlankAck = false;
@@ -446,7 +446,7 @@ class PPU implements PPUType {
 
         for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
             const paletteIndexAddress = baseAddress + x;
-            const paletteIndex = byteArrayToInt32(this.memory.getBytes(paletteIndexAddress, 1), false);
+            const paletteIndex = this.memory.getInt8(paletteIndexAddress).value;
             // Palette colors occupy 16 bits, so index is multiplied by 2 to get correct byte offset.
             const paletteColorAddress = backgroundPaletteAddress + (paletteIndex * 0x2);
             const rgbColor = this.get15BitColorFromAddress(paletteColorAddress);
@@ -687,8 +687,8 @@ class PPU implements PPUType {
             // Affine backgrounds can only use 256/1 palette mode
             const bytesPerTile = 64;
             const bytesPerRow = 8;
-            const colorIndex = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (tileYOffset * bytesPerRow) + tileXOffset, 1)[0];
-
+            const colorIndex = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (tileYOffset * bytesPerRow) + tileXOffset).value;
+            
             if (colorIndex > 0) {
                 const tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
                 this.display.setPixel(x, y, tileColor);

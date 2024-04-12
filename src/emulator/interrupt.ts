@@ -42,7 +42,9 @@ const interruptsEnabled = (cpu: CPU) : boolean => {
 const requestInterrupt = (cpu: CPU, interrupt: Interrupt) : void => {
     let interruptEnable = cpu.memory.getInt16(InterruptRegisters.Enable).value;
     interruptEnable |= (1 << InterruptEnableIndex[interrupt]);
-    cpu.memory.setBytesForInterrupt(InterruptRegisters.RequestAckFlags, int16ToByteArray(interruptEnable, false));
+
+    // Pass checkForInterruptAck flag as false, since this memory write doesn't represent a software IRQ acknowledgement.
+    cpu.memory.setInt16(InterruptRegisters.RequestAckFlags, interruptEnable, false);
 }
 
 const handleInterrupts = (cpu: CPU, instructionOptions: ProcessedInstructionOptions) : boolean => {
@@ -90,7 +92,30 @@ const handleInterrupts = (cpu: CPU, instructionOptions: ProcessedInstructionOpti
     return interruptRequested;
 }
 
-const handleInterruptAcknowledge = (cpu: CPU, address: number, bytes: Uint8Array) : boolean => {
+/**
+ * In order to acknowledge that an interrupt has been handled, user code writes a 1 to
+ * the corresponding bit in the IF register. When this 1 bit is written, the bit is
+ * cleared.
+ * 
+ * This function checks if a 16 bit memory write is writing to the IF register, and if so
+ * clears any bits that are set to 1 by the written value.
+ * 
+ * The function returns true if the IF register was updated. If not, false is returned and
+ * the memory write should be handled normally.
+ * 
+ * TODO: what if a 32 or 8 bit value is used to updated the register?
+ */
+const handleInterruptAcknowledge = (cpu: CPU, address: number, value: number) : boolean => {
+    if (address === InterruptRegisters.RequestAckFlags) {
+        const ifRegister = cpu.memory.getInt16(address).value;
+        const result = ifRegister & ~value;
+        cpu.memory.setInt16(address, result, false);
+        return true;
+    }
+    return false;
+}
+
+const handleInterruptAcknowledge_old = (cpu: CPU, address: number, bytes: Uint8Array) : boolean => {
     if (bytes.length === 1) {
         // Writing single byte
     } else if (bytes.length === 2) {
@@ -102,7 +127,9 @@ const handleInterruptAcknowledge = (cpu: CPU, address: number, bytes: Uint8Array
                 const ifRegister = cpu.memory.getInt16(address).value;
                 const value = bytes[0] + (bytes[1] << 8);
                 const result = ifRegister & ~value;
-                cpu.memory.setBytesForInterrupt(address, int16ToByteArray(result, false));
+
+                // Pass checkForInterruptAck flag as false, since this memory write doesn't represent a software IRQ acknowledgement.
+                cpu.memory.setInt16(address, result, false);
                 return true;
         }
     } else if (bytes.length === 4) {

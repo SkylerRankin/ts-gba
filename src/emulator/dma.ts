@@ -1,5 +1,4 @@
 import { CPU } from "./cpu";
-import { int16ToByteArray, int32ToByteArray } from "./math";
 import { PPUStepFlags } from "./ppu";
 
 const MAX_CHANNEL = 3;
@@ -126,10 +125,11 @@ const executeTransfer = (cpu: CPU, channel: number, dmaControl: number) : void =
     let sourceAddressDelta = AddressDeltas[transferSize][sourceAdjustment];
 
     for (let i = 0; i < DMAState.wordCount[channel]; i++) {
-        const data = halfwordTransfer ?
-            int16ToByteArray(cpu.memory.getInt16(currentSourceAddress).value, false) :
-            int32ToByteArray(cpu.memory.getInt32(currentSourceAddress).value, false);
-        cpu.memory.setBytes(currentDestinationAddress, data);
+        if (halfwordTransfer) {
+            cpu.memory.setInt16(currentDestinationAddress, cpu.memory.getInt16(currentSourceAddress).value);
+        } else {
+            cpu.memory.setInt32(currentDestinationAddress, cpu.memory.getInt32(currentSourceAddress).value);
+        }
 
         currentSourceAddress += sourceAddressDelta;
         currentDestinationAddress += destinationAddressDelta;
@@ -141,7 +141,7 @@ const executeTransfer = (cpu: CPU, channel: number, dmaControl: number) : void =
     if (!repeat) {
         // Disable this DMA channel since transfer has completed.
         const newDMAControl = dmaControl & 0x7FFF;
-        cpu.memory.setBytes(DMA_REGISTERS.CONTROL[channel], int16ToByteArray(newDMAControl, false));
+        cpu.memory.setInt16(DMA_REGISTERS.CONTROL[channel], newDMAControl);
         DMAState.enabled[channel] = false;
     }
 

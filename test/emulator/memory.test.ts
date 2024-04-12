@@ -6,10 +6,10 @@ test('Set word in WRAM', () => {
     memory.reset();
 
     const address = 0x03007ff2;
-    const data = new Uint8Array([0, 1, 2, 3]);
-    memory.setBytes(address, data);
+    const data = 0x1234;
+    memory.setInt32(address, data);
 
-    const actual = memory.getBytes(address, 4);
+    const actual = memory.getInt32(address).value;
     expect(actual).toStrictEqual(data);
 });
 

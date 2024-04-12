@@ -1,5 +1,5 @@
 import { CPU, OperatingModeCodes, OperatingModes, Reg } from './cpu';
-import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, signExtend, int32ToByteArray, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray, halfWordAlignAddress, signedOverflowFromAddition } from './math';
+import { rotateRight, logicalShiftLeft, logicalShiftRight, arithmeticShiftRight, signExtend, numberOfSetBits, isNegative32, borrowFrom, signedOverflowFromSubtraction, value32ToNative, wordAlignAddress, int8ToByteArray, halfWordAlignAddress, signedOverflowFromAddition } from './math';
 
 type ProcessedInstructionOptions = {
     incrementPC: boolean
@@ -1050,8 +1050,7 @@ const processSTR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
-    const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
-    const cycles = cpu.memory.setBytes(wordAlignAddress(address), bytes);
+    const cycles = cpu.memory.setInt32(wordAlignAddress(address), cpu.getGeneralRegister(rd));
     cpu.cycles += cycles;
     return { incrementPC: true };
 }
@@ -1063,8 +1062,7 @@ const processSTRB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
     const rd = (i >>> 12) & 0xF;
     const address = getLoadStoreAddress(cpu, i);
-    const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
-    const cycles = cpu.memory.setBytes(address, bytes);
+    const cycles = cpu.memory.setInt8(address, cpu.getGeneralRegister(rd));
     cpu.cycles += cycles;
     return { incrementPC: true };
 }
@@ -1081,8 +1079,7 @@ const processSTRBT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // the W bit back to 0 before calculating the address handles this case as if it was
     // a normal post-indexed situation.
     const address = getLoadStoreAddress(cpu, i & 0xFFDFFFFF);
-    const bytes = new Uint8Array([cpu.getGeneralRegister(rd) & 0xFF]);
-    const cycles = cpu.memory.setBytes(address, bytes);
+    const cycles = cpu.memory.setInt8(address, cpu.getGeneralRegister(rd));
     cpu.cycles += cycles;
     return { incrementPC: true };
 }
@@ -1095,9 +1092,7 @@ const processSTRH = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     const rd = (i >>> 12) & 0xF;
     const rdValue = cpu.getGeneralRegister(rd);
     const address = getLoadStoreAddress(cpu, i);
-    const bytes = new Uint8Array([rdValue & 0xFF, (rdValue >> 8) & 0xFF]);
-    if (cpu.bigEndian) bytes.reverse();
-    const cycles = cpu.memory.setBytes(address, bytes);
+    const cycles = cpu.memory.setInt16(address, rdValue);
     cpu.cycles += cycles;
     return { incrementPC: true };
 }
@@ -1114,8 +1109,7 @@ const processSTRT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     // the W bit back to 0 before calculating the address handles this case as if it was
     // a normal post-indexed situation.
     const address = getLoadStoreAddress(cpu, i & 0xFFDFFFFF);
-    const bytes = int32ToByteArray(cpu.getGeneralRegister(rd), cpu.bigEndian);
-    const cycles = cpu.memory.setBytes(wordAlignAddress(address), bytes);
+    const cycles = cpu.memory.setInt32(wordAlignAddress(address), cpu.getGeneralRegister(rd));
     cpu.cycles += cycles;
     return { incrementPC: true };
 }
@@ -1207,8 +1201,7 @@ const processSTM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     for (let i = 0; i <= 15; i++) {
         if (((regList >> i) & 0x1) === 1) {
             const riValue = cpu.getGeneralRegister(i);
-            const bytes = int32ToByteArray(riValue, cpu.bigEndian);
-            const cycles = cpu.memory.setBytes(address, bytes);
+            const cycles = cpu.memory.setInt32(address, riValue);
             cpu.cycles += cycles;
             address += 4;
         }
@@ -1541,7 +1534,7 @@ const processSWP = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         value = rotateRight(value, 24, 32);
     }
 
-    cycles = cpu.memory.setBytes(address, int32ToByteArray(rmValue, cpu.bigEndian));
+    cycles = cpu.memory.setInt32(address, rmValue);
     cpu.cycles += cycles;
     cpu.setGeneralRegister(rd, value);
 
@@ -1564,7 +1557,7 @@ const processSWPB = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 
     let {value, cycles} = cpu.memory.getInt8(address);
     cpu.cycles += cycles;
-    cycles = cpu.memory.setBytes(address, int8ToByteArray(rmValue & 0xFF, cpu.bigEndian));
+    cycles = cpu.memory.setInt8(address, rmValue);
     cpu.cycles += cycles;
     cpu.setGeneralRegister(rd, value);
     return { incrementPC: true };
