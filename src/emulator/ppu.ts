@@ -585,12 +585,13 @@ class PPU implements PPUType {
                 const bytesPerTile = 32;
                 const bytesPerRow = 4;
 
-                // Get all bytes for the row
-                const tileBytes = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow), bytesPerRow);
+                // Get byte in tile corresponding to this pixels
+                const tileByte = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow) + Math.floor(mirroredXTileOffset / 2)).value;
+
                 // Select the specific 4 bit palette index value for this pixel
                 const colorIndex = mirroredXTileOffset % 2 === 0 ?
-                    tileBytes[mirroredXTileOffset / 2] & 0xF :
-                    (tileBytes[Math.floor(mirroredXTileOffset / 2)] >> 4) & 0xF;
+                    tileByte & 0xF :
+                    (tileByte >> 4) & 0xF;
 
                 if (colorIndex === 0) {
                     // Transparent
@@ -601,8 +602,8 @@ class PPU implements PPUType {
                 // 256/1 palette mode
                 const bytesPerTile = 64;
                 const bytesPerRow = 8;
-                const tileBytes = this.memory.getBytes(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow), bytesPerRow);
-                const colorIndex = tileBytes[mirroredXTileOffset] & 0xFF;
+                const tileByte = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow) + mirroredXTileOffset).value;
+                const colorIndex = tileByte & 0xFF;
                 if (colorIndex === 0) {
                     // Transparent
                 } else {
