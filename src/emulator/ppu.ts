@@ -579,40 +579,57 @@ class PPU implements PPUType {
             const paletteAddress = MemorySegments.PALETTE.start + (palette * 32);
 
             // Find and decompose the corresponding tile.
-            let tileColor;
             if (paletteMode === 0) {
                 // 16/16 palette mode
                 const bytesPerTile = 32;
                 const bytesPerRow = 4;
 
-                // Get byte in tile corresponding to this pixels
-                const tileByte = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow) + Math.floor(mirroredXTileOffset / 2)).value;
+                // Set pixels for the rest of the row in the tile overlapping the current scanline.
+                for (let rowX = mirroredXTileOffset; rowX < 8; rowX++) {
+                    if (rowX > mirroredXTileOffset) {
+                        x++;
+                        if (((scanlineControls[x] >> backgroundIndex) & 0x1) === 0) {
+                            // This background is enabled in DISPCNT, but not in the corresponding window control value.
+                            continue;
+                        }
+                    }
 
-                // Select the specific 4 bit palette index value for this pixel
-                const colorIndex = mirroredXTileOffset % 2 === 0 ?
-                    tileByte & 0xF :
-                    (tileByte >> 4) & 0xF;
+                    // Get byte in tile corresponding to this pixels
+                    const tileByte = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow) + Math.floor(rowX / 2)).value;
 
-                if (colorIndex === 0) {
-                    // Transparent
-                } else {
-                    tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+                    // Select the specific 4 bit palette index value for this pixel
+                    const colorIndex = rowX % 2 === 0 ?
+                        tileByte & 0xF :
+                        (tileByte >> 4) & 0xF;
+
+                    if (colorIndex === 0) {
+                        // Transparent
+                    } else {
+                        this.display.setPixel(x, y, this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex));
+                    }
                 }
             } else {
                 // 256/1 palette mode
                 const bytesPerTile = 64;
                 const bytesPerRow = 8;
-                const tileByte = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow) + mirroredXTileOffset).value;
-                const colorIndex = tileByte & 0xFF;
-                if (colorIndex === 0) {
-                    // Transparent
-                } else {
-                    tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
-                }
-            }
 
-            if (tileColor) {
-                this.display.setPixel(x, y, tileColor);
+                for (let rowX = mirroredXTileOffset; rowX < 8; rowX++) {
+                    if (rowX > mirroredXTileOffset) {
+                        x++;
+                        if (((scanlineControls[x] >> backgroundIndex) & 0x1) === 0) {
+                            // This background is enabled in DISPCNT, but not in the corresponding window control value.
+                            continue;
+                        }
+                    }
+                    
+                    const tileByte = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (mirroredYTileOffset * bytesPerRow) + rowX).value;
+                    const colorIndex = tileByte & 0xFF;
+                    if (colorIndex === 0) {
+                        // Transparent
+                    } else {
+                        this.display.setPixel(x, y, this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex));
+                    }
+                }
             }
         }
     }
