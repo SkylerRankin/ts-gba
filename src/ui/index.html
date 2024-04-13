@@ -579,8 +579,8 @@
                     </div>
                     <div id="tab0_container" class="">
                         <div id="game_control_container">
-                            <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)">
-                            <input id="biosInput" type="file" style="display: none !important;" onChange="onBIOSUpload(this)">
+                            <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)" accept=".gba, .bin, .rom">
+                            <input id="biosInput" type="file" style="display: none !important;" onChange="onBIOSUpload(this)" accept=".gba, .bin, .rom">
                             <div class="button" id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</div>
                             <div class="button" id='uploadBiosButton' onClick="document.getElementById('biosInput').click()"}>Upload BIOS</div>
                             <div class="button" id="startButton">Start</div>
