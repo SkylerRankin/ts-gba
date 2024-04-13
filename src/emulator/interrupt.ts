@@ -1,5 +1,6 @@
 import { ProcessedInstructionOptions } from "./armInstructionProcessors";
 import { CPU, OperatingModeCodes, OperatingModes, Reg } from "./cpu";
+import { getCachedIORegister } from "./ioCache";
 import { byteArrayToInt32, int16ToByteArray } from "./math";
 
 type Interrupt =
@@ -34,13 +35,13 @@ const InterruptRegisters = {
 const IRQVectorAddress = 0x00000018;
 
 const interruptsEnabled = (cpu: CPU) : boolean => {
-    const masterEnabled = (cpu.memory.getInt8(InterruptRegisters.MasterEnable).value & 0x1) === 1;
+    const masterEnabled = (getCachedIORegister(InterruptRegisters.MasterEnable) & 0x1) === 1;
     const cpsrIFlag = (cpu.getStatusRegister("CPSR") >> 7) & 0x1;
     return masterEnabled && cpsrIFlag === 0;
 }
 
 const requestInterrupt = (cpu: CPU, interrupt: Interrupt) : void => {
-    let interruptEnable = cpu.memory.getInt16(InterruptRegisters.Enable).value;
+    let interruptEnable = getCachedIORegister(InterruptRegisters.Enable);
     interruptEnable |= (1 << InterruptEnableIndex[interrupt]);
 
     // Pass checkForInterruptAck flag as false, since this memory write doesn't represent a software IRQ acknowledgement.
@@ -50,11 +51,11 @@ const requestInterrupt = (cpu: CPU, interrupt: Interrupt) : void => {
 const handleInterrupts = (cpu: CPU, instructionOptions: ProcessedInstructionOptions) : boolean => {
     if (!interruptsEnabled(cpu)) return false;
 
-    const interruptEnable = cpu.memory.getInt16(InterruptRegisters.Enable).value;
+    const interruptEnable = getCachedIORegister(InterruptRegisters.Enable);
     if (interruptEnable === 0x0) return false;
 
     let interruptRequested = false;
-    const requestFlags = cpu.memory.getInt16(InterruptRegisters.RequestAckFlags).value;
+    const requestFlags = getCachedIORegister(InterruptRegisters.RequestAckFlags);
     if (requestFlags === 0x0) return false;
 
     const maxInterruptIndex = 13;
@@ -107,7 +108,7 @@ const handleInterrupts = (cpu: CPU, instructionOptions: ProcessedInstructionOpti
  */
 const handleInterruptAcknowledge = (cpu: CPU, address: number, value: number) : boolean => {
     if (address === InterruptRegisters.RequestAckFlags) {
-        const ifRegister = cpu.memory.getInt16(address).value;
+        const ifRegister = getCachedIORegister(address);
         const result = ifRegister & ~value;
         cpu.memory.setInt16(address, result, false);
         return true;

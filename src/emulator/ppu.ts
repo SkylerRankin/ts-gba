@@ -1,7 +1,8 @@
 import { CPU } from "./cpu";
 import { Display, RGBColor } from "./display";
 import { requestInterrupt } from "./interrupt";
-import { byteArrayToInt32, mod, signExtend } from "./math";
+import { getCachedIORegister } from "./ioCache";
+import { mod, signExtend } from "./math";
 import { Memory, MemorySegments } from "./memory";
 
 interface PPUType {
@@ -107,6 +108,18 @@ const displayRegisters: {[key in DisplayRegister]: number} = {
     WIN1V: 0x04000046,
     WININ: 0x04000048,
     WINOUT: 0x0400004A,
+};
+
+const DisplayRegistersByIndex = {
+    BGCNT: [ 0x04000008, 0x0400000A, 0x0400000C, 0x0400000E, ],
+    BGHOFS: [ 0x04000010, 0x04000014, 0x04000018, 0x0400001C, ],
+    BGVOFS: [ 0x04000012, 0x04000016, 0x0400001A, 0x0400001E, ],
+    BGX: [-1, -1, 0x04000028, 0x04000038 ],
+    BGY: [-1, -1, 0x0400002C, 0x0400003C ],
+    BGPA: [ -1, -1, 0x04000020, 0x04000030, ],
+    BGPB: [ -1, -1, 0x04000022, 0x04000032, ],
+    BGPC: [ -1, -1, 0x04000024, 0x04000034, ],
+    BGPD: [ -1, -1, 0x04000026, 0x04000036, ],
 };
 
 const BackgroundMapSizes = {
@@ -215,7 +228,7 @@ class PPU implements PPUType {
             return;
         }
 
-        const dispStat = this.cpu.memory.getInt16(displayRegisters.DISPSTAT).value;
+        const dispStat = getCachedIORegister(displayRegisters.DISPSTAT);
         const vBlankIrqEnabled = (dispStat & 0x8) > 0;
         const hBlankIrqEnabled = (dispStat & 0x10) > 0;
         const vCounterIrqEnabled = (dispStat & 0x20) > 0;
@@ -230,7 +243,7 @@ class PPU implements PPUType {
                 this.renderScanline(this.currentScanline);
 
                 // Set H-Blank flag in DISPSTAT
-                let dispstat = this.memory.getInt8(displayRegisters.DISPSTAT).value;
+                let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
                 dispstat |= 0x2;
                 this.memory.setInt8(displayRegisters.DISPSTAT, dispstat);
 
@@ -250,7 +263,7 @@ class PPU implements PPUType {
                     this.displayState = 'vBlank';
 
                     // Set V-Blank flag in DISPSTAT
-                    let dispstat = this.memory.getInt16(displayRegisters.DISPSTAT).value;
+                    let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
                     dispstat |= 1;
                     this.memory.setInt16(displayRegisters.DISPSTAT, dispstat);
 
@@ -259,7 +272,7 @@ class PPU implements PPUType {
                 }
 
                 // Clear H-Blank flag in DISPSTAT
-                let dispstat = this.memory.getInt8(displayRegisters.DISPSTAT).value;
+                let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
                 dispstat &= 0xFD;
                 this.memory.setInt8(displayRegisters.DISPSTAT, dispstat);
 
@@ -289,7 +302,7 @@ class PPU implements PPUType {
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
 
                     // Clear V-Blank flag in DISPSTAT
-                    let dispstat = this.memory.getInt16(displayRegisters.DISPSTAT).value;
+                    let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
                     dispstat &= 0xFE;
                     this.memory.setInt16(displayRegisters.DISPSTAT, dispstat);
 
@@ -319,7 +332,7 @@ class PPU implements PPUType {
     }
 
     renderScanline(y: number) {
-        const displayControl = this.memory.getInt16(displayRegisters.DISPCNT).value;
+        const displayControl = getCachedIORegister(displayRegisters.DISPCNT);
         const displayMode = displayControl & 0x7;
 
         switch (displayMode) {
@@ -507,7 +520,7 @@ class PPU implements PPUType {
             return;
         }
 
-        const backgroundControl = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}CNT` as DisplayRegister]).value;
+        const backgroundControl = getCachedIORegister(DisplayRegistersByIndex.BGCNT[backgroundIndex]);
         const priority = backgroundControl & 0x3;
         const characterBaseBlock = (backgroundControl >> 2) & 0x3;
         const mosaic = (backgroundControl >> 6) & 0x1;
@@ -517,8 +530,8 @@ class PPU implements PPUType {
         const backgroundSize = BackgroundMapSizes.TEXT[backgroundSizeMode];
 
         const scrolling = {
-            x: this.memory.getInt16(displayRegisters[`BG${backgroundIndex}HOFS` as DisplayRegister]).value & 0x1FF,
-            y: this.memory.getInt16(displayRegisters[`BG${backgroundIndex}VOFS` as DisplayRegister]).value & 0x1FF,
+            x: getCachedIORegister(DisplayRegistersByIndex.BGHOFS[backgroundIndex]) & 0x1FF,
+            y: getCachedIORegister(DisplayRegistersByIndex.BGVOFS[backgroundIndex]) & 0x1FF,
         };
 
         const charBlockStart = MemorySegments.VRAM.start + BackgroundConstants.charBlockBytes * characterBaseBlock;
@@ -623,7 +636,7 @@ class PPU implements PPUType {
             return;
         }
 
-        const backgroundControl = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}CNT` as DisplayRegister]).value;
+        const backgroundControl = getCachedIORegister(DisplayRegistersByIndex.BGCNT[backgroundIndex]);
         const priority = backgroundControl & 0x3;
         const characterBaseBlock = (backgroundControl >> 2) & 0x3;
         const mosaic = (backgroundControl >> 6) & 0x1;
@@ -637,10 +650,10 @@ class PPU implements PPUType {
 
         const referencePoint = this.affineReferencePoints[backgroundIndex];
 
-        const pa16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PA` as DisplayRegister]).value;
-        const pb16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PB` as DisplayRegister]).value;
-        const pc16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PC` as DisplayRegister]).value;
-        const pd16 = this.memory.getInt16(displayRegisters[`BG${backgroundIndex}PD` as DisplayRegister]).value;
+        const pa16 = getCachedIORegister(DisplayRegistersByIndex.BGPA[backgroundIndex]);
+        const pb16 = getCachedIORegister(DisplayRegistersByIndex.BGPB[backgroundIndex]);
+        const pc16 = getCachedIORegister(DisplayRegistersByIndex.BGPC[backgroundIndex]);
+        const pd16 = getCachedIORegister(DisplayRegistersByIndex.BGPD[backgroundIndex]);
 
         const fractionStep = 0.00390625;
         const pa = signExtend(pa16 >> 8, 8) + fractionStep * (pa16 & 0xFF);
@@ -885,12 +898,12 @@ class PPU implements PPUType {
         const windowEnabled = window0Enabled | window1Enabled | windowObjEnabled;
 
         if (windowEnabled) {
-            const win0Horizontal = this.cpu.memory.getInt16(displayRegisters.WIN0H).value;
-            const win1Horizontal = this.cpu.memory.getInt16(displayRegisters.WIN1H).value;
-            const win0Vertical = this.cpu.memory.getInt16(displayRegisters.WIN0V).value;
-            const win1Vertical = this.cpu.memory.getInt16(displayRegisters.WIN1V).value;
-            const winIn = this.cpu.memory.getInt16(displayRegisters.WININ).value;
-            const winOut = this.cpu.memory.getInt16(displayRegisters.WINOUT).value;
+            const win0Horizontal = getCachedIORegister(displayRegisters.WIN0H);
+            const win1Horizontal = getCachedIORegister(displayRegisters.WIN1H);
+            const win0Vertical = getCachedIORegister(displayRegisters.WIN0V);
+            const win1Vertical = getCachedIORegister(displayRegisters.WIN1V);
+            const winIn = getCachedIORegister(displayRegisters.WININ);
+            const winOut = getCachedIORegister(displayRegisters.WINOUT);
 
             const window0Edges = {
                 right: Math.min(win0Horizontal & 0xFF, DisplayConstants.hDrawPixels) - 1,
@@ -958,14 +971,14 @@ class PPU implements PPUType {
 
     loadAffineBackgroundReferencePoints() {
         for (let backgroundIndex = 2; backgroundIndex <= 3; backgroundIndex++) {
-            const referencePointXControl = this.memory.getInt32(displayRegisters[`BG${backgroundIndex}X` as DisplayRegister]).value >>> 0;
+            const referencePointXControl = getCachedIORegister(DisplayRegistersByIndex.BGX[backgroundIndex]) >>> 0;
             const referencePointXSign = (referencePointXControl & 0x4000000) > 0 ? -1 : 1;
             const referencePointXInteger = referencePointXSign === -1 ?
                 ~signExtend((referencePointXControl >> 8) & 0x7FFFF, 19) + 1 :
                 (referencePointXControl >> 8) & 0x7FFFF;
             const referencePointXFraction = referencePointXControl & 0xFF;
 
-            const referencePointYControl = this.memory.getInt32(displayRegisters[`BG${backgroundIndex}Y` as DisplayRegister]).value >>> 0;
+            const referencePointYControl = getCachedIORegister(DisplayRegistersByIndex.BGY[backgroundIndex]) >>> 0;
             const referencePointYSign = (referencePointYControl & 0x4000000) > 0 ? -1 : 1;
             const referencePointYInteger = referencePointYSign === -1 ?
                 ~signExtend((referencePointYControl >> 8) & 0x7FFFF, 19) + 1 :

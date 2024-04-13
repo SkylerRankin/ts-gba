@@ -1,4 +1,5 @@
 import { CPU } from "./cpu";
+import { getCachedIORegister } from "./ioCache";
 import { PPUStepFlags } from "./ppu";
 
 const MAX_CHANNEL = 3;
@@ -52,7 +53,7 @@ const DMAState = {
 
 const executeDMAs = (cpu: CPU, ppuFlags: PPUStepFlags) : void => {
     for (let channel = 0; channel <= MAX_CHANNEL; channel++) {
-        const dmaControl = cpu.memory.getInt16(DMA_REGISTERS.CONTROL[channel]).value >>> 0;
+        const dmaControl = getCachedIORegister(DMA_REGISTERS.CONTROL[channel]);
         const enabled = (dmaControl & 0x8000) !== 0;
 
         if (!enabled) {
@@ -65,17 +66,18 @@ const executeDMAs = (cpu: CPU, ppuFlags: PPUStepFlags) : void => {
         if (repeatedDMA) {
             // This is a repeated DMA. Only the word count value and optionally the destination address
             // (if Increment+Reload mode is used) are reloaded.
-            DMAState.wordCount[channel] = cpu.memory.getInt16(DMA_REGISTERS.WORD_COUNT[channel]).value >>> 0;
+            DMAState.wordCount[channel] = getCachedIORegister(DMA_REGISTERS.WORD_COUNT[channel]);
+
             if (((dmaControl >> 5) & 0x3) === 0x3) {
-                DMAState.currentDestinationAddress[channel] = cpu.memory.getInt32(DMA_REGISTERS.DESTINATION[channel]).value & 0x07FFFFFF;
+                DMAState.currentDestinationAddress[channel] = getCachedIORegister(DMA_REGISTERS.DESTINATION[channel]) & 0x07FFFFFF;
             }
         }
         else {
             // A fresh DMA: channel was disabled on previous step, but now is enabled. Reloading source,
             // destination, and word count values.
-            DMAState.currentSourceAddress[channel] = cpu.memory.getInt32(DMA_REGISTERS.SOURCE[channel]).value & 0x0FFFFFFF;
-            DMAState.currentDestinationAddress[channel] = cpu.memory.getInt32(DMA_REGISTERS.DESTINATION[channel]).value & 0x07FFFFFF;
-            DMAState.wordCount[channel] = cpu.memory.getInt16(DMA_REGISTERS.WORD_COUNT[channel]).value >>> 0;
+            DMAState.currentSourceAddress[channel] = getCachedIORegister(DMA_REGISTERS.SOURCE[channel]) & 0x0FFFFFFF;
+            DMAState.currentDestinationAddress[channel] = getCachedIORegister(DMA_REGISTERS.DESTINATION[channel]) & 0x07FFFFFF;
+            DMAState.wordCount[channel] = getCachedIORegister(DMA_REGISTERS.WORD_COUNT[channel]) >>> 0;
 
             DMAState.enabled[channel] = true;
         }

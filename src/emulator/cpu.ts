@@ -128,7 +128,7 @@ class CPU implements CPUType {
     }
 
     atBreakpoint() : boolean {
-        return this.breakpoints.has(this.getGeneralRegister(Reg.PC) - this.instructionSize * 2);
+        return this.breakpoints.size > 0 && this.breakpoints.has(this.getGeneralRegister(Reg.PC) - this.instructionSize * 2);
     }
 
     step() : void {

@@ -1,4 +1,5 @@
 import { handleInterruptAcknowledge } from "./interrupt";
+import { updateIOCache16, updateIOCache32, updateIOCache8 } from "./ioCache";
 
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'PALETTE' | 'VRAM' | 'OAM' | 'ROM_WS0' | 'ROM_WS1' | 'ROM_WS2' | 'SRAM';
 type MemoryAccess = { nSeq16: number, seq16: number, nSeq32: number, seq32: number };
@@ -142,11 +143,15 @@ class Memory implements MemoryType {
 
         // TODO: should a 32 bit write handle acknowledging interrupts?
 
-        const segmentAddress = address - segments[segment].start;
-        this.memoryBlocks[segment][segmentAddress + 0] = (value >> 0) & 0xFF;
-        this.memoryBlocks[segment][segmentAddress + 1] = (value >> 8) & 0xFF;
-        this.memoryBlocks[segment][segmentAddress + 2] = (value >> 16) & 0xFF;
-        this.memoryBlocks[segment][segmentAddress + 3] = (value >> 24) & 0xFF;
+        const cachedWrite = updateIOCache32(address, value);
+
+        if (!cachedWrite) {
+            const segmentAddress = address - segments[segment].start;
+            this.memoryBlocks[segment][segmentAddress + 0] = (value >> 0) & 0xFF;
+            this.memoryBlocks[segment][segmentAddress + 1] = (value >> 8) & 0xFF;
+            this.memoryBlocks[segment][segmentAddress + 2] = (value >> 16) & 0xFF;
+            this.memoryBlocks[segment][segmentAddress + 3] = (value >> 24) & 0xFF;
+        }
 
         return waitStateCycles[segment].nSeq32;
     }
@@ -166,9 +171,13 @@ class Memory implements MemoryType {
             return waitStateCycles[segment].nSeq32;
         }
 
-        const segmentAddress = address - segments[segment].start;
-        this.memoryBlocks[segment][segmentAddress + 0] = (value >> 0) & 0xFF;
-        this.memoryBlocks[segment][segmentAddress + 1] = (value >> 8) & 0xFF;
+        const cachedWrite = updateIOCache16(address, value);
+
+        if (!cachedWrite) {
+            const segmentAddress = address - segments[segment].start;
+            this.memoryBlocks[segment][segmentAddress + 0] = (value >> 0) & 0xFF;
+            this.memoryBlocks[segment][segmentAddress + 1] = (value >> 8) & 0xFF;
+        }
 
         return waitStateCycles[segment].nSeq32;
     }
@@ -182,10 +191,14 @@ class Memory implements MemoryType {
             return 0;
         }
 
-        // TODO: should a 32 bit write handle acknowledging interrupts?
+        // TODO: should an 8 bit write handle acknowledging interrupts?
 
-        const segmentAddress = address - segments[segment].start;
-        this.memoryBlocks[segment][segmentAddress] = value & 0xFF;
+        const cachedWrite = updateIOCache8(address, value);
+
+        if (!cachedWrite) {
+            const segmentAddress = address - segments[segment].start;
+            this.memoryBlocks[segment][segmentAddress] = value & 0xFF;
+        }
 
         return waitStateCycles[segment].nSeq32;
     }

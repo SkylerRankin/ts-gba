@@ -1,6 +1,7 @@
 import { CPU } from "./cpu";
 import { CanvasDisplay, Display } from "./display";
 import { executeDMAs } from "./dma";
+import { resetIOCache } from "./ioCache";
 import { Keypad } from "./keypad";
 import { Memory } from "./memory";
 import { PPU } from "./ppu";
@@ -83,14 +84,14 @@ class GBA implements GBAType {
         this.cyclesQueue.push(this.cpu.cycles - cyclesStart);
         this.stepsQueue.push(steps);
 
-        if (this.frameQueue.length > 200) {
-            this.frameQueue.splice(0, 100);
+        if (this.frameQueue.length > 20) {
+            this.frameQueue.splice(0, 10);
         }
-        if (this.cyclesQueue.length > 200) {
-            this.cyclesQueue.splice(0, 100);
+        if (this.cyclesQueue.length > 20) {
+            this.cyclesQueue.splice(0, 10);
         }
-        if (this.stepsQueue.length > 200) {
-            this.stepsQueue.splice(0, 100);
+        if (this.stepsQueue.length > 20) {
+            this.stepsQueue.splice(0, 10);
         }
 
         if (this.status === 'running') {
@@ -108,6 +109,7 @@ class GBA implements GBAType {
         this.status = 'paused';
         window.clearTimeout(this.nextFrameTimer);
 
+        resetIOCache();
         this.memory.reset();
         this.cpu.reset();
         this.ppu.reset();

@@ -1,5 +1,6 @@
 import { CPU } from "./cpu";
 import { requestInterrupt } from "./interrupt";
+import { getCachedIORegister } from "./ioCache";
 import { int16ToByteArray } from "./math";
 import { Memory } from "./memory";
 
@@ -18,7 +19,7 @@ const KeyOffset: {[key in Key]: number} = {
 };
 
 const KeyInputRegister = 0x04000130;
-const keyInterruptRegister = 0x04000132;
+const KeyInterruptRegister = 0x04000132;
 
 class Keypad {
     cpu: CPU;
@@ -31,13 +32,13 @@ class Keypad {
     }
 
     onKeyDown(key: Key) {
-        let keyInput = this.cpu.memory.getInt16(KeyInputRegister).value;
+        let keyInput = getCachedIORegister(KeyInputRegister);
         const offset = KeyOffset[key];
         keyInput &= ~(1 << offset);
         this.cpu.memory.setInt16(KeyInputRegister, keyInput, false, true);
         this.pressedKeys.add(offset);
 
-        const interruptControl = this.cpu.memory.getInt16(keyInterruptRegister).value;
+        const interruptControl = getCachedIORegister(KeyInterruptRegister);
         const keyInterruptEnabled = (interruptControl & 0x2000) > 0;
         if (keyInterruptEnabled) {
             const andCondition = (interruptControl & 0x4000) > 0;
@@ -65,7 +66,7 @@ class Keypad {
     }
 
     onKeyUp(key: Key) {
-        let keyInput = this.cpu.memory.getInt16(KeyInputRegister).value;
+        let keyInput = getCachedIORegister(KeyInputRegister);
         keyInput |= (1 << KeyOffset[key]);
         this.cpu.memory.setInt16(KeyInputRegister, keyInput, false, true);
         this.pressedKeys.delete(KeyOffset[key]);
