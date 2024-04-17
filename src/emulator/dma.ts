@@ -103,7 +103,7 @@ const executeDMAs = (cpu: CPU, ppuFlags: PPUStepFlags) : void => {
                 break;
             case 3:
                 // Special?
-                console.warn("DMA timing mode 3 not implemented.");
+                // console.warn("DMA timing mode 3 not implemented.");
                 break;
         }
     }

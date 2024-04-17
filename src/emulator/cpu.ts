@@ -190,6 +190,11 @@ class CPU implements CPUType {
         } else {
             this.setGeneralRegister(Reg.PC, 0x08000008);
         }
+
+        // Setting default stack pointer values
+        this.setGeneralRegister(Reg.SP, 0x03007F00);                        // SP for usr/sys mode
+        this.generalRegisters[OperatingModes.svc][Reg.SP] = 0x03007FE0;     // SP for svc mode
+        this.generalRegisters[OperatingModes.irq][Reg.SP] = 0x03007FA0;     // SP for irq mode
     }
 
     conditionIsMet(condition: number) : boolean {

@@ -190,7 +190,6 @@ const SpriteConstants = {
     maxVRAMTiles: 1024,
 };
 
-
 class PPU implements PPUType {
     cpu: CPU;
     memory: Memory;
@@ -853,7 +852,7 @@ class PPU implements PPUType {
             const gfxMode = (attr0 >> 10) & 0x3;
             const mosaic = (attr0 >> 12) & 0x1;
             const colorMode = (attr0 >> 13) & 0x1; // 0 = 16/16, 1 = 256/1
-            const spriteShape = (attr0 >> 14) & 0x1;
+            const spriteShape = (attr0 >> 14) & 0x3;
             const forceAlphaBlending = gfxMode === 1;
 
             // Attribute 1 components
@@ -883,7 +882,12 @@ class PPU implements PPUType {
             const tileSize = { x: size.x / SpriteConstants.tileSize, y: size.y / SpriteConstants.tileSize };
             const tilesPerRow = size.x / SpriteConstants.tileSize;
             const bytesPerTileRow = colorMode === 1 ? 8 : 4;
-            const bytesPerTile = colorMode === 1 ? 64 : 32;
+            // Despite there being 4 and 8 bit palette modes, sprite tile offsets are always done in 32 byte chunks.
+            // So the byte offsets for tiles 0-2 are 0x0, 0x20, and 0x40 for both palette modes. In the 8 bit color
+            // mode, the odd tiles are not accessible. So a tile count multiple is used to account for that fact that
+            // the tile indices should actually be doubled in some cases.
+            const tileByteOffset = 32;
+            const tileCountMultiple = colorMode === 1 ? 2 : 1;
 
             const affineSprite = affineMode !== 0;
             const doubleAffineSize = affineMode === 0x3;
@@ -980,13 +984,13 @@ class PPU implements PPUType {
                     // 1D tile arrangement
                     tileRowAddress =
                         SpriteConstants.charBlock4Address +
-                        (tileIndex + tileY * tilesPerRow + tileX) % SpriteConstants.maxVRAMTiles * bytesPerTile +
+                        (tileIndex + tileY * tilesPerRow + tileX * tileCountMultiple) % SpriteConstants.maxVRAMTiles * tileByteOffset +
                         (localY % SpriteConstants.tileSize) * bytesPerTileRow;
                 } else {
                     // 2D tile arrangement
                     tileRowAddress =
                         SpriteConstants.charBlock4Address +
-                        (tileIndex + tileY * 32 + tileX) % SpriteConstants.maxVRAMTiles * bytesPerTile +
+                        ((tileIndex + tileY * 32 + tileX * tileCountMultiple) % SpriteConstants.maxVRAMTiles) * tileByteOffset +
                         (localY % SpriteConstants.tileSize) * bytesPerTileRow;
                 }
 
@@ -1006,7 +1010,7 @@ class PPU implements PPUType {
                     // 8 bit color index in 256/1 palette
                     const tilePixelAddress = tileRowAddress + (localX % SpriteConstants.tileSize)
                     const paletteIndex = this.memory.getInt8(tilePixelAddress).value;
-                    if (palette > 0) {
+                    if (paletteIndex > 0) {
                         const colorAddress = SpriteConstants.spritePaletteAddress + paletteIndex * 2;
                         pixelColor = this.get15BitColorFromAddress(colorAddress);
                     }
@@ -1088,7 +1092,7 @@ class PPU implements PPUType {
 
             if (windowObjEnabled) {
                 // TODO: implement OBJ window. Sprites should act as mask for other layers?
-                console.warn(`OBJ window not implemented, ignoring.`);
+                // console.warn(`OBJ window not implemented, ignoring.`);
             }
 
             // Full range covering the scanline for the background
