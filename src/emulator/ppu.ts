@@ -178,6 +178,7 @@ class PPU implements PPUType {
     // Flags used by DMA to check when an HBlank or VBlank has occurred.
     stepFlags: PPUStepFlags;
     affineReferencePoints: AffineReferencePoint[];
+    scanlinePriorityBuffer: Uint8Array;
 
     constructor(cpu: CPU, display: Display) {
         this.cpu = cpu;
@@ -208,6 +209,7 @@ class PPU implements PPUType {
             { x: -1, y: -1 },
             { x: -1, y: -1 },
         ];
+        this.scanlinePriorityBuffer = new Uint8Array(DisplayConstants.hDrawPixels);
     }
 
     /**
@@ -335,6 +337,9 @@ class PPU implements PPUType {
         const displayControl = getCachedIORegister(displayRegisters.DISPCNT);
         const displayMode = displayControl & 0x7;
 
+        // Reset the scanline priority buffer with lowest priority.
+        this.scanlinePriorityBuffer.fill(3);
+
         switch (displayMode) {
             case 0x0:
                 this.renderDisplayMode0Scanline(y, displayControl);
@@ -367,7 +372,7 @@ class PPU implements PPUType {
         const scanlineControls = this.getScanlineControls(y, displayControl);
 
         // Render backgrounds
-        for (let backgroundIndex = 0; backgroundIndex <= 3; backgroundIndex++) {
+        for (let backgroundIndex = 3; backgroundIndex >= 0; backgroundIndex--) {
             const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
             if (backgroundEnabled) {
                 this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
@@ -386,17 +391,17 @@ class PPU implements PPUType {
         const scanlineControls = this.getScanlineControls(y, displayControl);
 
         // Render backgrounds
-        for (let backgroundIndex = 0; backgroundIndex <= 1; backgroundIndex++) {
-            const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
-            if (backgroundEnabled) {
-                this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
-            }
-        }
-
         const background2Index = 2;
         const background2Enabled = ((displayControl >> (background2Index + 8)) & 0x1) === 1;
         if (background2Enabled) {
             this.renderAffineTiledBackgroundScanline(y, displayControl, background2Index, scanlineControls);
+        }
+
+        for (let backgroundIndex = 1; backgroundIndex >= 0; backgroundIndex--) {
+            const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
+            if (backgroundEnabled) {
+                this.renderTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
+            }
         }
 
         // Render sprites
@@ -411,7 +416,7 @@ class PPU implements PPUType {
         const scanlineControls = this.getScanlineControls(y, displayControl);
 
         // Render backgrounds
-        for (let backgroundIndex = 2; backgroundIndex <= 3; backgroundIndex++) {
+        for (let backgroundIndex = 3; backgroundIndex >= 2; backgroundIndex--) {
             const backgroundEnabled = ((displayControl >> (backgroundIndex + 8)) & 0x1) === 1;
             if (backgroundEnabled) {
                 this.renderAffineTiledBackgroundScanline(y, displayControl, backgroundIndex, scanlineControls);
@@ -547,6 +552,11 @@ class PPU implements PPUType {
                 continue;
             }
 
+            if (this.scanlinePriorityBuffer[x] < priority) {
+                // Previously drawn pixel has higher priority.
+                continue;
+            }
+
             const adjustedX = (x + scrolling.x) % backgroundSize.x;
             const tileX = Math.floor(adjustedX / BackgroundConstants.tilePixelSize) % BackgroundConstants.screenBlockTileSize;
             const xTileOffset = adjustedX % BackgroundConstants.tilePixelSize;
@@ -626,6 +636,7 @@ class PPU implements PPUType {
 
             if (tileColor) {
                 this.display.setPixel(x, y, tileColor);
+                this.scanlinePriorityBuffer[x] = priority;
             }
         }
     }
@@ -671,6 +682,11 @@ class PPU implements PPUType {
                 continue;
             }
 
+            if (this.scanlinePriorityBuffer[x] < priority) {
+                // Previously drawn pixel has higher priority.
+                continue;
+            }
+
             // This transform first adds the reference point offset to x and y, then applies the affine matrix transform.
             // The resulting equation, simplified below, is localX = pa * (x1 + x0 - x0) + pb * (y1 + y0 - y0) + x0,
             // where x1 is the global x position and x0 is the reference point position.
@@ -706,6 +722,7 @@ class PPU implements PPUType {
             if (colorIndex > 0) {
                 const tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
                 this.display.setPixel(x, y, tileColor);
+                this.scanlinePriorityBuffer[x] = priority;
             }
         }
 
@@ -810,6 +827,11 @@ class PPU implements PPUType {
                     continue;
                 }
 
+                if (this.scanlinePriorityBuffer[x] < priority) {
+                    // Previously drawn pixel has higher priority.
+                    continue;
+                }
+
                 // Coordinates local to the sprite, (0, 0) = sprite top left
                 let localX = x - xStart - (doubleAffineSize ? size.x >> 2 : 0);
                 let localY = y - spriteY - (doubleAffineSize ? size.y >> 2 : 0);
@@ -885,6 +907,7 @@ class PPU implements PPUType {
 
                 if (pixelColor) {
                     this.display.setPixel(x, y, pixelColor);
+                    this.scanlinePriorityBuffer[x] = priority;
                 }
 
             }
