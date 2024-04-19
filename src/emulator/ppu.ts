@@ -43,7 +43,10 @@ type DisplayRegister =
     'WIN0V' |       // Window 0 Vertical Dimensions
     'WIN1V' |       // Window 1 Vertical Dimensions
     'WININ' |       // Control of Inside of Windows
-    'WINOUT'        // Control of Outside of Windows and Inside OBJ Window
+    'WINOUT' |      // Control of Outside of Windows and Inside OBJ Window
+    'BLDCNT' |      // Color Effects Control
+    'BLDALPHA' |    // Alpha Blending Coefficients
+    'BLDY'          // Brightness Coefficients
 ;
 
 type DisplayState = 'hDraw' | 'hBlank' | 'vBlank';
@@ -64,6 +67,12 @@ const DisplayConstants = {
     displayMode5Height: 128,
 };
 
+const ColorEffectMode = {
+    AlphaBlend: 1,
+    Brighten: 2,
+    Darken: 3,
+};
+
 type DisplayMode4Config = {
     currentFrame: number,
 };
@@ -74,7 +83,20 @@ type DisplayMode5Config = {
 
 type ScanlineSegment = { min: number, max: number, controls: number };
 
-const displayRegisters: {[key in DisplayRegister]: number} = {
+type ColorEffectState = {
+    mode: number,
+    backgroundFirstTargets: boolean[],
+    objectFirstTarget: boolean,
+    backdropFirstTarget: boolean,
+    backgroundSecondTargets: boolean[],
+    objectSecondTarget: boolean,
+    backdropSecondTarget: boolean,
+    eva: number,
+    evb: number,
+    evy: number,
+};
+
+const DisplayRegisters: {[key in DisplayRegister]: number} = {
     DISPCNT: 0x04000000,
     DISPSTAT: 0x04000004,
     VCOUNT: 0x04000006,
@@ -108,6 +130,9 @@ const displayRegisters: {[key in DisplayRegister]: number} = {
     WIN1V: 0x04000046,
     WININ: 0x04000048,
     WINOUT: 0x0400004A,
+    BLDCNT: 0x04000050,
+    BLDALPHA: 0x04000052,
+    BLDY: 0x04000054,
 };
 
 const DisplayRegistersByIndex = {
@@ -165,6 +190,7 @@ const SpriteConstants = {
     maxVRAMTiles: 1024,
 };
 
+
 class PPU implements PPUType {
     cpu: CPU;
     memory: Memory;
@@ -179,6 +205,10 @@ class PPU implements PPUType {
     stepFlags: PPUStepFlags;
     affineReferencePoints: AffineReferencePoint[];
     scanlinePriorityBuffer: Uint8Array;
+    scanlineColorBuffer: RGBColor[];
+    scanlineBlendBuffer: (RGBColor | undefined)[];
+    // State for each color effect mode reused by each scanline render function.
+    colorEffect: ColorEffectState;
 
     constructor(cpu: CPU, display: Display) {
         this.cpu = cpu;
@@ -210,6 +240,20 @@ class PPU implements PPUType {
             { x: -1, y: -1 },
         ];
         this.scanlinePriorityBuffer = new Uint8Array(DisplayConstants.hDrawPixels);
+        this.scanlineColorBuffer = new Array<RGBColor>(DisplayConstants.hDrawPixels);
+        this.scanlineBlendBuffer = new Array<RGBColor>(DisplayConstants.hDrawPixels);
+        this.colorEffect = {
+            mode: 0,
+            backgroundFirstTargets: [ false, false, false, false ],
+            objectFirstTarget: false,
+            backdropFirstTarget: false,
+            backgroundSecondTargets: [ false, false, false, false ],
+            objectSecondTarget: false,
+            backdropSecondTarget: false,
+            eva: 0,
+            evb: 0,
+            evy: 0
+        };
     }
 
     /**
@@ -230,7 +274,7 @@ class PPU implements PPUType {
             return;
         }
 
-        const dispStat = getCachedIORegister(displayRegisters.DISPSTAT);
+        const dispStat = getCachedIORegister(DisplayRegisters.DISPSTAT);
         const vBlankIrqEnabled = (dispStat & 0x8) > 0;
         const hBlankIrqEnabled = (dispStat & 0x10) > 0;
         const vCounterIrqEnabled = (dispStat & 0x20) > 0;
@@ -245,9 +289,9 @@ class PPU implements PPUType {
                 this.renderScanline(this.currentScanline);
 
                 // Set H-Blank flag in DISPSTAT
-                let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
+                let dispstat = getCachedIORegister(DisplayRegisters.DISPSTAT);
                 dispstat |= 0x2;
-                this.memory.setInt8(displayRegisters.DISPSTAT, dispstat);
+                this.memory.setInt8(DisplayRegisters.DISPSTAT, dispstat);
 
                 break;
             }
@@ -257,7 +301,7 @@ class PPU implements PPUType {
 
                 if (this.currentScanline < DisplayConstants.vDrawPixels - 1) {
                     this.currentScanline += 1;
-                    this.memory.setInt16(displayRegisters.VCOUNT, this.currentScanline);
+                    this.memory.setInt16(DisplayRegisters.VCOUNT, this.currentScanline);
                     this.displayState = 'hDraw';
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
                 } else {
@@ -265,18 +309,18 @@ class PPU implements PPUType {
                     this.displayState = 'vBlank';
 
                     // Set V-Blank flag in DISPSTAT
-                    let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
+                    let dispstat = getCachedIORegister(DisplayRegisters.DISPSTAT);
                     dispstat |= 1;
-                    this.memory.setInt16(displayRegisters.DISPSTAT, dispstat);
+                    this.memory.setInt16(DisplayRegisters.DISPSTAT, dispstat);
 
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
                     this.display.drawFrame();
                 }
 
                 // Clear H-Blank flag in DISPSTAT
-                let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
+                let dispstat = getCachedIORegister(DisplayRegisters.DISPSTAT);
                 dispstat &= 0xFD;
-                this.memory.setInt8(displayRegisters.DISPSTAT, dispstat);
+                this.memory.setInt8(DisplayRegisters.DISPSTAT, dispstat);
 
                 // Request H-Blank interrupt
                 if (hBlankIrqEnabled) {
@@ -288,7 +332,7 @@ class PPU implements PPUType {
                 if (this.currentScanline < (DisplayConstants.vDrawPixels + DisplayConstants.hBlankPixels - 1)) {
                     // Completed empty V-Draw scanline
                     this.currentScanline += 1;
-                    this.memory.setInt16(displayRegisters.VCOUNT, this.currentScanline);
+                    this.memory.setInt16(DisplayRegisters.VCOUNT, this.currentScanline);
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles + DisplayConstants.hBlankCycles;
 
                     // Request hidden H-Blank interrupt
@@ -300,13 +344,13 @@ class PPU implements PPUType {
                     this.vBlankAck = true;
                     this.displayState = 'hDraw';
                     this.currentScanline = 0;
-                    this.memory.setInt16(displayRegisters.VCOUNT, this.currentScanline);
+                    this.memory.setInt16(DisplayRegisters.VCOUNT, this.currentScanline);
                     this.nextCycleTrigger = cpuCycles + DisplayConstants.hDrawCycles;
 
                     // Clear V-Blank flag in DISPSTAT
-                    let dispstat = getCachedIORegister(displayRegisters.DISPSTAT);
+                    let dispstat = getCachedIORegister(DisplayRegisters.DISPSTAT);
                     dispstat &= 0xFE;
-                    this.memory.setInt16(displayRegisters.DISPSTAT, dispstat);
+                    this.memory.setInt16(DisplayRegisters.DISPSTAT, dispstat);
 
                     // The affine background reference points are loaded into internal registers on each VBlank.
                     this.loadAffineBackgroundReferencePoints();
@@ -327,18 +371,31 @@ class PPU implements PPUType {
 
     reset() {
         this.currentScanline = 0;
-        this.memory.setInt16(displayRegisters.VCOUNT, 0);
+        this.memory.setInt16(DisplayRegisters.VCOUNT, 0);
         this.displayState = 'hDraw';
         this.nextCycleTrigger = DisplayConstants.hDrawCycles;
         this.vBlankAck = false;
     }
 
     renderScanline(y: number) {
-        const displayControl = getCachedIORegister(displayRegisters.DISPCNT);
+        const displayControl = getCachedIORegister(DisplayRegisters.DISPCNT);
         const displayMode = displayControl & 0x7;
 
         // Reset the scanline priority buffer with lowest priority.
         this.scanlinePriorityBuffer.fill(3);
+
+        // Fill color buffer with background color and clear blend buffer.
+        const backgroundColor = this.get15BitColorFromAddress(MemorySegments.PALETTE.start);
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            this.scanlineColorBuffer[x] = backgroundColor;
+            if (this.colorEffect.backdropSecondTarget) {
+                this.scanlineBlendBuffer[x] = backgroundColor;
+            } else {
+                this.scanlineBlendBuffer[x] = undefined;
+            }
+        }
+
+        this.updateColorEffect();
 
         switch (displayMode) {
             case 0x0:
@@ -363,12 +420,12 @@ class PPU implements PPUType {
                 throw Error(`Invalid display mode (${displayMode}) in DISPCNT.`);
         }
 
+        this.display.setScanline(y, this.scanlineColorBuffer);
     }
 
     renderDisplayMode0Scanline(y: number, displayControl: number) {
         // Display mode 0 allows for backgrounds 0 - 3 with no transformations on any background.
 
-        this.fillBackgroundColor(y);
         const scanlineControls = this.getScanlineControls(y, displayControl);
 
         // Render backgrounds
@@ -387,7 +444,6 @@ class PPU implements PPUType {
         // Display mode 1 allows for backgrounds 0 - 2 with transformations allowed
         // only on background 2.
 
-        this.fillBackgroundColor(y);
         const scanlineControls = this.getScanlineControls(y, displayControl);
 
         // Render backgrounds
@@ -412,7 +468,6 @@ class PPU implements PPUType {
         // Display mode 2 allows for backgrounds 2 - 3, with transformations allowed
         // on both background.
 
-        this.fillBackgroundColor(y);
         const scanlineControls = this.getScanlineControls(y, displayControl);
 
         // Render backgrounds
@@ -439,7 +494,8 @@ class PPU implements PPUType {
         for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
             const address = baseAddress + (x * bytesPerPixel);
             const rgbColor = this.get15BitColorFromAddress(address);
-            this.display.setPixel(x, y, rgbColor);
+            // this.display.setPixel(x, y, rgbColor);
+            this.scanlineColorBuffer[x] = rgbColor;
         }
     }
 
@@ -468,7 +524,8 @@ class PPU implements PPUType {
             // Palette colors occupy 16 bits, so index is multiplied by 2 to get correct byte offset.
             const paletteColorAddress = backgroundPaletteAddress + (paletteIndex * 0x2);
             const rgbColor = this.get15BitColorFromAddress(paletteColorAddress);
-            this.display.setPixel(x, y, rgbColor);
+            // this.display.setPixel(x, y, rgbColor);
+            this.scanlineColorBuffer[x] = rgbColor;
         }
     }
 
@@ -499,6 +556,7 @@ class PPU implements PPUType {
                 rgbColor = { red: 255, green: 0, blue: 255 };
             }
             this.display.setPixel(x, y, rgbColor);
+            this.scanlineColorBuffer[x] = rgbColor;
         }
 
     }
@@ -510,13 +568,6 @@ class PPU implements PPUType {
             green: 255 * ((colorData >>> 5) & 0x1F) / 32,
             blue: 255 * ((colorData >>> 10) & 0x1F) / 32,
         };
-    }
-
-    fillBackgroundColor(y: number) {
-        const backgroundColor = this.get15BitColorFromAddress(MemorySegments.PALETTE.start);
-        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
-            this.display.setPixel(x, y, backgroundColor);
-        }
     }
 
     renderTiledBackgroundScanline(y: number, displayControl: number, backgroundIndex: number, scanlineControls: number[]) {
@@ -635,7 +686,34 @@ class PPU implements PPUType {
             }
 
             if (tileColor) {
-                this.display.setPixel(x, y, tileColor);
+                if (this.colorEffect.backgroundSecondTargets[backgroundIndex]) {
+                    this.scanlineBlendBuffer[x] = tileColor;
+                }
+
+                switch (this.colorEffect.mode) {
+                    case ColorEffectMode.AlphaBlend:
+                        if (this.colorEffect.backgroundFirstTargets[backgroundIndex]) {
+                            // Blend color with second target color
+                            if (this.scanlineBlendBuffer[x]) {
+                                tileColor = this.blendColors(tileColor, this.scanlineBlendBuffer[x] as RGBColor);
+                            } else {
+                                // No second target, so original color is used, no blending.
+                            }
+                        }
+                        break;
+                    case ColorEffectMode.Brighten:
+                        if (this.colorEffect.backgroundFirstTargets[backgroundIndex]) {
+                            tileColor = this.brightenColor(tileColor);
+                        }
+                        break;
+                    case ColorEffectMode.Darken:
+                        if (this.colorEffect.backgroundFirstTargets[backgroundIndex]) {
+                            tileColor = this.darkenColor(tileColor);
+                        }
+                        break;
+                }
+
+                this.scanlineColorBuffer[x] = tileColor;
                 this.scanlinePriorityBuffer[x] = priority;
             }
         }
@@ -720,14 +798,42 @@ class PPU implements PPUType {
             const colorIndex = this.memory.getInt8(charBlockStart + (tileIndex * bytesPerTile) + (tileYOffset * bytesPerRow) + tileXOffset).value;
             
             if (colorIndex > 0) {
-                const tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
-                this.display.setPixel(x, y, tileColor);
+                let tileColor = this.get15BitColorFromAddress(paletteAddress + 2 * colorIndex);
+
+                if (this.colorEffect.backgroundSecondTargets[backgroundIndex]) {
+                    this.scanlineBlendBuffer[x] = tileColor;
+                }
+
+                switch (this.colorEffect.mode) {
+                    case ColorEffectMode.AlphaBlend:
+                        if (this.colorEffect.backgroundFirstTargets[backgroundIndex]) {
+                            // Blend color with second target color
+                            if (this.scanlineBlendBuffer[x]) {
+                                tileColor = this.blendColors(tileColor, this.scanlineBlendBuffer[x] as RGBColor);
+                            } else {
+                                // No second target, so original color is used, no blending.
+                            }
+                        }
+                        break;
+                    case ColorEffectMode.Brighten:
+                        if (this.colorEffect.backgroundFirstTargets[backgroundIndex]) {
+                            tileColor = this.brightenColor(tileColor);
+                        }
+                        break;
+                    case ColorEffectMode.Darken:
+                        if (this.colorEffect.backgroundFirstTargets[backgroundIndex]) {
+                            tileColor = this.darkenColor(tileColor);
+                        }
+                        break;
+                }
+
+                this.scanlineColorBuffer[x] = tileColor;
                 this.scanlinePriorityBuffer[x] = priority;
             }
         }
 
         // According to GBATEK, after each scanline, the internal copies of the background reference points are incremented by dmx (pb) and dmy (pa).
-        // This seems to break the transformations, is it being some implicitly already?
+        // This seems to break the transformations, is it being done implicitly already?
         // this.affineReferencePoints[backgroundIndex].x += pb;
         // this.affineReferencePoints[backgroundIndex].y += pd;
     }
@@ -748,6 +854,7 @@ class PPU implements PPUType {
             const mosaic = (attr0 >> 12) & 0x1;
             const colorMode = (attr0 >> 13) & 0x1; // 0 = 16/16, 1 = 256/1
             const spriteShape = (attr0 >> 14) & 0x1;
+            const forceAlphaBlending = gfxMode === 1;
 
             // Attribute 1 components
             let spriteX = signExtend(attr1 & 0x1FF, 9);
@@ -906,7 +1013,34 @@ class PPU implements PPUType {
                 }
 
                 if (pixelColor) {
-                    this.display.setPixel(x, y, pixelColor);
+                    const colorEffectMode = forceAlphaBlending ? ColorEffectMode.AlphaBlend : this.colorEffect.mode;
+                    switch (colorEffectMode) {
+                        case ColorEffectMode.AlphaBlend:
+                            if (this.colorEffect.objectSecondTarget) {
+                                // Save color if this background is a second target
+                                this.scanlineBlendBuffer[x] = pixelColor;
+                            } else if (forceAlphaBlending || this.colorEffect.objectFirstTarget) {
+                                // Blend color with second target color
+                                if (this.scanlineBlendBuffer[x]) {
+                                    pixelColor = this.blendColors(pixelColor, this.scanlineBlendBuffer[x] as RGBColor);
+                                } else {
+                                    // No second target, so original color is used, no blending.
+                                }
+                            }
+                            break;
+                        case ColorEffectMode.Brighten:
+                            if (this.colorEffect.objectFirstTarget) {
+                                pixelColor = this.brightenColor(pixelColor);
+                            }
+                            break;
+                        case ColorEffectMode.Darken:
+                            if (this.colorEffect.objectFirstTarget) {
+                                pixelColor = this.darkenColor(pixelColor);
+                            }
+                            break;
+                    }
+
+                    this.scanlineColorBuffer[x] = pixelColor;
                     this.scanlinePriorityBuffer[x] = priority;
                 }
 
@@ -921,12 +1055,12 @@ class PPU implements PPUType {
         const windowEnabled = window0Enabled | window1Enabled | windowObjEnabled;
 
         if (windowEnabled) {
-            const win0Horizontal = getCachedIORegister(displayRegisters.WIN0H);
-            const win1Horizontal = getCachedIORegister(displayRegisters.WIN1H);
-            const win0Vertical = getCachedIORegister(displayRegisters.WIN0V);
-            const win1Vertical = getCachedIORegister(displayRegisters.WIN1V);
-            const winIn = getCachedIORegister(displayRegisters.WININ);
-            const winOut = getCachedIORegister(displayRegisters.WINOUT);
+            const win0Horizontal = getCachedIORegister(DisplayRegisters.WIN0H);
+            const win1Horizontal = getCachedIORegister(DisplayRegisters.WIN1H);
+            const win0Vertical = getCachedIORegister(DisplayRegisters.WIN0V);
+            const win1Vertical = getCachedIORegister(DisplayRegisters.WIN1V);
+            const winIn = getCachedIORegister(DisplayRegisters.WININ);
+            const winOut = getCachedIORegister(DisplayRegisters.WINOUT);
 
             const window0Edges = {
                 right: Math.min(win0Horizontal & 0xFF, DisplayConstants.hDrawPixels) - 1,
@@ -1016,6 +1150,63 @@ class PPU implements PPUType {
         }
     }
 
+    updateColorEffect() {
+        const colorEffectControl = getCachedIORegister(DisplayRegisters.BLDCNT);
+        this.colorEffect.mode = (colorEffectControl >> 6) & 0x3;
+ 
+        if (this.colorEffect.mode > 0) {
+            this.colorEffect.backgroundFirstTargets = [
+                (colorEffectControl & 0x1) === 1,
+                ((colorEffectControl >> 1) & 0x1) === 1,
+                ((colorEffectControl >> 2) & 0x1) === 1,
+                ((colorEffectControl >> 3) & 0x1) === 1,
+            ];
+            this.colorEffect.objectFirstTarget = ((colorEffectControl >> 4) & 0x1) === 1;
+            this.colorEffect.backdropFirstTarget = ((colorEffectControl >> 5) & 0x1) === 1;
+
+            if (this.colorEffect.mode === 1) {
+                this.colorEffect.backgroundSecondTargets = [
+                    ((colorEffectControl >> 8) & 0x1) === 1,
+                    ((colorEffectControl >> 9) & 0x1) === 1,
+                    ((colorEffectControl >> 10) & 0x1) === 1,
+                    ((colorEffectControl >> 11) & 0x1) === 1,
+                ];
+                this.colorEffect.objectSecondTarget = ((colorEffectControl >> 12) & 0x1) === 1;
+                this.colorEffect.backdropSecondTarget = ((colorEffectControl >> 13) & 0x1) === 1;
+    
+                const coefficients = getCachedIORegister(DisplayRegisters.BLDALPHA);
+                this.colorEffect.eva = Math.min(16, (coefficients & 0x1F)) / 16;
+                this.colorEffect.evb = Math.min(16, (coefficients >> 8) & 0x1F) / 16;
+            } else if (this.colorEffect.mode > 1) {
+                const coefficient = getCachedIORegister(DisplayRegisters.BLDY);
+                this.colorEffect.evy = Math.min(16, (coefficient & 0x1F)) / 16;
+            }
+        }
+    }
+
+    blendColors(first: RGBColor, second: RGBColor) : RGBColor {
+        return {
+            red: Math.min(255, (first.red * this.colorEffect.eva) + (second.red * this.colorEffect.evb)),
+            green: Math.min(255, (first.green * this.colorEffect.eva) + (second.green * this.colorEffect.evb)),
+            blue: Math.min(255, (first.blue * this.colorEffect.eva) + (second.blue * this.colorEffect.evb)),
+        };
+    }
+
+    darkenColor(color: RGBColor) : RGBColor {
+        return {
+            red: color.red - color.red * this.colorEffect.evy,
+            green: color.green - color.green * this.colorEffect.evy,
+            blue: color.blue - color.blue * this.colorEffect.evy,
+        };
+    }
+
+    brightenColor(color: RGBColor) : RGBColor {
+        return {
+            red: color.red + (255 - color.red) * this.colorEffect.evy,
+            green: color.green + (255 - color.green) * this.colorEffect.evy,
+            blue: color.blue + (255 - color.blue) * this.colorEffect.evy,
+        };
+    }
 }
 
 

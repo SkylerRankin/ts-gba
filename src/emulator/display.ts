@@ -13,6 +13,7 @@ const CanvasScaling = 2;
 
 interface Display {
     setPixel: (x: number, y: number, color: RGBColor) => void;
+    setScanline: (y: number, colors: RGBColor[]) => void;
     setFrame: (frame: number) => void;
     drawFrame: () => void;
     reset: () => void;
@@ -61,6 +62,16 @@ class CanvasDisplay implements Display {
         this.imageData[this.currentContext].data[baseIndex + 1] = Math.floor(color.green);
         this.imageData[this.currentContext].data[baseIndex + 2] = Math.floor(color.blue);
         this.imageData[this.currentContext].data[baseIndex + 3] = 255;
+    }
+
+    setScanline(y: number, colors: RGBColor[]) {
+        for (let x = 0; x < colors.length; x++) {
+            const baseIndex = (y * DisplaySize.width + x) * 4;
+            this.imageData[this.currentContext].data[baseIndex + 0] = Math.floor(colors[x].red);
+            this.imageData[this.currentContext].data[baseIndex + 1] = Math.floor(colors[x].green);
+            this.imageData[this.currentContext].data[baseIndex + 2] = Math.floor(colors[x].blue);
+            this.imageData[this.currentContext].data[baseIndex + 3] = 255;
+        }
     }
 
     drawFrame() {
