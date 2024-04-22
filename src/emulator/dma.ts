@@ -1,4 +1,5 @@
 import { CPU } from "./cpu";
+import { requestInterrupt } from "./interrupt";
 import { getCachedIORegister } from "./ioCache";
 import { PPUStepFlags } from "./ppu";
 
@@ -148,7 +149,10 @@ const executeTransfer = (cpu: CPU, channel: number, dmaControl: number) : void =
     }
 
     if (raiseIrq) {
-        // TODO: request irq
+        if (channel === 0) requestInterrupt(cpu, "DMA_0");
+        else if (channel === 1) requestInterrupt(cpu, "DMA_1");
+        else if (channel === 2) requestInterrupt(cpu, "DMA_2");
+        else if (channel === 3) requestInterrupt(cpu, "DMA_3");
     }
 }
 

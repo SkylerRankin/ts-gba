@@ -104,9 +104,9 @@ const handleInterrupts = (cpu: CPU, instructionOptions: ProcessedInstructionOpti
  * The function returns true if the IF register was updated. If not, false is returned and
  * the memory write should be handled normally.
  * 
- * TODO: what if a 32 or 8 bit value is used to updated the register?
+ * TODO: what if a 32 bit value is used to updated the register?
  */
-const handleInterruptAcknowledge = (cpu: CPU, address: number, value: number) : boolean => {
+const handleInterruptAcknowledge16 = (cpu: CPU, address: number, value: number) : boolean => {
     if (address === InterruptRegisters.RequestAckFlags) {
         const ifRegister = getCachedIORegister(address);
         const result = ifRegister & ~value;
@@ -116,28 +116,19 @@ const handleInterruptAcknowledge = (cpu: CPU, address: number, value: number) : 
     return false;
 }
 
-const handleInterruptAcknowledge_old = (cpu: CPU, address: number, bytes: Uint8Array) : boolean => {
-    if (bytes.length === 1) {
-        // Writing single byte
-    } else if (bytes.length === 2) {
-        // Writing half word
-        switch (address) {
-            // IF: Interrupt request flags / IRQ acknowledge
-            // Any bits that are being set to 1 should be instead set to 0.
-            case 0x04000202:
-                const ifRegister = cpu.memory.getInt16(address).value;
-                const value = bytes[0] + (bytes[1] << 8);
-                const result = ifRegister & ~value;
-
-                // Pass checkForInterruptAck flag as false, since this memory write doesn't represent a software IRQ acknowledgement.
-                cpu.memory.setInt16(address, result, false);
-                return true;
-        }
-    } else if (bytes.length === 4) {
-        // Writing word
+const handleInterruptAcknowledge8 = (cpu: CPU, address: number, value: number) : boolean => {
+    if (address === InterruptRegisters.RequestAckFlags) {
+        const ifRegister = getCachedIORegister(address);
+        const result = ifRegister & ~(value & 0xFF);
+        cpu.memory.setInt16(InterruptRegisters.RequestAckFlags, result, false);
+        return true;
+    } else if (address === InterruptRegisters.RequestAckFlags + 1) {
+        const ifRegister = getCachedIORegister(address);
+        const result = ifRegister & ~((value << 8) && 0xFF);
+        cpu.memory.setInt16(InterruptRegisters.RequestAckFlags, result, false);
+        return true;
     }
-
     return false;
 }
 
-export { handleInterrupts, requestInterrupt, handleInterruptAcknowledge, InterruptRegisters }
+export { handleInterrupts, requestInterrupt, handleInterruptAcknowledge8, handleInterruptAcknowledge16, InterruptRegisters }

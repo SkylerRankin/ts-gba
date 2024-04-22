@@ -1,4 +1,4 @@
-import { handleInterruptAcknowledge } from "./interrupt";
+import { handleInterruptAcknowledge8, handleInterruptAcknowledge16 } from "./interrupt";
 import { updateIOCache16, updateIOCache32, updateIOCache8 } from "./ioCache";
 
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'PALETTE' | 'VRAM' | 'OAM' | 'ROM_WS0' | 'ROM_WS1' | 'ROM_WS2' | 'SRAM';
@@ -167,7 +167,7 @@ class Memory implements MemoryType {
 
         // Return early since interrupt acknowledgements don't actual write these
         // bytes to memory.
-        if (checkForInterruptAck && handleInterruptAcknowledge(this.cpu, address, value)) {
+        if (checkForInterruptAck && handleInterruptAcknowledge16(this.cpu, address, value)) {
             return waitStateCycles[segment].nSeq32;
         }
 
@@ -191,7 +191,11 @@ class Memory implements MemoryType {
             return 0;
         }
 
-        // TODO: should an 8 bit write handle acknowledging interrupts?
+        // Return early since interrupt acknowledgements don't actual write these
+        // bytes to memory.
+        if (checkForInterruptAck && handleInterruptAcknowledge8(this.cpu, address, value)) {
+            return waitStateCycles[segment].nSeq32;
+        }
 
         const cachedWrite = updateIOCache8(address, value);
 
