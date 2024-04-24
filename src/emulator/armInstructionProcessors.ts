@@ -518,11 +518,6 @@ const processAnd = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('AND');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -531,6 +526,11 @@ const processAnd = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('z', result32 === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry === 1);
         }
+    }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
     }
 
     cpu.setGeneralRegister(rd, result32 + offset);
@@ -545,10 +545,6 @@ const processEor = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     const result = value1 ^ value2;
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
 
     if (sFlag) {
         if (rd === Reg.PC) {
@@ -558,6 +554,11 @@ const processEor = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('z', result === 0);
             cpu.setStatusRegisterFlag('c', shiftCarry === 1);
         }
+    }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
     }
 
     cpu.setGeneralRegister(rd, value1 ^ value2 + offset);
@@ -573,10 +574,6 @@ const processSub = (data: DataProcessingParameter) : number => {
 
     const result = value1 - value2;
     const result32 = result & 0xFFFFFFFF;
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
 
     if (sFlag) {
         if (rd === Reg.PC) {
@@ -588,6 +585,12 @@ const processSub = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value1, value2, result32) === 1);
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
@@ -601,11 +604,6 @@ const processRsb = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('RSB');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -615,6 +613,11 @@ const processRsb = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('c', borrowFrom(value2, value1) === 0);
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value2, value1, result32));
         }
+    }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
     }
 
     cpu.setGeneralRegister(rd, result32 + offset);
@@ -630,11 +633,6 @@ const processAdd = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('ADD');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -645,6 +643,12 @@ const processAdd = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromAddition(value1, value2, result32));
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
@@ -659,10 +663,6 @@ const processAdc = (data: DataProcessingParameter) : number => {
 
     const result = value1 + value2 + cFlag;
     const result32 = result & 0xFFFFFFFF;
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
 
     if (sFlag) {
         if (rd === Reg.PC) {
@@ -674,6 +674,12 @@ const processAdc = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromAddition(value1, value2 + cFlag, result32));
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
@@ -689,11 +695,6 @@ const processSbc = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('SBC');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -704,6 +705,12 @@ const processSbc = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value1, value2 + notCarry, result32));
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
@@ -719,11 +726,6 @@ const processRsc = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('RSC');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -734,6 +736,12 @@ const processRsc = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('v', signedOverflowFromSubtraction(value2, value1 + notCarry, result32));
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
     return result;
 }
@@ -814,11 +822,6 @@ const processOrr = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('ORR');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -828,6 +831,12 @@ const processOrr = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
     return result32;
 }
@@ -840,11 +849,6 @@ const processMov = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('MOV');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -854,6 +858,12 @@ const processMov = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
 
     return result32 - offset;
@@ -867,11 +877,6 @@ const processBic = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('BIC');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -881,6 +886,12 @@ const processBic = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result + offset);
     return result;
 }
@@ -893,11 +904,6 @@ const processMvn = (data: DataProcessingParameter) : number => {
     cpu.history.setInstructionName('MVN');
     // #REMOVE_IN_BUILD_END
 
-    let offset = 0;
-    if (rd === Reg.PC) {
-        offset = cpu.instructionSize * 2;
-    }
-
     if (sFlag) {
         if (rd === Reg.PC) {
             cpu.spsrToCPSR();
@@ -907,6 +913,12 @@ const processMvn = (data: DataProcessingParameter) : number => {
             cpu.setStatusRegisterFlag('c', shiftCarry);
         }
     }
+
+    let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     cpu.setGeneralRegister(rd, result32 + offset);
     return result32;
 }

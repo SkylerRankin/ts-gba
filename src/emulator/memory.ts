@@ -136,6 +136,11 @@ class Memory implements MemoryType {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
 
+        // Ignore writes to read only sections
+        if (segment === 'BIOS' || segment === 'ROM_WS0' || segment === 'ROM_WS1' || segment === 'ROM_WS2') {
+            return 0;
+        }
+
         if (!ioRegisterWrite && this.ignoreWriteAttempt(address)) {
             console.log(`Attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt.`);
             return 0;
@@ -159,6 +164,11 @@ class Memory implements MemoryType {
     setInt16 = (address: number, value: number, checkForInterruptAck: boolean = true, ioRegisterWrite: boolean = false): MemoryWriteResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
+
+        // Ignore writes to read only sections
+        if (segment === 'BIOS' || segment === 'ROM_WS0' || segment === 'ROM_WS1' || segment === 'ROM_WS2') {
+            return 0;
+        }
 
         if (!ioRegisterWrite && this.ignoreWriteAttempt(address)) {
             console.log(`Attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt.`);
@@ -185,6 +195,11 @@ class Memory implements MemoryType {
     setInt8 = (address: number, value: number, checkForInterruptAck: boolean = true, ioRegisterWrite: boolean = false): MemoryWriteResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
+
+        // Ignore writes to read only sections
+        if (segment === 'BIOS' || segment === 'ROM_WS0' || segment === 'ROM_WS1' || segment === 'ROM_WS2') {
+            return 0;
+        }
 
         if (!ioRegisterWrite && this.ignoreWriteAttempt(address)) {
             console.log(`Attempted to write to ${address.toString(16)} without ioRegisterWrite, ignoring attempt.`);
