@@ -519,10 +519,13 @@ const processAnd = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -543,10 +546,13 @@ const processEor = (data: DataProcessingParameter) : number => {
 
     const result = value1 ^ value2;
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result));
             cpu.setStatusRegisterFlag('z', result === 0);
@@ -568,10 +574,13 @@ const processSub = (data: DataProcessingParameter) : number => {
     const result = value1 - value2;
     const result32 = result & 0xFFFFFFFF;
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -593,10 +602,13 @@ const processRsb = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -619,10 +631,13 @@ const processAdd = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -645,10 +660,13 @@ const processAdc = (data: DataProcessingParameter) : number => {
     const result = value1 + value2 + cFlag;
     const result32 = result & 0xFFFFFFFF;
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -672,10 +690,13 @@ const processSbc = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -699,10 +720,13 @@ const processRsc = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -791,10 +815,13 @@ const processOrr = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -841,10 +868,13 @@ const processBic = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result));
             cpu.setStatusRegisterFlag('z', result === 0);
@@ -864,10 +894,13 @@ const processMvn = (data: DataProcessingParameter) : number => {
     // #REMOVE_IN_BUILD_END
 
     let offset = 0;
+    if (rd === Reg.PC) {
+        offset = cpu.instructionSize * 2;
+    }
+
     if (sFlag) {
-        if (rd === 15) {
+        if (rd === Reg.PC) {
             cpu.spsrToCPSR();
-            offset = cpu.instructionSize * 2;
         } else {
             cpu.setStatusRegisterFlag('n', isNegative32(result32));
             cpu.setStatusRegisterFlag('z', result32 === 0);
@@ -939,7 +972,7 @@ const processLDR = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
         case 0b11: value = rotateRight(value, 24, 32); break;
     }
 
-    if (rd === 15) {
+    if (rd === Reg.PC) {
         const newPC = (value + 8) & 0xFFFFFFFC;
         cpu.setGeneralRegister(Reg.PC, newPC);
     } else {
