@@ -121,6 +121,7 @@ const executeTransfer = (cpu: CPU, channel: number, dmaControl: number) : void =
 
     const halfwordTransfer = transferSize === 0;
 
+    const originalStartAddress = DMAState.currentSourceAddress[channel];
     let currentSourceAddress = DMAState.currentSourceAddress[channel];
     let currentDestinationAddress = DMAState.currentDestinationAddress[channel];
 
@@ -140,6 +141,12 @@ const executeTransfer = (cpu: CPU, channel: number, dmaControl: number) : void =
 
     DMAState.currentSourceAddress[channel] = currentSourceAddress;
     DMAState.currentDestinationAddress[channel] = currentDestinationAddress;
+
+    if (halfwordTransfer) {
+        cpu.cycles += 2 * DMAState.wordCount[channel] * cpu.memory.get16BitSeqWaitCycles(originalStartAddress);
+    } else {
+        cpu.cycles += 2 * DMAState.wordCount[channel] * cpu.memory.get32BitSeqWaitCycles(originalStartAddress);
+    }
 
     if (!repeat) {
         // Disable this DMA channel since transfer has completed.
