@@ -65,6 +65,7 @@ const DisplayConstants = {
     vBlankCycles: 68 * (240 + 68) * 4,
     displayMode5Width: 160,
     displayMode5Height: 128,
+    lowestPriority: 3,
 };
 
 const ColorEffectMode = {
@@ -203,9 +204,19 @@ class PPU implements PPUType {
     // Flags used by DMA to check when an HBlank or VBlank has occurred.
     stepFlags: PPUStepFlags;
     affineReferencePoints: AffineReferencePoint[];
+    // Contains the priority (0 - 3) for each pixel in a scanline.
     scanlinePriorityBuffer: Uint8Array;
+    // Contains the current color for each pixel in a scanline.
     scanlineColorBuffer: RGBColor[];
+    // Contains the color of any 2nd blend target at the given pixel.
     scanlineBlendBuffer: (RGBColor | undefined)[];
+    // Contains the color of the topmost sprite overlapping a given pixel.
+    scanlineSpriteBuffer: (RGBColor | undefined)[];
+    // Contains true for every pixel that is overlapping a non-transparent pixel
+    // in a sprite using the object window.
+    scanlineSpriteMaskBuffer: boolean[];
+    // Contains the priority (0 - 3) of any sprite overlapping a given pixel.
+    scanlineSpritePriorityBuffer: Uint8Array;
     // State for each color effect mode reused by each scanline render function.
     colorEffect: ColorEffectState;
 
@@ -241,6 +252,9 @@ class PPU implements PPUType {
         this.scanlinePriorityBuffer = new Uint8Array(DisplayConstants.hDrawPixels);
         this.scanlineColorBuffer = new Array<RGBColor>(DisplayConstants.hDrawPixels);
         this.scanlineBlendBuffer = new Array<RGBColor>(DisplayConstants.hDrawPixels);
+        this.scanlineSpriteBuffer = new Array<RGBColor>(DisplayConstants.hDrawPixels);
+        this.scanlineSpriteMaskBuffer = new Array<boolean>(DisplayConstants.hDrawPixels);
+        this.scanlineSpritePriorityBuffer = new Uint8Array(DisplayConstants.hDrawPixels);
         this.colorEffect = {
             mode: 0,
             backgroundFirstTargets: [ false, false, false, false ],
@@ -381,7 +395,7 @@ class PPU implements PPUType {
         const displayMode = displayControl & 0x7;
 
         // Reset the scanline priority buffer with lowest priority.
-        this.scanlinePriorityBuffer.fill(3);
+        this.scanlinePriorityBuffer.fill(DisplayConstants.lowestPriority);
 
         // Fill color buffer with background color and clear blend buffer.
         const backgroundColor = this.get15BitColorFromAddress(MemorySegments.PALETTE.start);
@@ -392,9 +406,12 @@ class PPU implements PPUType {
             } else {
                 this.scanlineBlendBuffer[x] = undefined;
             }
+            this.scanlineSpriteBuffer[x] = undefined;
+            this.scanlineSpritePriorityBuffer[x] = DisplayConstants.lowestPriority;
         }
 
         this.updateColorEffect();
+        this.updateSpriteScanlineBuffers(y, displayControl);
 
         switch (displayMode) {
             case 0x0:
@@ -436,7 +453,7 @@ class PPU implements PPUType {
         }
 
         // Render sprites
-        this.renderSpritesScanline(y, displayControl, scanlineControls);
+        this.renderSpritesScanline(scanlineControls);
     }
 
     renderDisplayMode1Scanline(y: number, displayControl: number) {
@@ -460,7 +477,7 @@ class PPU implements PPUType {
         }
 
         // Render sprites
-        this.renderSpritesScanline(y, displayControl, scanlineControls);
+        this.renderSpritesScanline(scanlineControls);
     }
 
     renderDisplayMode2Scanline(y: number, displayControl: number) {
@@ -478,7 +495,7 @@ class PPU implements PPUType {
         }
 
         // Render sprites
-        this.renderSpritesScanline(y, displayControl, scanlineControls);
+        this.renderSpritesScanline(scanlineControls);
     }
 
     renderDisplayMode3Scanline(y: number, displayControl: number) {
@@ -493,7 +510,6 @@ class PPU implements PPUType {
         for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
             const address = baseAddress + (x * bytesPerPixel);
             const rgbColor = this.get15BitColorFromAddress(address);
-            // this.display.setPixel(x, y, rgbColor);
             this.scanlineColorBuffer[x] = rgbColor;
         }
     }
@@ -523,7 +539,6 @@ class PPU implements PPUType {
             // Palette colors occupy 16 bits, so index is multiplied by 2 to get correct byte offset.
             const paletteColorAddress = backgroundPaletteAddress + (paletteIndex * 0x2);
             const rgbColor = this.get15BitColorFromAddress(paletteColorAddress);
-            // this.display.setPixel(x, y, rgbColor);
             this.scanlineColorBuffer[x] = rgbColor;
         }
     }
@@ -837,7 +852,38 @@ class PPU implements PPUType {
         // this.affineReferencePoints[backgroundIndex].y += pd;
     }
 
-    renderSpritesScanline(y: number, displayControl: number, scanlineControls: number[]) {
+    renderSpritesScanline(scanlineControls: number[]) {
+        for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
+            // Skip pixels that do not have objects enabled for the window being drawn
+            if (((scanlineControls[x] >> 4) & 0x1) === 0) {
+                continue;
+            }
+
+            // Previously drawn pixel has higher priority.
+            if (this.scanlinePriorityBuffer[x] < this.scanlineSpritePriorityBuffer[x]) {
+                continue;
+            }
+
+            // Sprite is used by the object window, acting as a mask for lower layers.
+            if (this.scanlineSpriteMaskBuffer[x]) {
+                continue;
+            }
+
+            const spriteColor = this.scanlineSpriteBuffer[x];
+            if (spriteColor) {
+                this.scanlineColorBuffer[x] = spriteColor;
+            }
+
+        }
+    }
+
+    /**
+     * Updates the sprite color, priority, and mask buffers, but does not actually
+     * write the color data to the scanline color buffer. The sprite buffers are used
+     * when determining scanline segments, since some sprits can act as masks for other
+     * objects/backgrounds.
+     */
+    updateSpriteScanlineBuffers(y: number, displayControl: number) {
         // 0 = 2D object tile mapping, 1 = 1D object tile mapping
         const objDimension = (displayControl >> 6) & 0x1;
 
@@ -854,6 +900,7 @@ class PPU implements PPUType {
             const colorMode = (attr0 >> 13) & 0x1; // 0 = 16/16, 1 = 256/1
             const spriteShape = (attr0 >> 14) & 0x3;
             const forceAlphaBlending = gfxMode === 1;
+            const objectWindowMasking = gfxMode === 2;
 
             // Attribute 1 components
             let spriteX = signExtend(attr1 & 0x1FF, 9);
@@ -933,16 +980,6 @@ class PPU implements PPUType {
                     continue;
                 }
 
-                // Skip pixels that do not have objects enabled for the window being drawn
-                if (((scanlineControls[x] >> 4) & 0x1) === 0) {
-                    continue;
-                }
-
-                if (this.scanlinePriorityBuffer[x] < priority) {
-                    // Previously drawn pixel has higher priority.
-                    continue;
-                }
-
                 // Coordinates local to the sprite, (0, 0) = sprite top left
                 let localX = x - xStart - (doubleAffineSize ? size.x >> 2 : 0);
                 let localY = y - spriteY - (doubleAffineSize ? size.y >> 2 : 0);
@@ -977,6 +1014,9 @@ class PPU implements PPUType {
                 if (tileX < 0 || tileX >= tileSize.x || tileY < 0 || tileY >= tileSize.y) {
                     continue;
                 }
+
+                this.scanlineSpritePriorityBuffer[x] = priority;
+                this.scanlineSpriteMaskBuffer[x] = objectWindowMasking;
 
                 // The address containing the first byte of the relevant tile's color data.
                 let tileRowAddress;
@@ -1044,20 +1084,30 @@ class PPU implements PPUType {
                             break;
                     }
 
-                    this.scanlineColorBuffer[x] = pixelColor;
-                    this.scanlinePriorityBuffer[x] = priority;
+                    this.scanlineSpriteBuffer[x] = pixelColor;
                 }
-
             }
         }
     }
 
-    getScanlineSegments(y: number, displayControl: number) : ScanlineSegment[] {
+    /**
+     * Creates an array with an index for every x coordinate in a given scanline. The
+     * value at each index is a number containing the bits controlling which backgrounds
+     * and if objects are enabled for that pixel. This resolves any background/object
+     * overlapping that may occur when multiple windows are enabled.
+     *
+     * If no windows are enabled, each index will have bits allowing for all backgrounds
+     * and objects, although the logic specific to each display mode and the display control
+     * registers may further restrict what gets rendered.
+     */
+    getScanlineControls(y: number, displayControl: number): number[] {
         const window0Enabled = (displayControl >> 13) & 0x1;
         const window1Enabled = (displayControl >> 14) & 0x1;
         const windowObjEnabled = (displayControl >> 15) & 0x1;
         const windowEnabled = window0Enabled | window1Enabled | windowObjEnabled;
 
+        // Create ordered list of segments within scanline.
+        const scanlineSegments = [];
         if (windowEnabled) {
             const win0Horizontal = getCachedIORegister(DisplayRegisters.WIN0H);
             const win1Horizontal = getCachedIORegister(DisplayRegisters.WIN1H);
@@ -1080,43 +1130,47 @@ class PPU implements PPUType {
                 top: (win1Vertical >> 8) & 0xFF,
             };
 
-            const ranges = [];
-
             if (window0Enabled && window0Edges.top <= y && window0Edges.bottom >= y) {
-                ranges.push({ min: window0Edges.left, max: window0Edges.right, controls: winIn & 0x3F });
+                scanlineSegments.push({ min: window0Edges.left, max: window0Edges.right, controls: winIn & 0x3F });
             }
 
             if (window1Enabled && window1Edges.top <= y && window1Edges.bottom >= y) {
-                ranges.push({ min: window1Edges.left, max: window1Edges.right, controls: (winIn >> 8) & 0x3F });
+                scanlineSegments.push({ min: window1Edges.left, max: window1Edges.right, controls: (winIn >> 8) & 0x3F });
             }
 
             if (windowObjEnabled) {
-                // TODO: implement OBJ window. Sprites should act as mask for other layers?
-                // console.warn(`OBJ window not implemented, ignoring.`);
+                let currentStart = 0;
+                let currentX = 0;
+                const objectWindowControls = (winOut >> 8) & 0x3F;
+
+                while (currentX < DisplayConstants.hDrawPixels) {
+                    if (this.scanlineSpriteBuffer[currentX] === undefined) {
+                        // Pixel at this x coordinate is transparent, so not included in the window segments.
+                        // Save the previous segment, if any.
+                        if (currentStart < currentX) {
+                            scanlineSegments.push({ min: currentStart, max: currentX - 1, controls: objectWindowControls });
+                        }
+                        currentStart = currentX + 1;
+                    }
+                    currentX++;
+                }
+
+                // Add the segment extending to the end of scanline, if present.
+                if (this.scanlineSpriteBuffer[currentStart] !== undefined) {
+                    scanlineSegments.push({ min: currentStart, max: currentX - 1, controls: objectWindowControls });
+                }
+
             }
 
             // Full range covering the scanline for the background
-            ranges.push({ min: 0, max: DisplayConstants.hDrawPixels - 1, controls: winOut & 0x3F });
-
-            return ranges;
+            scanlineSegments.push({ min: 0, max: DisplayConstants.hDrawPixels - 1, controls: winOut & 0x3F });
         } else {
             // Range that covers full screen width and enables all controls.
-            return [ {min: 0, max: DisplayConstants.hDrawPixels - 1, controls: 0x3F} ];
+            scanlineSegments.push({min: 0, max: DisplayConstants.hDrawPixels - 1, controls: 0x3F});
         }
-    }
 
-    /**
-     * Creates an array with an index for every x coordinate in a given scanline. The
-     * value at each index is a number containing the bits controlling which backgrounds
-     * and if objects are enabled for that pixel. This resolves any background/object
-     * overlapping that may occur when multiple windows are enabled.
-     *
-     * If no windows are enabled, each index will have bits allowing for all backgrounds
-     * and objects, although the logic specific to each display mode and the display control
-     * registers may further restrict what gets rendered.
-     */
-    getScanlineControls(y: number, displayControl: number): number[] {
-        const scanlineSegments = this.getScanlineSegments(y, displayControl);
+        // Consolidate segments into a single array, using array index as priority indicator for overlapping
+        // segments.
         const scanlineControls = new Array(DisplayConstants.hDrawPixels).fill(scanlineSegments.length - 1);
         for (let x = 0; x < DisplayConstants.hDrawPixels; x++) {
             for (let i = 0; i < scanlineSegments.length; i++) {
