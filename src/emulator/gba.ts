@@ -5,6 +5,7 @@ import { resetIOCache } from "./ioCache";
 import { Keypad } from "./keypad";
 import { Memory } from "./memory";
 import { PPU } from "./ppu";
+import { updateTimers } from "./timers";
 import { UI } from "./ui";
 
 interface GBAType {
@@ -58,6 +59,7 @@ class GBA implements GBAType {
         this.cpu.step();
         this.ppu.step(this.cpu.cycles);
         executeDMAs(this.cpu, this.ppu.stepFlags);
+        updateTimers(this.cpu);
     }
 
     runFrame() {

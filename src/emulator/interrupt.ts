@@ -131,4 +131,4 @@ const handleInterruptAcknowledge8 = (cpu: CPU, address: number, value: number) :
     return false;
 }
 
-export { handleInterrupts, requestInterrupt, handleInterruptAcknowledge8, handleInterruptAcknowledge16, InterruptRegisters }
+export { handleInterrupts, requestInterrupt, handleInterruptAcknowledge8, handleInterruptAcknowledge16, InterruptRegisters, Interrupt }

@@ -1,5 +1,6 @@
 import { handleInterruptAcknowledge8, handleInterruptAcknowledge16 } from "./interrupt";
 import { updateIOCache16, updateIOCache32, updateIOCache8 } from "./ioCache";
+import { handleTimerCounterWrite16 } from "./timers";
 
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'PALETTE' | 'VRAM' | 'OAM' | 'ROM_WS0' | 'ROM_WS1' | 'ROM_WS2' | 'SRAM';
 type MemoryAccess = { nSeq16: number, seq16: number, nSeq32: number, seq32: number };
@@ -148,6 +149,8 @@ class Memory implements MemoryType {
 
         // TODO: should a 32 bit write handle acknowledging interrupts?
 
+        // TODO: handle writes to timer counter register
+
         const cachedWrite = updateIOCache32(address, value);
 
         if (!cachedWrite) {
@@ -181,6 +184,12 @@ class Memory implements MemoryType {
             return waitStateCycles[segment].nSeq32;
         }
 
+        // Check if writing to timer counter register, and return early if so since the
+        // written value is saved to an internal register, not memory.
+        if (!ioRegisterWrite && handleTimerCounterWrite16(address, value)) {
+            return waitStateCycles[segment].nSeq16;
+        }
+
         const cachedWrite = updateIOCache16(address, value);
 
         if (!cachedWrite) {
@@ -211,6 +220,8 @@ class Memory implements MemoryType {
         if (checkForInterruptAck && handleInterruptAcknowledge8(this.cpu, address, value)) {
             return waitStateCycles[segment].nSeq32;
         }
+
+        // TODO: handle writes to timer counter register
 
         const cachedWrite = updateIOCache8(address, value);
 
