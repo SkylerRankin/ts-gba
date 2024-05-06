@@ -32,6 +32,22 @@ const getInstructionTableLines = (baseAddress: number, length: number, gba: GBA)
     return lines;
 }
 
+const getMemoryBytes = (gba: GBA, startAddress: number) : any => {
+    let rows = [];
+    startAddress &= 0xFFFFFFF0;
+    for (let i = 0; i < 10; i++) {
+        const bytes = [];
+        for (let j = 0; j < 16; j++) {
+            bytes.push(gba.memory.getInt8(startAddress + i * 16 + j).value);
+        }
+        rows.push({
+            address: startAddress + i * 16,
+            bytes,
+        });
+    }
+    return rows;
+}
+
 const getRegisterText = (gba: GBA) => {
     const text: {[key: string]: string} = {};
     for (let i = 0; i <= 15; i++) {
@@ -208,6 +224,7 @@ const get15BitColorFromAddress = (gba: GBA, address: number) : any => {
 
 const UI = {
     getInstructionTableLines,
+    getMemoryBytes,
     getRegisterText,
     getFrameInfo,
     getPaletteColors,

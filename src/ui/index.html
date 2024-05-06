@@ -33,14 +33,15 @@
             }
             #registers_table { width: 100%; }
             #registers_table, #registers_table > tr, #registers_table > tr > td { border-collapse: collapse; }
-            #instruction_jump_container { display: flex; margin-bottom: 10px; }
-            #instruction_jump_container > div { flex-grow: 1; margin-left: 20px; text-align: center; }
-            #instruction_jump_container > input { border: solid 1px #969696; border-radius: 3px; }
+            #instruction_jump_container, #memory_jump_container { display: flex; margin-bottom: 10px; }
+            #instruction_jump_container > div, #memory_jump_container > div { flex-grow: 1; margin-left: 20px; text-align: center; }
+            #instruction_jump_container > input, #memory_jump_container > input { border: solid 1px #969696; border-radius: 3px; }
             #fps_container td { padding-right: 20px; }
             #palette_canvas { margin: auto; display: block; }
             #charblock_canvas { margin: auto; display: block; }
             #interrupt_table { width: 100%; }
             #interrupt_table > tbody > tr > td:nth-child(odd) { width: 20%; }
+            #memory_table { border-spacing: 0px; width: 100%; overscroll-behavior: contain; }
 
             .hidden { display: none; }
             .tab {
@@ -134,6 +135,8 @@
                 color: black;
                 font-weight: bold;
             }
+            .memory_table_row:hover { background-color: #c9c9c9; }
+            .memory_table_cell { width: 20px; }
 
 
         </style>
@@ -151,6 +154,12 @@
                 lastClickedRowAddress: 0,
                 lastClickedRowTime: 0,
                 doubleClickMs: 400,
+            };
+
+            const memoryTableState = {
+                startAddress: 0x0,
+                checkScroll: true,
+                addressHistory: [0x0],
             };
 
             const tileState = {
@@ -251,6 +260,7 @@
                 // Focus instruction list on PC on pause
                 instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
                 updateInstructionList();
+                updateMemoryTable();
                 updateRegisters();
                 updateColorPalettes();
                 updateTiles();
@@ -274,6 +284,7 @@
                 instructionTableState.activeAddress = gba.cpu.getGeneralRegister(15) - gba.cpu.instructionSize * 2;
                 instructionTableState.pcOffset = 0;
                 updateInstructionList();
+                updateMemoryTable();
                 updateRegisters();
                 updateColorPalettes();
                 updateTiles();
@@ -353,6 +364,45 @@
                     tr.appendChild(address);
                     tr.appendChild(instruction);
                     tr.appendChild(text);
+                    table.appendChild(tr);
+                });
+            }
+
+            const updateMemoryTable = () => {
+                const bytes = window.UI.getMemoryBytes(gba, memoryTableState.startAddress);
+                const table = document.getElementById("memory_table");
+                table.replaceChildren([]);
+
+                const columnRow = document.createElement("tr");
+                columnRow.appendChild(document.createElement("td"));
+                for (let i = 0; i < 16; i++) {
+                    const td = document.createElement("td");
+                    td.innerHTML = i.toString(16).padStart(2, '0');
+                    columnRow.appendChild(td);
+                }
+                table.appendChild(columnRow);
+
+                bytes.forEach((row, i) => {
+                    const tr = document.createElement("tr");
+                    tr.classList.add("memory_table_row");
+
+                    const address = document.createElement("td");
+                    address.innerHTML = `0x${(row.address).toString(16).padStart(8, '0')}`;
+                    address.style.paddingRight = "10px";
+                    tr.appendChild(address);
+
+                    row.bytes.forEach((byte, j) => {
+                        const text = document.createElement("td");
+                        if (byte !== undefined) {
+                            text.innerHTML = byte.toString(16).padStart(2, '0');
+                        } else {
+                            text.innerHTML = "xx";
+                        }
+                        text.classList.add("memory_table_cell");
+
+                        tr.appendChild(text);
+                    });
+
                     table.appendChild(tr);
                 });
             }
@@ -530,6 +580,17 @@
                         instructionTableState.checkScroll = true;
                     });
                     instructionTableState.checkScroll = false;
+                    event.preventDefault();
+                });
+                document.getElementById("memory_table").addEventListener("wheel", (event) => {
+                    if (!memoryTableState.checkScroll) return;
+                    memoryTableState.startAddress = Math.max(0, memoryTableState.startAddress + 16 * Math.sign(event.wheelDeltaY) * -1);
+                    requestAnimationFrame(() => {
+                        updateMemoryTable();
+                        memoryTableState.checkScroll = true;
+                    });
+                    memoryTableState.checkScroll = false;
+                    event.preventDefault();
                 });
 
                 document.getElementById("debug_reset_button").addEventListener("click", () => { onReset(); });
@@ -547,6 +608,25 @@
                 document.getElementById("instruction_pc_button").addEventListener("click", () => {
                     instructionTableState.pcOffset = 0;
                     updateInstructionList();
+                });
+                document.getElementById("memory_jump_button").addEventListener("click", () => {
+                    let addressText = document.getElementById("memory_jump_input").value;
+                    if (!addressText.startsWith("0x")) addressText = "0x" + addressText;
+                    const address = Number.parseInt(addressText);
+                    if (address !== memoryTableState.startAddress) {
+                        memoryTableState.addressHistory.push(address);
+                        memoryTableState.startAddress = address;
+                        updateMemoryTable();
+                    }
+                });
+                document.getElementById("memory_back_button").addEventListener("click", () => {
+                    if (memoryTableState.addressHistory.length > 1) {
+                        memoryTableState.addressHistory.pop();
+                        const address = memoryTableState.addressHistory[memoryTableState.addressHistory.length - 1];
+                        memoryTableState.startAddress = address;
+                        document.getElementById("memory_jump_input").value = `${address.toString(16).padStart(8, '0')}`;
+                        updateMemoryTable();
+                    }
                 });
 
                 setPPUListeners();
@@ -730,6 +810,15 @@
                                     <li>Current PC is highlighted in blue</li>
                                     <li>All instructions in table are decoded according to current operating state, may not be correct</li>
                                 </ul>
+                            </div>
+                            <div class="outline_container">
+                                <div style="margin-bottom: 10px;">Memory</div>
+                                <table id="memory_table"></table>
+                            </div>
+                            <div id="memory_jump_container">
+                                <input id="memory_jump_input" type="text" value="00000000">
+                                <div class="button" id="memory_jump_button">Jump</div>
+                                <div class="button" id="memory_back_button">Back</div>
                             </div>
                             <div class="outline_container">
                                 <div style="margin-bottom: 10px;">Interrupts</div>

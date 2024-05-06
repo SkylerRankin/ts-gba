@@ -1,3 +1,4 @@
+import { FlashMemory } from "./flash";
 import { handleInterruptAcknowledge8, handleInterruptAcknowledge16 } from "./interrupt";
 import { updateIOCache16, updateIOCache32, updateIOCache8 } from "./ioCache";
 import { handleTimerCounterWrite16 } from "./timers";
@@ -66,8 +67,10 @@ class Memory implements MemoryType {
         'SRAM': new Uint8Array(segments.SRAM.end - segments.SRAM.start + 1),
     };
     cpu: any;
+    flashMemory: FlashMemory;
 
     constructor() {
+        this.flashMemory = new FlashMemory();
         this.reset();
         this.cpu = null;
     }
@@ -76,6 +79,7 @@ class Memory implements MemoryType {
         for (const block in this.memoryBlocks) {
             this.memoryBlocks[block as MemorySegment].fill(0);
         }
+        this.flashMemory.reset();
     }
 
     /**
@@ -128,8 +132,15 @@ class Memory implements MemoryType {
     getInt8 = (address: number): MemoryReadResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
-        address = address - segments[segment].start;
-        let result = this.memoryBlocks[segment][address];
+
+        let result;
+        if (segment === "SRAM") {
+            result = this.flashMemory.read8(address);
+        } else {
+            address = address - segments[segment].start;
+            result = this.memoryBlocks[segment][address];
+        }
+
         return { value: result, cycles: waitStateCycles[segment].nSeq16 };
     }
 
@@ -138,7 +149,7 @@ class Memory implements MemoryType {
         const segment = this.getSegment(address);
 
         // Ignore writes to read only sections
-        if (segment === 'BIOS' || segment === 'ROM_WS0' || segment === 'ROM_WS1' || segment === 'ROM_WS2') {
+        if (segment === 'BIOS') {
             return 0;
         }
 
@@ -169,7 +180,7 @@ class Memory implements MemoryType {
         const segment = this.getSegment(address);
 
         // Ignore writes to read only sections
-        if (segment === 'BIOS' || segment === 'ROM_WS0' || segment === 'ROM_WS1' || segment === 'ROM_WS2') {
+        if (segment === 'BIOS') {
             return 0;
         }
 
@@ -206,8 +217,13 @@ class Memory implements MemoryType {
         const segment = this.getSegment(address);
 
         // Ignore writes to read only sections
-        if (segment === 'BIOS' || segment === 'ROM_WS0' || segment === 'ROM_WS1' || segment === 'ROM_WS2') {
+        if (segment === 'BIOS') {
             return 0;
+        }
+
+        if (segment === 'SRAM') {
+            this.flashMemory.write8(address, value);
+            return waitStateCycles[segment].nSeq32;
         }
 
         if (!ioRegisterWrite && this.ignoreWriteAttempt(address)) {
