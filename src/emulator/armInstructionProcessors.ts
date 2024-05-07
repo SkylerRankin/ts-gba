@@ -1212,7 +1212,7 @@ const processLDM = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     if (loadPC) {
         const {value, cycles} = cpu.memory.getInt32(address);
         const mask = cpu.getStatusRegisterFlag('CPSR', 't') === 1 ? 0xFFFFFFFE : 0xFFFFFFFC;
-        const newPC = value & mask;
+        const newPC = (value & mask) + cpu.instructionSize * 2;
         cpu.setGeneralRegister(Reg.PC, newPC);
         cpu.cycles += cycles;
         address += 4;
