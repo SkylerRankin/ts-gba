@@ -190,7 +190,7 @@ class CPU implements CPUType {
         this.bigEndian = false;
         this.setModeBits(OperatingModeCodes.sys);
         this.setStatusRegisterFlag('t', 0);
-        this.bootBIOS = false;
+        this.bootBIOS = true;
         this.breakpoints.clear();
 
         if (this.bootBIOS) {

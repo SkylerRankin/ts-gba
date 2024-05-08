@@ -222,6 +222,66 @@ const get15BitColorFromAddress = (gba: GBA, address: number) : any => {
     };
 }
 
+const getROMInfo = (rom: Uint8Array) : any => {
+    const entryPoint =
+        (rom[0] << 0) |
+        (rom[1] << 8) |
+        (rom[2] << 16) |
+        (rom[3] << 24);
+    const entryPointString = (entryPoint >>> 0).toString(16);
+
+    let title = "";
+    for (let i = 0xA0; i < 0xAC; i++) {
+        title += String.fromCharCode(rom[i]);
+    }
+
+    let gameCode = "";
+    for (let i = 0xAC; i < 0xB0; i++) {
+        gameCode += String.fromCharCode(rom[i]);
+    }
+
+    let makerCode = "";
+    for (let i = 0xB0; i < 0xB2; i++) {
+        makerCode += String.fromCharCode(rom[i]);
+    }
+
+    const checksum = rom[0xBD];
+
+    return {
+        entryPoint: entryPointString,
+        title,
+        gameCode,
+        makerCode,
+        checksum,
+        backupID: "????"
+    };
+}
+
+const getBIOSInfo = (bios: Uint8Array) : any => {
+    let checksum = 0;
+    for (let i = 0; i < bios.length; i+=4) {
+        const int32 =
+            (bios[i + 0] << 0) |
+            (bios[i + 1] << 8) |
+            (bios[i + 2] << 16) |
+            (bios[i + 3] << 24);
+            checksum += int32;
+    }
+    checksum >>>= 0;
+
+    let biosType = "Unrecognized bios file";
+    switch (checksum) {
+        case 0xBAAE187F:
+            biosType = "Official Nintendo BIOS"
+            break;
+        case 0x4A2228F:
+            biosType = "Normmatt Open Source BIOS";
+            break;
+    }
+
+    return { checksum, biosType };
+}
+
 const UI = {
     getInstructionTableLines,
     getMemoryBytes,
@@ -231,6 +291,8 @@ const UI = {
     getTiles,
     getDisplayControl,
     getInterruptInfo,
+    getROMInfo,
+    getBIOSInfo,
 };
 
 export { UI }

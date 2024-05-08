@@ -212,6 +212,7 @@
                     return;
                 }
                 const fileReader = new FileReader();
+                let fileInfo = event.files[0];
                 fileReader.onloadend = event => {
                     if (fileReader.result !== null) {
                         const buffer = new Uint8Array(fileReader.result);
@@ -219,6 +220,7 @@
                         gba.loadROM(buffer);
                         romLoaded = true;
                         onPause();
+                        updateROMInfo(fileInfo, buffer);
                     }
                 };
                 fileReader.readAsArrayBuffer(event.files[0]);
@@ -230,10 +232,12 @@
                     return;
                 }
                 const fileReader = new FileReader();
+                let fileInfo = event.files[0];
                 fileReader.onloadend = event => {
                     if (fileReader.result !== null) {
                         const buffer = new Uint8Array(fileReader.result);
                         gba.loadBIOS(buffer);
+                        updateBIOSInfo(fileInfo, buffer);
                     }
                 };
                 fileReader.readAsArrayBuffer(event.files[0]);
@@ -275,6 +279,10 @@
                 document.getElementById("cpu_info_container").classList.remove("hidden");
                 document.getElementById("ppu_info_warning").classList.add("hidden");
                 document.getElementById("ppu_info_container").classList.remove("hidden");
+                document.getElementById("rom_info").classList.add("hidden");
+                document.getElementById("no_rom_loaded_warning").classList.remove("hidden");
+                document.getElementById("bios_info").classList.add("hidden");
+                document.getElementById("no_bios_loaded_warning").classList.remove("hidden");
                 romLoaded = false;
                 clearTimeout(fpsTimer);
             }
@@ -300,6 +308,30 @@
                     gba.cpu.setBreakpoint(address);
                 }
                 updateInstructionList();
+            }
+
+            const updateROMInfo = (fileInfo, buffer) => {
+                document.getElementById("no_rom_loaded_warning").classList.add("hidden");
+                document.getElementById("rom_info").classList.remove("hidden");
+                document.getElementById("rom_file_string").innerHTML = `${fileInfo.name}, ${Math.floor(fileInfo.size / 1024).toLocaleString()} KB`;
+
+                const info = window.UI.getROMInfo(buffer);
+                document.getElementById("rom_title").innerHTML = info.title;
+                document.getElementById("rom_code").innerHTML = info.gameCode;
+                document.getElementById("rom_maker").innerHTML = info.makerCode;
+                document.getElementById("rom_entry_point").innerHTML = info.entryPoint.toUpperCase();
+                document.getElementById("rom_checksum").innerHTML = info.checksum.toString(16).toUpperCase();
+                document.getElementById("rom_backup_id").innerHTML = info.backupID;
+            }
+
+            const updateBIOSInfo = (fileInfo, buffer) => {
+                document.getElementById("no_bios_loaded_warning").classList.add("hidden");
+                document.getElementById("bios_info").classList.remove("hidden");
+                document.getElementById("bios_file_string").innerHTML = `${fileInfo.name}, ${Math.floor(fileInfo.size / 1024).toLocaleString()} KB`;
+
+                const info = window.UI.getBIOSInfo(buffer);
+                document.getElementById("bios_checksum").innerHTML = (info.checksum >>> 0).toString(16).toUpperCase();
+                document.getElementById("bios_type").innerHTML = info.biosType;
             }
 
             const updateRegisters = () => {
@@ -702,22 +734,56 @@
                         <div id="fps_container">
                             <table>
                                 <tr>
-                                    <td>Mean frames per second</td>
+                                    <td>Frames per second</td>
                                     <td id="fps_value">0</td>
                                 </tr>
                                 <tr>
-                                    <td>Mean frame time (ms)</td>
+                                    <td>Frame time (ms)</td>
                                     <td id="frame_time_value">0</td>
                                 </tr>
                                 <tr>
-                                    <td>Elapsed cycles per frame</td>
+                                    <td>Cycles per frame</td>
                                     <td id="cycles_value">0</td>
                                 </tr>
                                 <tr>
-                                    <td>Elapsed steps per frame</td>
+                                    <td>Steps per frame</td>
                                     <td id="steps_value">0</td>
                                 </tr>
                             </table>
+                        </div>
+                        <div class="outline_container">
+                            <div style="margin-bottom: 10px;">ROM</div>
+                            <div id="no_rom_loaded_warning">No ROM loaded</div>
+                            <div id="rom_info" class="hidden">
+                                <div id="rom_file_string" style="margin-bottom: 10px"></div>
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tbody>
+                                        <tr>
+                                            <td style="width: 70px;">Title</td>
+                                            <td id="rom_title"></td>
+                                            <td style="width: 70px;">Code</td>
+                                            <td id="rom_code"></td>
+                                            <td style="width: 70px;">Entry Point</td>
+                                            <td id="rom_entry_point"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Checksum</td>
+                                            <td id="rom_checksum"></td>
+                                            <td>Maker</td>
+                                            <td id="rom_maker"></td>
+                                            <td>Backup ID</td>
+                                            <td id="rom_backup_id"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div style="margin: 20px 0px 10px 0px;">BIOS</div>
+                            <div id="no_bios_loaded_warning">No BIOS loaded</div>
+                            <div id="bios_info" class="hidden">
+                                <div id="bios_file_string" style="margin-bottom: 10px"></div>
+                                <div>Checksum <span id="bios_checksum" style="margin-left: 20px;"></span></div>
+                                <div id="bios_type"></div>
+                            </div>
                         </div>
                     </div>
                     <div id="tab1_container" class="hidden">
