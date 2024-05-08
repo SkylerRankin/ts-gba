@@ -1,3 +1,4 @@
+import { CPU, Reg } from "./cpu";
 import { FlashMemory } from "./flash";
 import { handleInterruptAcknowledge8, handleInterruptAcknowledge16 } from "./interrupt";
 import { updateIOCache16, updateIOCache32, updateIOCache8 } from "./ioCache";
@@ -87,7 +88,7 @@ class Memory implements MemoryType {
      * of the upper bounds of the segment.
      */
     getSegment = (address: number): MemorySegment => {
-        const segmentIndex = Math.max((address >> 24) - 1, 0);
+        const segmentIndex = Math.max((address >>> 24) - 1, 0);
         return segmentsByIndex[segmentIndex];
     }
 
@@ -106,6 +107,12 @@ class Memory implements MemoryType {
     getInt32 = (address: number): MemoryReadResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
+        if (segment === undefined) {
+            return this.getInvalidMemory32();
+        } else if (segment === "BIOS" && this.cpu.getGeneralRegister(Reg.PC) - this.cpu.instructionSize * 2 > 0x3FFF) {
+            return this.getBIOS32();
+        }
+
         address = address - segments[segment].start;
 
         let result = 0;
@@ -120,6 +127,12 @@ class Memory implements MemoryType {
     getInt16 = (address: number): MemoryReadResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
+        if (segment === undefined) {
+            return this.getInvalidMemory16();
+        } else if (segment === "BIOS" && this.cpu.getGeneralRegister(Reg.PC) - this.cpu.instructionSize * 2 > 0x3FFF) {
+            return this.getBIOS16();
+        }
+
         address = address - segments[segment].start;
         let result = 0;
 
@@ -132,6 +145,11 @@ class Memory implements MemoryType {
     getInt8 = (address: number): MemoryReadResult => {
         address = this.resolveMirroredAddress(address);
         const segment = this.getSegment(address);
+        if (segment === undefined) {
+            return this.getInvalidMemory8();
+        } else if (segment === "BIOS" && this.cpu.getGeneralRegister(Reg.PC) - this.cpu.instructionSize * 2 > 0x3FFF) {
+            return this.getBIOS8();
+        }
 
         let result;
         if (segment === "SRAM") {
@@ -298,6 +316,93 @@ class Memory implements MemoryType {
 
     get32BitNonSeqWaitCycles = (address: number): number => {
         return 1 + waitStateCycles[this.getSegment(address)].nSeq32;
+    }
+
+    /**
+     * Instructions that attempt to read from unused memory locations will get the most
+     * recently pre-fetched instruction as the read value.
+     */
+    getInvalidMemory32 = () : MemoryReadResult => {
+        const cpu = (this.cpu as CPU);
+        const pc = cpu.getGeneralRegister(Reg.PC);
+        let value = 0;
+        if (cpu.operatingState === "ARM") {
+            value = this.getInt32(pc).value;
+        } else {
+            const segment = this.getSegment(pc);
+            switch (segment) {
+                case "WRAM_O":
+                case "PALETTE":
+                case "VRAM":
+                case "ROM_WS0":
+                case "ROM_WS1":
+                case "ROM_WS2":
+                    value = (this.getInt16(pc).value << 16) | this.getInt16(pc).value;
+                    break;
+                case "BIOS":
+                case "OAM":
+                    if ((pc & 0x3) === 0) {
+                        // 4 byte aligned address
+                        value = (this.getInt16(pc + 2).value << 16) | this.getInt16(pc).value;
+                    } else {
+                        value = (this.getInt16(pc).value << 16) | this.getInt16(pc - 2).value;
+                    }
+                    break;
+                case "WRAM_I":
+                    if ((pc & 0x3) === 0) {
+                        // 4 byte aligned address
+                        value = (this.getInt16(pc - 2).value << 16) | this.getInt16(pc).value;
+                    } else {
+                        value = (this.getInt16(pc).value << 16) | this.getInt16(pc - 2).value;
+                    }
+                    break;
+                default:
+                    throw Error(`Program executing in unexpected segment ${segment}.`);
+            }
+        }
+        return { value: value, cycles: this.get32BitNonSeqWaitCycles(pc) };
+    }
+
+    getInvalidMemory16 = () : MemoryReadResult => {
+        const {value, cycles} = this.getInvalidMemory32();
+        return { value: value & 0xFFFF, cycles };
+    }
+
+    getInvalidMemory8 = () : MemoryReadResult => {
+        const {value, cycles} = this.getInvalidMemory32();
+        return { value: value & 0xFF, cycles };
+    }
+
+    /**
+     * Reads to the BIOS segment are restricted to only instructions that are executing
+     * within the BIOS. Other instructions will receive the last fetched instruction in
+     * the BIOS segment.
+     */
+    getBIOS32 = () : MemoryReadResult => {
+        const pc = this.cpu.lastBIOSPC;
+        const address = pc - segments["BIOS"].start;
+        let value = 0;
+        value |= this.memoryBlocks["BIOS"][address + 0] << (0 * 8);
+        value |= this.memoryBlocks["BIOS"][address + 1] << (1 * 8);
+        value |= this.memoryBlocks["BIOS"][address + 2] << (2 * 8);
+        value |= this.memoryBlocks["BIOS"][address + 3] << (3 * 8);
+        return { value: value, cycles: this.get32BitNonSeqWaitCycles(pc) }
+    }
+
+    getBIOS16 = () : MemoryReadResult => {
+        const pc = this.cpu.lastBIOSPC;
+        const address = pc - segments["BIOS"].start;
+        let value = 0;
+        value |= this.memoryBlocks["BIOS"][address + 0] << (0 * 8);
+        value |= this.memoryBlocks["BIOS"][address + 1] << (1 * 8);
+        return { value: value & 0xFFFF, cycles: this.get32BitNonSeqWaitCycles(pc) }
+    }
+
+    getBIOS8 = () : MemoryReadResult => {
+        const pc = this.cpu.lastBIOSPC;
+        const address = pc - segments["BIOS"].start;
+        const value = this.memoryBlocks["BIOS"][address];
+        return { value: value & 0xFF, cycles: this.get32BitNonSeqWaitCycles(pc) }
     }
 
 }

@@ -107,6 +107,9 @@ class CPU implements CPUType {
     historyEnabled = false;
     instructionSize = 4;
     breakpoints = new Set<number>();
+    // Memory reads to BIOS must keep track of the mostly recently fetched BIOS instruction, so
+    // the PC of that instruction is saved and updated here.
+    lastBIOSPC = -1;
     breakpointCallback = () => {};
 
     constructor(memory: Memory) {
@@ -133,6 +136,11 @@ class CPU implements CPUType {
 
     step() : void {
         const pc = this.getGeneralRegister(Reg.PC);
+
+        // Update BIOS PC tracker if executing within the BIOS.
+        if (pc >= 0 && pc <= 0x3FFF) {
+            this.lastBIOSPC = pc;
+        }
 
         // PC points to the instruction after the next instruction, so we subtract 8 bytes.
         const instruction = this.operatingState === 'ARM' ?
