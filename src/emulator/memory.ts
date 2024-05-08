@@ -6,6 +6,8 @@ import { handleTimerCounterWrite16 } from "./timers";
 
 type MemorySegment = 'BIOS' | 'WRAM_O' | 'WRAM_I' | 'IO' | 'PALETTE' | 'VRAM' | 'OAM' | 'ROM_WS0' | 'ROM_WS1' | 'ROM_WS2' | 'SRAM';
 type MemoryAccess = { nSeq16: number, seq16: number, nSeq32: number, seq32: number };
+type MemoryBackupType = 'Invalid' | 'EEPROM' | 'SRAM' | 'FLASH' | 'FLASH512' | 'FLASH1M';
+type MemoryBackup = { type: MemoryBackupType, sizeKB: number, idString: string };
 const segmentsByIndex: MemorySegment[] = ['BIOS', 'WRAM_O', 'WRAM_I', 'IO', 'PALETTE', 'VRAM', 'OAM', 'ROM_WS0', 'ROM_WS0', 'ROM_WS1', 'ROM_WS1', 'ROM_WS2', 'ROM_WS2', 'SRAM'];
 const segments: {[key in MemorySegment]: {[key in 'start' | 'end']: number}} = {
     BIOS:     { start: 0x00000000, end: 0x00003FFF },
@@ -69,11 +71,13 @@ class Memory implements MemoryType {
     };
     cpu: any;
     flashMemory: FlashMemory;
+    backup: MemoryBackup;
 
     constructor() {
         this.flashMemory = new FlashMemory();
         this.reset();
         this.cpu = null;
+        this.backup = { type: 'Invalid', sizeKB: 0, idString: "" };
     }
 
     reset = (): void => {
@@ -81,6 +85,7 @@ class Memory implements MemoryType {
             this.memoryBlocks[block as MemorySegment].fill(0);
         }
         this.flashMemory.reset();
+        this.backup = { type: 'Invalid', sizeKB: 0, idString: "" };
     }
 
     /**
@@ -294,6 +299,7 @@ class Memory implements MemoryType {
             this.memoryBlocks.ROM_WS1[i] = rom[i];
             this.memoryBlocks.ROM_WS2[i] = rom[i];
         }
+        this.loadBackupID();
     }
 
     loadBIOS = (bios: Uint8Array): void => {
@@ -403,6 +409,81 @@ class Memory implements MemoryType {
         const address = pc - segments["BIOS"].start;
         const value = this.memoryBlocks["BIOS"][address];
         return { value: value & 0xFF, cycles: this.get32BitNonSeqWaitCycles(pc) }
+    }
+
+    /**
+     * The cartridge backup ID is stored as a word aligned ASCII string somewhere in the ROM
+     * memory segment. The string is a multiple of 4 bytes and zero padded.
+     */
+    loadBackupID = () : void => {
+        const validIDs = [
+            "EEPROM_V",
+            "SRAM_V",
+            "FLASH_V",
+            "FLASH512_V",
+            "FLASH1M_V",
+        ];
+
+        let currentID = "";
+        let i = 0;
+        for (; i < this.memoryBlocks["ROM_WS0"].length; i++) {
+            const character = String.fromCharCode(this.memoryBlocks["ROM_WS0"][i]);
+            let foundMatch = false;
+            let foundPrefix = false;
+            for (let j = 0; j < validIDs.length; j++) {
+                if (validIDs[j] === currentID + character) {
+                    foundMatch = true;
+                    break;
+                } else if (validIDs[j].startsWith(currentID + character)) {
+                    foundPrefix = true;
+                    break;
+                }
+            }
+
+            if (foundMatch) {
+                currentID = currentID + character;
+                break;
+            } else if (foundPrefix) {
+                currentID = currentID + character;
+            } else {
+                currentID = character;
+            }
+        }
+
+        switch (currentID) {
+            case "EEPROM_V":
+                this.backup.type = "EEPROM";
+                this.backup.sizeKB = 8;
+                break;
+            case "SRAM_V":
+                this.backup.type = "SRAM";
+                this.backup.sizeKB = 32;
+                break;
+            case "FLASH_V":
+            case "FLASH512_V":
+                this.backup.type = "FLASH";
+                this.backup.sizeKB = 64;
+                break;
+            case "FLASH1M_V":
+                this.backup.type = "FLASH";
+                this.backup.sizeKB = 128;
+                break;
+            default:
+                this.backup.type = "Invalid";
+                this.backup.sizeKB = 0;
+        }
+
+        // The three characters after id are version numbers.
+        if (validIDs.includes(currentID)) {
+            for (let j = 1; j <= 3; j++) {
+                currentID += String.fromCharCode(this.memoryBlocks["ROM_WS0"][i + j]);
+            }
+            this.backup.idString = currentID;
+        }
+
+        if (this.backup.type !== "FLASH" && this.backup.sizeKB !== 128) {
+            throw Error(`Unsupported backup chip: ${this.backup.idString}. Only 128 KB Flash storage is implemented.`);
+        }
     }
 
 }

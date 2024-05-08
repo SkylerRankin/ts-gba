@@ -315,7 +315,7 @@
                 document.getElementById("rom_info").classList.remove("hidden");
                 document.getElementById("rom_file_string").innerHTML = `${fileInfo.name}, ${Math.floor(fileInfo.size / 1024).toLocaleString()} KB`;
 
-                const info = window.UI.getROMInfo(buffer);
+                const info = window.UI.getROMInfo(buffer, gba);
                 document.getElementById("rom_title").innerHTML = info.title;
                 document.getElementById("rom_code").innerHTML = info.gameCode;
                 document.getElementById("rom_maker").innerHTML = info.makerCode;

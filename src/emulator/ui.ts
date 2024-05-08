@@ -222,7 +222,7 @@ const get15BitColorFromAddress = (gba: GBA, address: number) : any => {
     };
 }
 
-const getROMInfo = (rom: Uint8Array) : any => {
+const getROMInfo = (rom: Uint8Array, gba: GBA) : any => {
     const entryPoint =
         (rom[0] << 0) |
         (rom[1] << 8) |
@@ -253,7 +253,7 @@ const getROMInfo = (rom: Uint8Array) : any => {
         gameCode,
         makerCode,
         checksum,
-        backupID: "????"
+        backupID: gba.memory.backup.idString,
     };
 }
 
