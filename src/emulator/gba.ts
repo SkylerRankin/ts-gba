@@ -1,6 +1,7 @@
 import { CPU } from "./cpu";
 import { CanvasDisplay, Display } from "./display";
 import { executeDMAs } from "./dma";
+import { parseBIOSInfo, parseROMInfo } from "./gameFiles";
 import { resetIOCache } from "./ioCache";
 import { Keypad } from "./keypad";
 import { Memory } from "./memory";
@@ -16,7 +17,8 @@ interface GBAType {
 }
 
 type GBAStatus = 'running' | 'paused';
-
+type ROMInfo = { title: string, code: string, maker: string, checksum: number, entryPoint: number };
+type BIOSInfo = { type: string, checksum: number };
 
 class GBA implements GBAType {
     status: GBAStatus = 'paused';
@@ -25,6 +27,8 @@ class GBA implements GBAType {
     cpu: CPU;
     ppu: PPU;
     keypad: Keypad;
+    romInfo: ROMInfo;
+    biosInfo: BIOSInfo;
     nextFrameTimer: number = 0;
     previousFrameStart: number = 0;
     frameQueue: number[] = [];
@@ -37,6 +41,8 @@ class GBA implements GBAType {
         this.display = display;
         this.ppu = new PPU(this.cpu, this.display);
         this.keypad = new Keypad(this.cpu);
+        this.romInfo = { title: "", code: "", maker: "", checksum: 0, entryPoint: 0 };
+        this.biosInfo = { type: "", checksum: 0 };
         this.frameQueue = new Array<number>();
         this.cyclesQueue = new Array<number>();
         this.stepsQueue = new Array<number>();
@@ -44,10 +50,12 @@ class GBA implements GBAType {
 
     loadROM(rom: Uint8Array) {
         this.memory.loadROM(rom);
+        this.romInfo = parseROMInfo(this);
     }
 
     loadBIOS(bios: Uint8Array) {
         this.memory.loadBIOS(bios);
+        this.biosInfo = parseBIOSInfo(this);
     }
 
     run() {
@@ -109,6 +117,8 @@ class GBA implements GBAType {
 
     reset() {
         this.status = 'paused';
+        this.romInfo = { title: "", code: "", maker: "", checksum: 0, entryPoint: 0 };
+        this.biosInfo = { type: "", checksum: 0 };
         window.clearTimeout(this.nextFrameTimer);
 
         resetIOCache();
@@ -126,5 +136,4 @@ class GBA implements GBAType {
 // Define the UI class on window for use in frontend.
 (window as any).UI = UI;
 
-export { GBA }
-export { GBAType }
+export { GBA, GBAType, ROMInfo }

@@ -137,6 +137,17 @@
             }
             .memory_table_row:hover { background-color: #c9c9c9; }
             .memory_table_cell { width: 20px; }
+            .local_save_button { display: inline-block;
+                border: solid 1px #969696;
+                border-radius: 3px;
+                text-align: center;
+                line-height: 20px;
+                cursor: pointer;
+                width: 50px;
+                height: 20px;
+                font-size: 12px;
+                margin-right: 10px; }
+            .local_save_button:hover { cursor: pointer; background-color: #cccccc; }
 
 
         </style>
@@ -173,6 +184,9 @@
             const paletteState = {
                 showBackgroundPalette: true
             };
+
+            const localSavePrefix = "ts_gba_save_";
+            let localSaveObjects = [];
 
             const keyCodeToKey = {
                 219: "A",
@@ -315,7 +329,7 @@
                 document.getElementById("rom_info").classList.remove("hidden");
                 document.getElementById("rom_file_string").innerHTML = `${fileInfo.name}, ${Math.floor(fileInfo.size / 1024).toLocaleString()} KB`;
 
-                const info = window.UI.getROMInfo(buffer, gba);
+                const info = window.UI.getROMInfo(gba);
                 document.getElementById("rom_title").innerHTML = info.title;
                 document.getElementById("rom_code").innerHTML = info.gameCode;
                 document.getElementById("rom_maker").innerHTML = info.makerCode;
@@ -329,9 +343,9 @@
                 document.getElementById("bios_info").classList.remove("hidden");
                 document.getElementById("bios_file_string").innerHTML = `${fileInfo.name}, ${Math.floor(fileInfo.size / 1024).toLocaleString()} KB`;
 
-                const info = window.UI.getBIOSInfo(buffer);
+                const info = window.UI.getBIOSInfo(gba);
                 document.getElementById("bios_checksum").innerHTML = (info.checksum >>> 0).toString(16).toUpperCase();
-                document.getElementById("bios_type").innerHTML = info.biosType;
+                document.getElementById("bios_type").innerHTML = info.type;
             }
 
             const updateRegisters = () => {
@@ -538,6 +552,48 @@
                 });
             }
 
+            const updateLocalSaves = () => {
+                const storageKeys = Object.keys(window.localStorage);
+                const saves = storageKeys.filter(key => key.startsWith(localSavePrefix)).map(key => {
+                    const save = window.localStorage.getItem(key);
+                    return {key: key, ...JSON.parse(save)};
+                });
+                localSaveObjects = saves;
+
+                const table = document.getElementById("local_save_table");
+                table.replaceChildren([]);
+                saves.forEach((save, i) => {
+                    const tr = document.createElement("tr");
+                    const titleTd = document.createElement("td");
+                    titleTd.innerHTML = save.gameTitle;
+                    tr.appendChild(titleTd);
+
+                    const timestampTd = document.createElement("td");
+                    timestampTd.innerHTML = new Date(save.timestamp).toLocaleString();
+                    tr.appendChild(timestampTd);
+
+                    const loadButtonTd = document.createElement("td");
+                    loadButtonTd.innerHTML = "Load";
+                    loadButtonTd.classList.add("local_save_button");
+                    loadButtonTd.addEventListener("click", () => {
+                        onLocalSaveUpload(i);
+                    });
+                    tr.appendChild(loadButtonTd);
+
+                    const deleteButtonTd = document.createElement("td");
+                    deleteButtonTd.innerHTML = "Delete";
+                    deleteButtonTd.classList.add("local_save_button");
+                    deleteButtonTd.addEventListener("click", () => {
+                        window.localStorage.removeItem(save.key);
+                        updateLocalSaves();
+                    });
+                    tr.appendChild(deleteButtonTd);
+
+                    table.appendChild(tr);
+                });
+
+            }
+
             const setPPUListeners = () => {
                 document.getElementById("charblock_decrease").onclick = () => {
                     tileState.charblock = Math.max(1, tileState.charblock - 1);
@@ -590,6 +646,65 @@
                 document.getElementById("cycles_value").innerHTML = Math.floor(cycles);
                 document.getElementById("steps_value").innerHTML = Math.floor(steps);
                 fpsTimer = setTimeout(() => { onFPSUpdate(); }, 250);
+            }
+
+            const onSaveLocal = () => {
+                // Create flash buffer to a UTF-16 string containing the flash data so that it
+                // can be stored in local storage.
+                const buffer = gba.memory.getFlashBuffer();
+                let bufferString = "";
+                for (let i = 0; i < buffer.length; i++) {
+                    bufferString += String.fromCharCode(buffer[i])
+                }
+
+                const timestamp = new Date().getTime();
+                const key = `${localSavePrefix}${btoa(gba.romInfo.title)}_${timestamp}`;
+                const save = {
+                    bufferString,
+                    gameTitle: gba.romInfo.title,
+                    timestamp,
+                };
+                window.localStorage.setItem(key, JSON.stringify(save));
+                updateLocalSaves();
+            }
+
+            const onSaveDownload = () => {
+                const filename = `ts_gba_${gba.romInfo.title}_${new Date().getTime()}.save`;
+                const buffer = gba.memory.getFlashBuffer().buffer;
+                const blob = new Blob([new DataView(buffer)], { type: "SAVE" });
+                const downloadUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(link);
+            }
+
+            const onSaveUpload = (event) => {
+                if (!event.files || !event.files[0]) {
+                    console.error(`No save file uploaded.`);
+                    return;
+                }
+                const fileReader = new FileReader();
+                let fileInfo = event.files[0];
+                fileReader.onloadend = event => {
+                    if (fileReader.result !== null) {
+                        const buffer = new Uint8Array(fileReader.result);
+                        gba.memory.loadFlashBuffer(buffer);
+                    }
+                };
+                fileReader.readAsArrayBuffer(event.files[0]);
+            }
+
+            const onLocalSaveUpload = (i) => {
+                const bufferString = localSaveObjects[i].bufferString;
+                const buffer = new Uint8Array(bufferString.length);
+                for (let i = 0; i < bufferString.length; i++) {
+                    buffer[i] = bufferString.charCodeAt(i);
+                }
+                gba.memory.loadFlashBuffer(buffer);
             }
 
             window.onload = () => {
@@ -660,6 +775,8 @@
                         updateMemoryTable();
                     }
                 });
+                document.getElementById("save_download_button").addEventListener("click", () => { onSaveDownload() });
+                document.getElementById("save_local_button").addEventListener("click", () => { onSaveLocal() });
 
                 setPPUListeners();
 
@@ -670,6 +787,7 @@
                 document.addEventListener("keydown", (event) => { onKeyUpdate(event.keyCode, true); });
                 document.addEventListener("keyup", (event) => { onKeyUpdate(event.keyCode, false); });
 
+                updateLocalSaves();
             }
         </script>
     </head>
@@ -693,8 +811,8 @@
                         <div id="game_control_container">
                             <input id="romInput" type="file" style="display: none !important;" onChange="onROMUpload(this)" accept=".gba, .bin, .rom">
                             <input id="biosInput" type="file" style="display: none !important;" onChange="onBIOSUpload(this)" accept=".gba, .bin, .rom">
-                            <div class="button" id='uploadButton' onClick="document.getElementById('romInput').click()"}>Upload ROM</div>
-                            <div class="button" id='uploadBiosButton' onClick="document.getElementById('biosInput').click()"}>Upload BIOS</div>
+                            <div class="button" id='uploadButton' onClick="document.getElementById('romInput').click()">Upload ROM</div>
+                            <div class="button" id='uploadBiosButton' onClick="document.getElementById('biosInput').click()">Upload BIOS</div>
                             <div class="button" id="startButton">Start</div>
                             <div class="button" id="resetButton">Reset</div>
                         </div>
@@ -783,6 +901,23 @@
                                 <div id="bios_file_string" style="margin-bottom: 10px"></div>
                                 <div>Checksum <span id="bios_checksum" style="margin-left: 20px;"></span></div>
                                 <div id="bios_type"></div>
+                            </div>
+                        </div>
+                        <div class="outline_container">
+                            <div style="margin-bottom: 10px;">Saves</div>
+                            <div>Load a previously saved game from local storage.</div>
+                            <table id="local_save_table" style="width: 80%; margin: 10px auto;">
+                            </table>
+                            <div style="margin-bottom: 10px;">Load a previously saved game from file.</div>
+                            <input id="saveInput" type="file" style="display: none !important;" onChange="onSaveUpload(this)">
+                            <div class="button" id="upload_save_button" onClick="document.getElementById('saveInput').click()">Upload</div>
+
+                            <div style="margin: 20px 0px 10px 0px;">
+                                <div style="margin-bottom: 10px;">Save current game to local storage or download as file.</div>
+                                <div>
+                                    <div class="button" id="save_local_button">Save (local)</div>
+                                    <div class="button" style="width: 140px;" id="save_download_button">Save (download)</div>
+                                </div>
                             </div>
                         </div>
                     </div>
