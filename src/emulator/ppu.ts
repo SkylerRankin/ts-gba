@@ -1024,7 +1024,7 @@ class PPU implements PPUType {
                     // 1D tile arrangement
                     tileRowAddress =
                         SpriteConstants.charBlock4Address +
-                        (tileIndex + tileY * tilesPerRow + tileX * tileCountMultiple) % SpriteConstants.maxVRAMTiles * tileByteOffset +
+                        (tileIndex + tileY * tilesPerRow * tileCountMultiple + tileX * tileCountMultiple) % SpriteConstants.maxVRAMTiles * tileByteOffset +
                         (localY % SpriteConstants.tileSize) * bytesPerTileRow;
                 } else {
                     // 2D tile arrangement
