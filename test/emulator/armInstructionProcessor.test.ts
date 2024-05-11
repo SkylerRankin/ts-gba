@@ -114,8 +114,3 @@ test("Execute load/store ARM instructions", () => {
 test("Execute load/store multiple ARM instructions", () => {
     executeInstructionTestFile("./test/emulator/data/load_store_multiple_arm.txt", processARM);
 });
-
-
-test.only("Debug", () => {
-    executeInstructionTestFile("./test/emulator/data/debug.txt", processARM);
-});

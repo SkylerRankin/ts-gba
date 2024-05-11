@@ -13,7 +13,7 @@ interface GBAType {
     loadROM(rom: Uint8Array) : void;
     run() : void;
     pause() : void;
-    reset() : void;
+    reset(bootBIOS: boolean) : void;
 }
 
 type GBAStatus = 'running' | 'paused';
@@ -115,7 +115,7 @@ class GBA implements GBAType {
         window.clearTimeout(this.nextFrameTimer);
     }
 
-    reset() {
+    reset(bootBIOS: boolean = true) {
         this.status = 'paused';
         this.romInfo = { title: "", code: "", maker: "", checksum: 0, entryPoint: 0 };
         this.biosInfo = { type: "", checksum: 0 };
@@ -123,7 +123,7 @@ class GBA implements GBAType {
 
         resetIOCache();
         this.memory.reset();
-        this.cpu.reset();
+        this.cpu.reset(bootBIOS);
         this.ppu.reset();
         this.keypad.reset();
         this.display.reset();

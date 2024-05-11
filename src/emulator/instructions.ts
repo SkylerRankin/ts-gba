@@ -4,16 +4,6 @@ type InstructionType =
     'mrs' | 'msr' | 'mul' | 'mvn' | 'orr' | 'rsb' | 'rsc' | 'sbc' | 'smlal' | 'smull' | 'stc' | 'stm' | 'str' |
     'strb' | 'strbt' | 'strh' | 'strt' | 'sub' | 'swi' | 'swp' | 'swpb' | 'teq' | 'tst' | 'umlal' | 'umull';
 
-type InstructionData = {
-    type: InstructionType,              // The instruction type
-    bitString: string                   // A bit string representation
-    cond: ConditionCodeType             // The condition code 2 letter abbreviation
-    sFlag: boolean,                     // True if the S flag was present
-    rn?: number,                         // The Rn register, if specified
-    rd?: number,                         // The Rd register, if specified
-    shiftOperand?: ShiftOperandData     // Info about the shift argument, if present
-}
-
 const Instruction = {
     UNDEFINED: 'undefined',
     ADC: 'adc',
@@ -121,4 +111,4 @@ const Encoding = {
 }
 
 export { Instruction, Encoding, ConditionCodeValue, DataProcessingOperandValue };
-export type { InstructionData, DataProcessingOperandType, ShiftOperandData, ConditionCodeType, InstructionType }
+export type { DataProcessingOperandType, ShiftOperandData, ConditionCodeType, InstructionType }

@@ -188,6 +188,9 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
 
     const test_cases = getTestCases(filePath);
     test_cases.forEach(t => {
+        if (t.lineNumber === 113) {
+            let x = "????";
+        }
         if (!t.instruction) {
             // Manual register updates
             Object.entries(t.registerUpdates).forEach(([register, value]) => {
@@ -309,13 +312,13 @@ const executeInstructionTestFile = (filePath: string, processingFunction: any) =
                 }
                 expect(
                     updatedSPSRFlags[i],
-                    `${messagePrefix} Expected flag ${flag} to be updated to ${t.spsrUpdates[flag]}, but was ${updatedSPSRFlags[i]}.`
+                    `${messagePrefix} Expected spsr flag ${flag} to be updated to ${t.spsrUpdates[flag]}, but was ${updatedSPSRFlags[i]}.`
                 ).toBe(t.spsrUpdates[flag]);
             } else {
                 if (updatedSPSRFlags && previousSPSRFlags) {
                     expect(
                         updatedSPSRFlags[i],
-                        `${messagePrefix} Expected flag ${flag} to be unchanged with value ${previousSPSRFlags[i]}, but was ${updatedSPSRFlags[i]}.`
+                        `${messagePrefix} Expected spsr flag ${flag} to be unchanged with value ${previousSPSRFlags[i]}, but was ${updatedSPSRFlags[i]}.`
                     ).toBe(previousSPSRFlags[i]);
                 }   
             }
@@ -485,6 +488,14 @@ class FileDisplay implements Display {
         buffer[y * DisplaySize.width + x][2] = color.blue;
     }
 
+    setScanline(y: number, colors: RGBColor[]) {
+        for (let x = 0; x < DisplaySize.width; x++) {
+            const buffer = this.buffers[this.currentFrame];
+            buffer[y * DisplaySize.width + x][0] = colors[x].red;
+            buffer[y * DisplaySize.width + x][1] = colors[x].green;
+            buffer[y * DisplaySize.width + x][2] = colors[x].blue;
+        }
+    }
     drawFrame() {}
 
     saveToFile() : string {

@@ -133,10 +133,12 @@ const setBackupID = (memory: Memory) : void => {
             currentID += String.fromCharCode(memory.memoryBlocks["ROM_WS0"][i + j]);
         }
         memory.backup.idString = currentID;
-    }
 
-    if (memory.backup.type !== "FLASH" && memory.backup.sizeKB !== 128) {
-        throw Error(`Unsupported backup chip: ${memory.backup.idString}. Only 128 KB Flash storage is implemented.`);
+        if (memory.backup.type !== "FLASH" && memory.backup.sizeKB !== 128) {
+            throw Error(`Unsupported backup chip: ${memory.backup.idString}. Only 128 KB Flash storage is implemented.`);
+        }
+    } else {
+        console.error("Loaded ROM does not contain any recognized backup storage string.");
     }
 }
 

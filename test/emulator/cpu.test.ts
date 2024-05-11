@@ -75,13 +75,13 @@ describe("Banked register switching", () => {
 
         // Switch to supervisor mode and check registers are cleared
         cpu.setModeBits(OperatingModeCodes.svc);
-        expect(cpu.getGeneralRegister(13)).toBe(0);
+        expect(cpu.getGeneralRegister(13)).toBe(0x03007FE0); // Stack pointer has a special default value
         expect(cpu.getGeneralRegister(14)).toBe(0);
         cpu.setGeneralRegister(13, 13 * 2);
         cpu.setGeneralRegister(14, 14 * 2);
 
         cpu.setModeBits(OperatingModeCodes.irq);
-        expect(cpu.getGeneralRegister(13)).toBe(0);
+        expect(cpu.getGeneralRegister(13)).toBe(0x03007FA0);
         expect(cpu.getGeneralRegister(14)).toBe(0);
         cpu.setGeneralRegister(13, 13 * 3);
         cpu.setGeneralRegister(14, 14 * 3);

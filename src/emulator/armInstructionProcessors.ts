@@ -1619,7 +1619,7 @@ const processBKPT = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
 const processSWI = (cpu: CPU, i: number) : ProcessedInstructionOptions => {
     cpu.history.setInstructionName('SWI');
     cpu.history.addError(`SWI not implemented: 0x${i.toString(16).padStart(8, '0')}.`);
-    throw Error("ARM SWI not implemented");
+    console.error("ARM SWI not implemented");
     return { incrementPC: true };
 }
 

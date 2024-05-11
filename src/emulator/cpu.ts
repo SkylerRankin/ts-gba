@@ -2,7 +2,6 @@ import { processARM, ProcessedInstructionOptions } from './armInstructionProcess
 import { processTHUMB } from './thumbInstructionProcessors';
 import { Memory } from './memory';
 import { StateHistory } from './stateHistory';
-import { CPUProfiler } from './cpuProfiler';
 import { handleInterrupts } from './interrupt';
 
 /**
@@ -20,12 +19,11 @@ type CPUType = {
     operatingMode: number,
     operatingState: OperatingState,
     history: StateHistory,
-    profiler: CPUProfiler,
     bigEndian: boolean,
     historyEnabled: boolean,
     breakpoints: Set<number>,
     
-    reset: () => void,
+    reset: (bootBIOS: boolean) => void,
     step: () => void,
     atBreakpoint: () => boolean,
     
@@ -101,9 +99,7 @@ class CPU implements CPUType {
     operatingMode = OperatingModes.usr;
     operatingState = 'ARM' as OperatingState;
     history = new StateHistory();
-    profiler = new CPUProfiler();
     bigEndian = false;
-    bootBIOS = false;
     historyEnabled = false;
     instructionSize = 4;
     breakpoints = new Set<number>();
@@ -175,7 +171,7 @@ class CPU implements CPUType {
     /**
      * Clears out all registers and memory. Sets CPU to ARM user mode.
      */
-    reset() : void {
+    reset(bootBIOS: boolean = true) : void {
         this.history.reset();
         this.cycles = 0;
         this.currentGeneralRegisters.fill(0);
@@ -190,10 +186,10 @@ class CPU implements CPUType {
         this.bigEndian = false;
         this.setModeBits(OperatingModeCodes.sys);
         this.setStatusRegisterFlag('t', 0);
-        this.bootBIOS = true;
         this.breakpoints.clear();
 
-        if (this.bootBIOS) {
+        this.lastBIOSPC = 0x8;
+        if (bootBIOS) {
             this.setGeneralRegister(Reg.PC, 0x00000008);
         } else {
             this.setGeneralRegister(Reg.PC, 0x08000008);

@@ -1,6 +1,0 @@
-# To begin, all registers and flags are 0
-SET N=0, C=0, Z=0, V=0
-
-# Solved, no longer need this test, things are working as expected
-SET R0=0x04000000, R15=0x00000034
-0xe510f004 LDR R15, [R0, #-4]  Updates=[R15=0x03FFFFFC]

@@ -13,7 +13,7 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/three_squares.gba",
         frameChecks: [
             {
-                frame: 3,
+                frame: 6,
                 path: "test/emulator/data/frames/three_squares.bmp"
             }
         ]
@@ -23,7 +23,7 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/mode_3_lines.gba",
         frameChecks: [
             {
-                frame: 4,
+                frame: 10,
                 path: "test/emulator/data/frames/mode_3_lines.bmp"
             }
         ]
@@ -33,11 +33,11 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/mode_4_page_flip.gba",
         frameChecks: [
             {
-                frame: 3,
+                frame: 8,
                 path: "test/emulator/data/frames/mode_4_page_front.bmp"
             },
             {
-                frame: 6,
+                frame: 9,
                 path: "test/emulator/data/frames/mode_4_page_back.bmp"
             }
         ]
@@ -47,15 +47,15 @@ const romFrameTests = [
         romPath: "test/emulator/data/roms/bitmap_mode_switch.gba",
         frameChecks: [
             {
-                frame: 3,
+                frame: 6,
                 path: "test/emulator/data/frames/mode_3_data.bmp"
             },
             {
-                frame: 4,
+                frame: 7,
                 path: "test/emulator/data/frames/mode_4_data.bmp"
             },
             {
-                frame: 5,
+                frame: 8,
                 path: "test/emulator/data/frames/mode_5_data.bmp"
             }
         ]
@@ -76,8 +76,7 @@ describe("Test ROM output display checks", () => {
         test(config.name, () => {
             const gba = new GBA(new FileDisplay());
             gba.ppu.display = gba.display;
-            gba.cpu.bootBIOS = false;
-            gba.reset();
+            gba.reset(false);
 
             const maxFrames = config.frameChecks[config.frameChecks.length - 1].frame;
             const rom = new Uint8Array(readFileSync(config.romPath));

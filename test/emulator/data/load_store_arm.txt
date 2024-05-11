@@ -7,23 +7,23 @@
 SET N=0, C=0, Z=0, V=0
 
 # --- LDR ---
-SET_MEMORY 0xE0=[0x12, 0xB0, 0xFF, 0x9]
-SET R0=0x0, R1=0xE0
+SET_MEMORY 0x020000E0=[0x12, 0xB0, 0xFF, 0x9]
+SET R0=0x0, R1=0x020000E0
 0xe5910000 LDR R0, [R1, #0] Updates=[R0=0x09FFB012]                                             # Load with no rotation
-SET R0=0x0, R1=0xE1
+SET R0=0x0, R1=0x020000E1
 0xe5910000 LDR R0, [R1, #0] Updates=[R0=0x1209FFB0]                                             # Load with 1 byte rotation
-SET R0=0x0, R1=0xE2
+SET R0=0x0, R1=0x020000E2
 0xe5910000 LDR R0, [R1, #0] Updates=[R0=0xB01209FF]                                             # Load with 2 byte rotation
-SET R0=0x0, R1=0xE3
+SET R0=0x0, R1=0x020000E3
 0xe5910000 LDR R0, [R1, #0] Updates=[R0=0xFFB01209]                                             # Load with 3 byte rotation
-SET_MEMORY 0xE4=[0xFF, 0x10, 0xEE, 0xFF]
-SET R15=0x0, R1=0xE4
-0xe591f000 LDR R15, [R1, #0] Updates=[R15=0xFFEE10FC]                                           # Load into PC
+SET_MEMORY 0x020000E4=[0xFF, 0x10, 0xEE, 0x03]
+SET R15=0x0, R1=0x020000E4
+0xe591f000 LDR R15, [R1, #0] Updates=[R15=0x03EE1104]                                           # Load into PC
 
 
 # --- LDRB ---
-SET_MEMORY 0xE0=[0x12, 0xB0, 0xFF, 0x9]
-SET R0=0x0, R1=0xE0
+SET_MEMORY 0x020000E0=[0x12, 0xB0, 0xFF, 0x9]
+SET R0=0x0, R1=0x020000E0
 0xe5d10000 LDRB R0, [R1, #0] Updates=[R0=0x12]                                                  # Load unsigned byte
 0xe5d10001 LDRB R0, [R1, #1] Updates=[R0=0xB0]                                                  # Load unsigned byte
 0xe5d10002 LDRB R0, [R1, #2] Updates=[R0=0xFF]                                                  # Load unsigned byte
@@ -31,82 +31,82 @@ SET R0=0x0, R1=0xE0
 
 
 # --- LDRBT ---
-SET_MEMORY 0xE0=[0x12, 0xB0, 0xFF, 0x9]
-SET R0=0x0, R1=0xE0
-0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0x12, R1=0xE1]                                         # Load unsigned byte
-0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0xB0, R1=0xE2]                                         # Load unsigned byte
-0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0xFF, R1=0xE3]                                         # Load unsigned byte
-0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0x09, R1=0xE4]                                         # Load unsigned byte
+SET_MEMORY 0x020000E0=[0x12, 0xB0, 0xFF, 0x9]
+SET R0=0x0, R1=0x020000E0
+0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0x12, R1=0x020000E1]                                  # Load unsigned byte
+0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0xB0, R1=0x020000E2]                                  # Load unsigned byte
+0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0xFF, R1=0x020000E3]                                  # Load unsigned byte
+0xe4f10001 LDRBT R0, [R1], #1 Updates=[R0=0x09, R1=0x020000E4]                                  # Load unsigned byte
 
 
 # --- LDRH ---
-SET_MEMORY 0xE0=[0x12, 0xB0, 0xFF, 0x9]
-SET R0=0x0, R1=0xE0
-0xe0d100b2 LDRH R0, [R1], #2 Updates=[R0=0xB012, R1=0xE2]                                         # Load unsigned half word
-0xe0d100b2 LDRH R0, [R1], #2 Updates=[R0=0x09FF, R1=0xE4]                                         # Load unsigned half word
+SET_MEMORY 0x020000E0=[0x12, 0xB0, 0xFF, 0x9]
+SET R0=0x0, R1=0x020000E0
+0xe0d100b2 LDRH R0, [R1], #2 Updates=[R0=0xB012, R1=0x020000E2]                                 # Load unsigned half word
+0xe0d100b2 LDRH R0, [R1], #2 Updates=[R0=0x09FF, R1=0x020000E4]                                 # Load unsigned half word
 
 
 # --- LDRSB ---
-SET_MEMORY 0xE0=[0x12, 0xB0, 0xF2, 0x9]
-SET R0=0x0, R1=0xE0
-0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0x12, R1=0xE1]                                          # Load signed byte
-0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0xFFFFFFB0, R1=0xE2]                                    # Load signed byte
-0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0xFFFFFFF2, R1=0xE3]                                    # Load signed byte
-0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0x9, R1=0xE4]                                           # Load signed byte
+SET_MEMORY 0x020000E0=[0x12, 0xB0, 0xF2, 0x9]
+SET R0=0x0, R1=0x020000E0
+0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0x12, R1=0x020000E1]                                  # Load signed byte
+0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0xFFFFFFB0, R1=0x020000E2]                            # Load signed byte
+0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0xFFFFFFF2, R1=0x020000E3]                            # Load signed byte
+0xe0d100d1 LDRSB R0, [R1], #1 Updates=[R0=0x9, R1=0x020000E4]                                   # Load signed byte
 
 
 # --- LDRSH ---
-SET_MEMORY 0xE0=[0x12, 0xB0, 0xF2, 0x9]
-SET R0=0x0, R1=0xE0
-0xe0d100f2 LDRSH R0, [R1], #2 Updates=[R0=0xFFFFB012, R1=0xE2]                                     # Load signed half word
-0xe0d100f2 LDRSH R0, [R1], #2 Updates=[R0=0x9F2, R1=0xE4]                                          # Load signed half word
+SET_MEMORY 0x020000E0=[0x12, 0xB0, 0xF2, 0x9]
+SET R0=0x0, R1=0x020000E0
+0xe0d100f2 LDRSH R0, [R1], #2 Updates=[R0=0xFFFFB012, R1=0x020000E2]                            # Load signed half word
+0xe0d100f2 LDRSH R0, [R1], #2 Updates=[R0=0x9F2, R1=0x020000E4]                                 # Load signed half word
 
 
 # --- LDRT ---
-SET_MEMORY 0xE0=[0x12, 0xB0, 0xF2, 0x9]
-SET_MEMORY 0xE4=[0x42, 0xB0, 0xE2, 0x9]
-SET_MEMORY 0xE8=[0x52, 0xB0, 0x00, 0x9]
-SET_MEMORY 0xEC=[0x92, 0x00, 0xF2, 0x8]
-SET R0=0x0, R1=0xE0
-0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0x09F2B012, R1=0xE4]                                     # Load with no rotation
-SET R1=0xE5
-0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0x4209E2B0, R1=0xE9]                                     # Load with 1 byte rotation
-SET R1=0xEA
-0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0xB0520900, R1=0xEE]                                     # Load with 2 byte rotation
-SET R1=0xEF
-0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0xF2009208, R1=0xF3]                                     # Load with 3 byte rotation
+SET_MEMORY 0x020000E0=[0x12, 0xB0, 0xF2, 0x9]
+SET_MEMORY 0x020000E4=[0x42, 0xB0, 0xE2, 0x9]
+SET_MEMORY 0x020000E8=[0x52, 0xB0, 0x00, 0x9]
+SET_MEMORY 0x020000EC=[0x92, 0x00, 0xF2, 0x8]
+SET R0=0x0, R1=0x020000E0
+0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0x09F2B012, R1=0x020000E4]                             # Load with no rotation
+SET R1=0x020000E5
+0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0x4209E2B0, R1=0x020000E9]                             # Load with 1 byte rotation
+SET R1=0x020000EA
+0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0xB0520900, R1=0x020000EE]                             # Load with 2 byte rotation
+SET R1=0x020000EF
+0xe4b10004 LDRT R0, [R1], #4 Updates=[R0=0xF2009208, R1=0x020000F3]                             # Load with 3 byte rotation
 
 
 # --- STR ---
-SET_MEMORY 0xD4=[0x0, 0x0, 0x0, 0x0]
-SET R0=0xB200F002, R1=0xD4
-0xe5810000 STR R0, [R1, #0]                                                                       # Store word
-CHECK_MEMORY 0xD4=[0x02, 0xF0, 0x00, 0xB2]
+SET_MEMORY 0x020000D4=[0x0, 0x0, 0x0, 0x0]
+SET R0=0xB200F002, R1=0x020000D4
+0xe5810000 STR R0, [R1, #0]                                                                     # Store word
+CHECK_MEMORY 0x020000D4=[0x02, 0xF0, 0x00, 0xB2]
 
 
 # --- STRB ---
-SET_MEMORY 0xD4=[0x0, 0x0, 0x0, 0x0]
-SET R0=0xB200F002, R1=0xD5
-0xe5c10000 STRB R0, [R1, #0]                                                                      # Store byte
-CHECK_MEMORY 0xD4=[0x0, 0x2, 0x0, 0x0]
+SET_MEMORY 0x020000D4=[0x0, 0x0, 0x0, 0x0]
+SET R0=0xB200F002, R1=0x020000D5
+0xe5c10000 STRB R0, [R1, #0]                                                                    # Store byte
+CHECK_MEMORY 0x020000D4=[0x0, 0x2, 0x0, 0x0]
 
 
 # --- STRBT ---
-SET_MEMORY 0xD4=[0x0, 0x0, 0x0, 0x0]
-SET R0=0xB200F002, R1=0xD5
-0xe4e10000 STRBT R0, [R1], #0                                                                      # Store byte
-CHECK_MEMORY 0xD4=[0x0, 0x2, 0x0, 0x0]
+SET_MEMORY 0x020000D4=[0x0, 0x0, 0x0, 0x0]
+SET R0=0xB200F002, R1=0x020000D5
+0xe4e10000 STRBT R0, [R1], #0                                                                   # Store byte
+CHECK_MEMORY 0x020000D4=[0x0, 0x2, 0x0, 0x0]
 
 
 # --- STRH ---
-SET_MEMORY 0xD4=[0x0, 0x0, 0x0, 0x0]
-SET R0=0xB200F002, R1=0xD4
-0xe0c100b0 STRH R0, [R1], #0                                                                      # Store half word
-CHECK_MEMORY 0xD4=[0x2, 0xF0, 0x0, 0x0]
+SET_MEMORY 0x020000D4=[0x0, 0x0, 0x0, 0x0]
+SET R0=0xB200F002, R1=0x020000D4
+0xe0c100b0 STRH R0, [R1], #0                                                                    # Store half word
+CHECK_MEMORY 0x020000D4=[0x2, 0xF0, 0x0, 0x0]
 
 
 # --- STRT ---
-SET_MEMORY 0xD4=[0x0, 0x0, 0x0, 0x0]
-SET R0=0xB200F002, R1=0xD4
-0xe4a10000 STRT R0, [R1], #0                                                                      # Store word
-CHECK_MEMORY 0xD4=[0x02, 0xF0, 0x00, 0xB2]
+SET_MEMORY 0x020000D4=[0x0, 0x0, 0x0, 0x0]
+SET R0=0xB200F002, R1=0x020000D4
+0xe4a10000 STRT R0, [R1], #0                                                                    # Store word
+CHECK_MEMORY 0x020000D4=[0x02, 0xF0, 0x00, 0xB2]
